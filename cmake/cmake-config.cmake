@@ -4,6 +4,8 @@ if(COMMAND cmake_policy)
   # Avoids a warning about linking against both absolute paths (like
   # the libraries we build) and searched-for paths (like -lpthread).
   cmake_policy(SET CMP0003 OLD)
+  # Avoids a warnings about setting policies in an included file (here).
+  cmake_policy(SET CMP0011 OLD)
 endif(COMMAND cmake_policy)
 
 # Makes the add_test() command work.
