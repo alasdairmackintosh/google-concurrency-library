@@ -33,3 +33,7 @@ add_test(lock_test lock_test)
 add_executable(race_test testing/race_test.cc)
 target_link_libraries(race_test gmock_main std_thread)
 add_test(race_test race_test)
+
+add_executable(concurrent_priority_queue_test testing/concurrent_priority_queue_test.cc)
+target_link_libraries(concurrent_priority_queue_test gmock_main std_thread)
+add_test(concurrent_priority_queue_test concurrent_priority_queue_test)
