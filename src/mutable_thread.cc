@@ -34,6 +34,10 @@ mutable_thread::~mutable_thread() {
   delete t_;
 }
 
+thread::id mutable_thread::get_id() {
+  return t_->get_id();
+}
+
 void mutable_thread::join() {
   {
     if (thread_state_.load() != DONE) {

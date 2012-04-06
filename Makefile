@@ -34,7 +34,7 @@ clean:
 	find * -name '*.a' -o -name '*.o' -o -name '*.d' | xargs $(RM)
 	$(RM) Tests NativeTests
 
-AllTests: Tests NativeTests RawTests CompileTests
+AllTests: all Tests NativeTests RawTests CompileTests
 
 test: AllTests
 	./Tests

@@ -58,6 +58,9 @@ class mutable_thread {
   // Thread has fully joined and will not accept any more work.
   bool is_done();
 
+  // Returns the id of this mutable thread.
+  thread::id get_id();
+
  private:
   enum thread_state {
     IDLE = 0,    // Ready to run
