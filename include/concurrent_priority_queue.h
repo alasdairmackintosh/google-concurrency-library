@@ -70,28 +70,43 @@ class concurrent_priority_queue {
     make_heap();
   }
 
-#if 0
-  // TODO(alasdair): Jeffrey suggests that these constructors, plus the update()
- // method, may not be necessary. (What is the use case for the
- // assignment and copy constructor?) Verify if we need these, and if
- // not remove them.
-
+  // Creates a new priority queue as a copy of an exisiting queue.
+  // This method is not thread safe. It is the caller's responsibility
+  // to ensure that the other queue will not be modified during this
+  // operation.
   // requires MoveConstructible<Cont>
   concurrent_priority_queue(const concurrent_priority_queue& other)
      : less_(other.less_), cont_(other.cont_) {
   }
 
+  // Copies the contents of another queue into this queue. 
+  // This method is not thread safe. It is the caller's responsibility
+  // to ensure that the other queue will not be modified during this
+  // operation, and that this queue will not not be accessed until the
+  // copy is complete.
   // requires MoveAssignable<Cont>
   concurrent_priority_queue& operator=(const concurrent_priority_queue& other) {
-    this.cont_ = other.cont_;
-    this.less_ = other.less_;
+    this->cont_ = other.cont_;
+    this->less_ = other.less_;
   }
-#endif
 
-  // TODO(alasdair): verify whether or not we need this.
-  //
+  // Exchanges the contents of this queue with the contents of
+  // another.
+  // This method is not thread safe. It is the caller's responsibility
+  // to ensure that the neither queue will be acessed by another
+  // thread until this operation is complete.
+  // requires Swappable<Cont>
+  void swap(concurrent_priority_queue& other) {
+    using std::swap;
+    swap(cont_, other.cont_);
+    swap(less_, other.less_);
+  }
+
   // Re-evaluates the order of elements in the queue, using a new
-  // comparator.
+  // comparator. This may change the order in which elements are
+  // removed from the front of the queue. 
+  // TODO(alasdair): verify what thread-safety guarantees we can make
+  // for this operation. We do not want to lock the entire queue.
   void update(const Less& less) {
     less_ = less;
     make_heap();
@@ -153,13 +168,6 @@ class concurrent_priority_queue {
       this_thread::sleep_for(10);
     }
     return result;
-  }
-
-  // requires Swappable<Cont>
-  void swap(concurrent_priority_queue& other) {
-    using std::swap;
-    swap(cont_, other.cont_);
-    swap(less_, other.less_);
   }
 
  private:

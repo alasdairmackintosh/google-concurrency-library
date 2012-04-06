@@ -142,6 +142,9 @@ class MyContainer {
 // Switchable comparison function
 class MyCompare : public binary_function <string, string, bool> {
  public:
+  MyCompare() : reverse_(false) {
+  }
+
   explicit MyCompare(bool reverse) : reverse_(reverse) {
   }
 
@@ -215,6 +218,49 @@ TEST_F(PriorityQueueTest, CopyConstructor) {
   ASSERT_TRUE(queue.try_pop(dummy));
   sort(values.begin(), values.end());
   validate_queue(new_queue, values);
+}
+
+// Verify that a concurrent_priority_queue can be assigned
+// the value of another queue.
+TEST_F(PriorityQueueTest, AssignmentOperator) {
+  vector<string> values = create_values();
+  concurrent_priority_queue<string> queue(values);
+  concurrent_priority_queue<string> new_queue;
+  ASSERT_EQ(0, new_queue.size());
+  new_queue = queue;
+  // Pop an element off the original queue. Should not affect the new
+  // queue
+  string dummy;
+  ASSERT_TRUE(queue.try_pop(dummy));
+  sort(values.begin(), values.end());
+  validate_queue(new_queue, values);
+}
+
+// Verify the contents of two queues can be swapped.
+TEST_F(PriorityQueueTest, Swap) {
+  MyCompare first_cmp(true);
+  MyCompare second_cmp(false);
+  vector<string> values = create_values();
+  concurrent_priority_queue<string, vector<string>, MyCompare> first_queue(
+      first_cmp, values);
+  concurrent_priority_queue<string, vector<string>, MyCompare> second_queue(
+      second_cmp, values);
+
+  // Make copies of the two queues. Use copy ctor and = operator (so that
+  // both code paths get additional testing.
+  concurrent_priority_queue<string, vector<string>, MyCompare>
+      first_queue_copy(first_queue);
+  concurrent_priority_queue<string, vector<string>, MyCompare>
+      second_queue_copy;
+  second_queue_copy = second_queue;
+
+  first_queue.swap(second_queue);
+
+  string new_first_elem = first_queue.pop();
+  string new_second_elem = second_queue.pop();
+  ASSERT_NE(new_first_elem, new_second_elem);
+  ASSERT_EQ(new_first_elem, second_queue_copy.pop());
+  ASSERT_EQ(new_second_elem, first_queue_copy.pop());
 }
 
 // Verify the a concurrent_priority_queue can be created from an
