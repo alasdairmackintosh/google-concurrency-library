@@ -17,7 +17,7 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party/googletest/include)
 include_directories(${PROJECT_SOURCE_DIR}/third_party/googlemock/include)
 
 # Main libraries
-add_library(std_thread src/thread.cc src/mutex.cc)
+add_library(std_thread src/thread.cc src/mutex.cc src/condition_variable.cc)
 target_link_libraries(std_thread ${system_libs})
 
 

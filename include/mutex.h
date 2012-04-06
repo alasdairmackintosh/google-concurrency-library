@@ -1,6 +1,8 @@
 #ifndef STD_MUTEX_
 #define STD_MUTEX_
 
+#include "posix_errors.h"
+#include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
@@ -72,6 +74,80 @@ private:
   lock_guard& operator=(lock_guard const&);
 
   mutex_type& pm;
+};
+
+template <class Mutex>
+class unique_lock {
+public:
+  typedef Mutex mutex_type;
+
+  unique_lock() : pm(NULL), owns(false) {}
+
+  explicit unique_lock(mutex_type& m) : pm(&m) {
+    pm->lock();
+    owns = true;
+  }
+
+  unique_lock(mutex_type& m, defer_lock_t) : pm(&m), owns(false) {}
+
+  unique_lock(mutex_type& m, try_to_lock_t) : pm(&m) {
+    owns = pm->try_lock();
+  }
+
+  unique_lock(mutex_type& m, adopt_lock_t) : pm(&m), owns(true) {}
+
+  ~unique_lock() {
+    release();
+  }
+
+  // 30.4.3.2.2 locking
+  void lock() {
+    if (pm == NULL)
+      throw std::system_error(std::make_error_code(EPERM));
+    pm->lock();
+    owns = true;
+  }
+
+  bool try_lock() {
+    if (pm == NULL)
+      throw std::system_error(std::make_error_code(EPERM));
+    owns = pm->try_lock();
+    return owns;
+  }
+
+  void unlock() {
+    if (!owns)
+      throw std::system_error(std::make_error_code(EPERM));
+    owns = false;
+    pm->unlock();
+  }
+
+  // 30.4.3.2.3 modiﬁers
+  void swap(unique_lock& u) {
+    using std::swap;
+    swap(pm, u.pm);
+    swap(owns, u.owns);
+  }
+
+  mutex_type *release() {
+    if (owns)
+      unlock();
+    mutex_type *result = pm;
+    pm = NULL;
+    return result;
+  }
+
+  // 30.4.3.2.4 observers
+  bool owns_lock() const { return owns; }
+  mutex_type* mutex() const { return pm; }
+
+private:
+  // Deleted:
+  unique_lock(unique_lock const&);
+  unique_lock& operator=(unique_lock const&);
+
+  mutex_type* pm;
+  bool owns;
 };
 
 #endif  // STD_MUTEX_
