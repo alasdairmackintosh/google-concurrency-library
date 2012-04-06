@@ -55,7 +55,7 @@ GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
 # The std_atomic library.
 include/atomic.h : util/atomic.sh
-	sh util/atomic.sh > include/atomic.h
+	/bin/bash util/atomic.sh > include/atomic.h
 
 src/atomic.o : include/atomic.h
 STD_ATOMIC_OBJS := src/atomic.o
