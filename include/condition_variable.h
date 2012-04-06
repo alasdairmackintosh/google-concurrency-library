@@ -9,23 +9,16 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+struct ConditionMonitor;
 class condition_variable {
 public:
   condition_variable();
   ~condition_variable();
 
-  void notify_one() {
-    handle_err_return(pthread_cond_signal(native_handle()));
-  }
+  void notify_one();
+  void notify_all();
 
-  void notify_all() {
-    handle_err_return(pthread_cond_broadcast(native_handle()));
-  }
-
-  void wait(unique_lock<mutex>& lock) {
-    handle_err_return(pthread_cond_wait(native_handle(),
-                                        lock.mutex()->native_handle()));
-  }
+  void wait(unique_lock<mutex>& lock);
 
   template<class Predicate>
   void wait(unique_lock<mutex>& lock, Predicate pred) {
@@ -34,15 +27,27 @@ public:
     }
   }
 
-  typedef pthread_cond_t* native_handle_type;
-  native_handle_type native_handle() { return &native_handle_; }
-
 private:
+  // Contains either the normal native handle or the test handle. See
+  // condition_variable.cc and test_mutex.cc.
+  union handle {
+    pthread_cond_t native_handle;
+    ConditionMonitor* monitor;
+  };
+  handle handle_;
+
+  typedef pthread_cond_t* native_handle_type;
+  native_handle_type native_handle() {
+    return &(handle_.native_handle);
+  }
+
+  ConditionMonitor* monitor() {
+    return handle_.monitor;
+  }
+
   // Deleted.
   condition_variable(const condition_variable&);
   condition_variable& operator=(const condition_variable&);
-
-  pthread_cond_t native_handle_;
 };
 
 #endif  // STD_CONDITION_VARIABLE_

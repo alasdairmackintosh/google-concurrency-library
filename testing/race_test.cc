@@ -4,8 +4,8 @@
 //  - Add tests on which race detectors may potentially give false warnings.
 //  - Add tests that use dynamic annotations.
 
+#include "test_mutex.h"
 #include "thread.h"
-#include "mutex.h"
 
 #include "gmock/gmock.h"
 #include <tr1/functional>

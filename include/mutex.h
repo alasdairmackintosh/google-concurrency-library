@@ -8,35 +8,37 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+class condition_variable;
+
 namespace MutexInternal {
+struct MutexMonitor;
 class _posix_mutex {
  public:
   _posix_mutex(int mutex_type);
   ~_posix_mutex();
 
-  void lock() {
-    handle_err_return(pthread_mutex_lock(&native_handle_));
-  }
+  void lock();
+  bool try_lock();
+  void unlock();
 
-  bool try_lock() {
-    int result = pthread_mutex_trylock(&native_handle_);
-    if (result == 0)
-      return true;
-    else if (result == EBUSY)
-      return false;
-    else
-      handle_err_return(result);
-  }
-
-  void unlock() {
-    handle_err_return(pthread_mutex_unlock(&native_handle_));
-  }
-
-  typedef pthread_mutex_t* native_handle_type;
-  native_handle_type native_handle() { return &native_handle_; }
-
+  friend class ::condition_variable;
  private:
-  pthread_mutex_t native_handle_;
+  // Contains either the normal native handle or the test handle. See
+  // mutex.cc and test_mutex.cc.
+  union handle {
+    pthread_mutex_t native_handle;
+    MutexMonitor* monitor;
+  };
+  handle handle_;
+  
+  typedef pthread_mutex_t* native_handle_type;
+  native_handle_type native_handle() {
+    return &handle_.native_handle;
+  }
+
+  MutexMonitor* monitor() {
+    return handle_.monitor;
+  }
 };
 }  // namespace MutexInternal
 

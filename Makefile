@@ -31,10 +31,13 @@ all: std_thread.a
 
 clean:
 	find * -name '*.a' -o -name '*.o' -o -name '*.d' | xargs $(RM)
-	$(RM) AllTests
+	$(RM) Tests NativeTests
 
-test: AllTests CompileTests
-	./AllTests
+AllTests: Tests NativeTests
+
+test: AllTests
+	./Tests
+	./NativeTests
 
 GTEST_I := -Ithird_party/googletest/include
 gtest.a gtest_main.a: CppFlags += -Ithird_party/googletest $(GTEST_I)
@@ -49,15 +52,38 @@ gmock_main.a: third_party/googlemock/src/gmock_main.o
 GMOCK_A := gtest.a gmock.a
 GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
-STD_THREAD_OBJS := src/thread.o src/mutex.o src/condition_variable.o
+# All of the components of the std_thread library, apart from the 
+# mutex/condition_variable
+STD_THREAD_OBJS := src/thread.o src/countdown_latch.o
 std_thread.a: CppFlags += -Iinclude
 std_thread.a: $(STD_THREAD_OBJS)
 
-TEST_OBJS := testing/thread_test.o testing/lock_test.o testing/race_test.o \
-		testing/concurrent_priority_queue_test.o
-AllTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
-AllTests: $(TEST_OBJS) std_thread.a $(GMOCK_MAIN_A)
+# Normal implementations of mutex and condition variable
+STD_MUTEX_OBJS := src/mutex.o src/condition_variable.o
+std_mutex.a: CppFlags += -Iinclude
+std_mutex.a: $(STD_MUTEX_OBJS)
+
+# Test implementations of mutex and condition variable
+TEST_MUTEX_OBJS := src/test_mutex.o
+test_mutex.a: CppFlags += -Iinclude
+test_mutex.a: $(TEST_MUTEX_OBJS)
+
+# Native tests that use the standard mutex clases rather than the test
+# mutex classes. These are for testing the normal
+# mutex/condition_variable classes.
+STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o 
+NativeTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
+NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
+
+# Tests that rely on the test mutex classes.
+TEST_MUTEX_TEST_OBJS := testing/test_mutex_test.o \
+    testing/condition_variable_test.o testing/lock_test.o testing/race_test.o \
+    testing/concurrent_priority_queue_test.o testing/blockable_thread.o
+Tests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
+Tests: $(TEST_MUTEX_TEST_OBJS) std_thread.a test_mutex.a $(GMOCK_MAIN_A)
+	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
+
 
 CompileTests: CppFlags += -Iinclude
 CompileTests: testing/cxx0x_test.o
