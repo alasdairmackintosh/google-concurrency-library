@@ -28,7 +28,7 @@ mutable_thread::mutable_thread(F f) {
 }
 
 mutable_thread::~mutable_thread() {
-  if (thread_state_.load() != JOINED) {
+  if (!is_done() && !is_joining()) {
     join();
   }
   delete t_;
