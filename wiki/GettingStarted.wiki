@@ -13,7 +13,7 @@ You can build using the supplied `Makefile`.
 {{{
 $ mkdir gcl-whatever
 $ cd gcl-whatever
-$ hg clone https://google-concurrency-library.googlecode.com/hg/ src
+$ svn checkout https://google-concurrency-library.googlecode.com/svn/ google-concurrency-library
 # build libraries
 $ make
 # run tests
