@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include "latch_base.h"
 
 #include "mutex.h"
@@ -20,7 +19,7 @@
 namespace gcl {
 
 latch_base::latch_base(size_t count)
-    : count_(count), completion_fn_(NULL) {
+    : count_(count) {
 }
 
 latch_base::latch_base(size_t count, function<void()> function)
@@ -40,7 +39,7 @@ void latch_base::count_down() {
     throw std::logic_error("internal count == 0");
   }
   if (--count_ == 0) {
-    if (completion_fn_ != NULL) {
+    if (completion_fn_) {
       completion_fn_();
     }
     condition_.notify_all();
@@ -53,7 +52,7 @@ void latch_base::count_down_and_wait() {
     throw std::logic_error("internal count == 0");
   }
   if (--count_ == 0) {
-    if (completion_fn_ != NULL) {
+    if (completion_fn_) {
       completion_fn_();
     }
     condition_.notify_all();
@@ -64,9 +63,13 @@ void latch_base::count_down_and_wait() {
   }
 }
 
-void latch_base::count_up() {
+bool latch_base::count_up() {
   lock_guard<mutex> lock(condition_mutex_);
+  if (count_ == 0) {
+    return false;
+  }
   ++count_;
+  return true;
 }
 
 void latch_base::reset(size_t count) {

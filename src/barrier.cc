@@ -25,8 +25,7 @@ barrier::barrier(size_t num_threads) throw (std::invalid_argument)
     : thread_count_(num_threads),
       latch1_(num_threads),
       latch2_(num_threads),
-      current_latch_(&latch1_),
-      completion_fn_(NULL) {
+      current_latch_(&latch1_) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
@@ -44,9 +43,6 @@ barrier::barrier(size_t num_threads,
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
-  if (completion_fn == NULL) {
-    throw std::invalid_argument("completion_fn is NULL");
-  }
   latch1_.reset(bind(&barrier::on_countdown, this));
   latch2_.reset(bind(&barrier::on_countdown, this));
 }
@@ -60,7 +56,8 @@ void barrier::count_down_and_wait()  throw (std::logic_error) {
 
 void barrier::on_countdown() {
   current_latch_ = (current_latch_ == &latch1_ ? &latch2_ : &latch1_);
-  if (completion_fn_ != NULL) {
+  current_latch_->reset(thread_count_);
+  if (completion_fn_) {
     completion_fn_();
   }
 }
@@ -68,6 +65,7 @@ void barrier::on_countdown() {
 void barrier::reset(size_t num_threads) {
   // TODO(alasdair): Consider adding a check that we are either in the
   // completion function, or have not yet called wait()
+  thread_count_ = num_threads;
   current_latch_->reset(num_threads);
 }
 

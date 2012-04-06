@@ -73,11 +73,9 @@ public:
   // Throws std::logic_error if the internal count is already 0.
   void count_down_and_wait();
 
-  // Increments the current count by one. This method should only be invoked
-  // when there are no other threads currently inside the wait() method. In
-  // particular, it is not safe to call this method from the registered
-  // completion_fn.
-  void count_up();
+  // Increments the current count by one and returns true, unless the count is
+  // already at 0, in which case returns false and does nothing.
+  bool count_up();
 
   // Resets the latch with a new count value. This method should only be invoked
   // when there are no other threads currently inside the wait() method. In

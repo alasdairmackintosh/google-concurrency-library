@@ -43,13 +43,10 @@ using gcl::barrier;
 
 static size_t kNumThreads = 3;
 
-class BarrierTest : public testing::Test {
-};
 
-// Invokes count_down_and_wait() on a barrier, and counts the number of exceptions
-// thrown. If progress_count is non-null, it is incremented before
-// calling count_down_and_wait(), and again afterwards. The thread in which count_down_and_wait()
-// returnsd true will increment progress_count one additional time.
+// Invokes count_down_and_wait() on a barrier, and counts the number of
+// exceptions thrown. If progress_count is non-null, it is incremented before
+// calling count_down_and_wait(), and again afterwards.
 static void WaitForBarrierCountExceptions(barrier* b,
                                           atomic_int *progress_count,
                                           atomic_int *exception_count) {
@@ -74,6 +71,25 @@ static void WaitFn(atomic_int* counters) {
     EXPECT_EQ(1, counters[i].load());
   }
 }
+
+class BarrierTest : public testing::Test {
+ protected:
+  void RunBarrierThreads(barrier* b, size_t n_threads) {
+    atomic_int num_exceptions;
+    num_exceptions = 0;
+
+    thread* threads[n_threads];
+    for (size_t i = 0; i < n_threads; i++) {
+      threads[i] = new thread(bind(WaitForBarrierCountExceptions,
+                                   b, static_cast<atomic_int*>(NULL),
+                                   &num_exceptions));
+    }
+    for (size_t i = 0; i < n_threads; i++) {
+      threads[i]->join();
+    }
+    EXPECT_EQ(0, num_exceptions.load());
+  }
+};
 
 TEST_F(BarrierTest, CorrectNumberOfThreads) {
   barrier b(kNumThreads);
@@ -128,54 +144,19 @@ TEST_F(BarrierTest, FunctionInvocation) {
   }
 }
 
-static void ResetBarrier(barrier* b, int n_threads) {
-  b->reset(n_threads);
+static void ResetBarrier(barrier* b, size_t* n_threads) {
+  --(*n_threads);
+  b->reset(*n_threads);
 }
 
 TEST_F(BarrierTest, Reset) {
-  barrier b(kNumThreads);
-  b.reset(bind(ResetBarrier, &b, kNumThreads - 1));
-  atomic_int num_exceptions;
-  num_exceptions = 0;
-
-  thread* threads[kNumThreads];
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic_int*>(NULL),
-                                      &num_exceptions));
-  }
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i]->join();
-  }
-  EXPECT_EQ(0, num_exceptions.load());
-  // Barrier will be reset by the call to ResetBarrier(). The number of threads
-  // will be decremented
-  for (size_t i = 0; i < kNumThreads - 1; i++) {
-    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic_int*>(NULL),
-                                      &num_exceptions));
-  }
-  for (size_t i = 0; i < kNumThreads - 1; i++) {
-    threads[i]->join();
-  }
-  EXPECT_EQ(0, num_exceptions.load());
-
-  for (size_t i = 0; i < kNumThreads - 1; i++) {
-    delete threads[i];
-  }
-
-  b.reset(kNumThreads);
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic_int*>(NULL),
-                                      &num_exceptions));
-  }
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i]->join();
-  }
-  EXPECT_EQ(0, num_exceptions.load());
-  for (size_t i = 0; i < kNumThreads - 1; i++) {
-    delete threads[i];
-  }
-
+  size_t n_threads = kNumThreads;
+  barrier b(n_threads);
+  b.reset(bind(ResetBarrier, &b, &n_threads));
+  RunBarrierThreads(&b, n_threads);
+  EXPECT_EQ(n_threads, kNumThreads - 1);
+  RunBarrierThreads(&b, n_threads);
+  EXPECT_EQ(n_threads, kNumThreads - 2);
+  RunBarrierThreads(&b, n_threads);
+  EXPECT_EQ(n_threads, kNumThreads - 3);
 }
