@@ -15,9 +15,10 @@
 #ifndef GCL_SOURCE_
 #define GCL_SOURCE_
 
-#include <gcl_string.h>
-#include <thread.h>
-#include <closed_error.h>
+#include "thread.h"
+
+#include "gcl_string.h"
+#include "closed_error.h"
 
 namespace gcl {
 

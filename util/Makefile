@@ -64,13 +64,15 @@ build : stdfake.a lower.a
 
 stdfake.a : atomic.o mutex.o condition_variable.o thread.o
 
-lower.a : atomic.o debug.o latch.o latch_base.o serial_executor.o barrier.o \
-	thread_barrier.o mutable_thread.o simple_thread_pool.o
+lower.a : countdown_latch.o serial_executor.o barrier.o \
+	mutable_thread.o simple_thread_pool.o
 
 ######## Testing
 
 test : cxx0x_test.o atomic_c_test.run atomic_cpp_test.run counter_test.run \
-	stdfake_test.run lower_test.run mutex_test.run higher_test.run 
+	stdfake_test.run lower_test.run mutex_test.run higher_test.run \
+	pipeline_test.run
+
 #### Simple Tests
 
 atomic_c_test.exe : atomic_c_test.o stdfake.a

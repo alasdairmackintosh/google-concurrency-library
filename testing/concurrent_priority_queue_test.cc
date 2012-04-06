@@ -13,15 +13,16 @@
 // limitations under the License.
 
 // This file is a rudimentary test of the concurrent_priority_queue class
-#include "concurrent_priority_queue.h"
 
-#include "gmock/gmock.h"
 #include <algorithm>
 #include <iterator>
 #include <string>
 #include <vector>
 
-#include <test_mutex.h>
+#include "concurrent_priority_queue.h"
+#include "test_mutex.h"
+
+#include "gmock/gmock.h"
 
 using namespace std;
 using testing::_;
@@ -402,8 +403,8 @@ TEST_F(PriorityQueueTest, Pop) {
   expected_values.push_back(last);
 
   size_t num_popped = 0;
-  thread thr(tr1::bind(PopElement, tr1::ref(queue),
-                       tr1::ref(expected_values), &num_popped));
+  thread thr(std::bind(PopElement, std::ref(queue),
+                       std::ref(expected_values), &num_popped));
   ThreadMonitor::GetInstance()->WaitUntilBlocked(thr.get_id());
 
   // PopElement should pop all of the elements from the queue, and

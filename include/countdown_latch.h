@@ -15,8 +15,8 @@
 #ifndef GCL_COUNTDOWN_LATCH_
 #define GCL_COUNTDOWN_LATCH_
 
-#include <condition_variable.h>
-#include <mutex.h>
+#include "mutex.h"
+#include "condition_variable.h"
 
 namespace gcl {
 

@@ -16,12 +16,13 @@
 #define STD_TEST_MUTEX_
 
 #include <map>
-#include <functional>
 #include <iostream>
 
-#include <mutex.h>
-#include <condition_variable.h>
-#include <thread.h>
+#include "functional.h"
+
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
 
 // Prints debug messages. The output is locked to ensure that only
 // one thread can print at a time. Prints out the thread id at the
@@ -79,7 +80,7 @@ class ThreadLatch;
 //   TEST_F(WorkQueueTest, GetTask) {
 //     TestTask task;
 //     WorkQueue queue;
-//     thread thread(tr1::bind(ProcessTask, &queue));
+//     thread thread(std::bind(ProcessTask, &queue));
 //   
 //     //  Wait until the thread has blocked. We expect it to be in the
 //     //  ProcessTask method, waiting for get_task() to return.

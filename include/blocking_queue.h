@@ -16,22 +16,18 @@
 #define GCL_BLOCKING_QUEUE_
 
 #include <algorithm>
-#include <functional>
 #include <deque>
 #include <stdexcept>
 #include <string>
-#include <tr1/functional>
 
-#include <atomic.h>
-#include <closed_error.h>
-#include <condition_variable.h>
-#include <mutex.h>
-#include <thread.h>
+#include "functional.h"
 
-using std::atomic_bool;
-using std::memory_order;
-using std::memory_order_acquire;
-using std::memory_order_release;
+#include "atomic.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
+
+#include "closed_error.h"
 
 namespace gcl {
 
@@ -112,7 +108,7 @@ class blocking_queue {
   // Closes this queue. No further attempts may be made to push
   // elements onto the queue. Existing elements may still be popped.
   void close() {
-    closed_.store(true, memory_order_release);
+    closed_.store(true, std::memory_order_release);
 
     // We need to notify any threads that may be waiting to push or
     // pop elements.
@@ -124,7 +120,7 @@ class blocking_queue {
   // Returns true if the queue has been closed, and it is no longer
   // possible to push new elements.
   bool is_closed() {
-    return closed_.load(memory_order_acquire);
+    return closed_.load(std::memory_order_acquire);
   }
 
  // Returns true if this queue is empty
@@ -274,7 +270,7 @@ class blocking_queue {
   // lock mutex at the expense of waiting threads.
   condition_variable empty_condition_;
 
-  atomic_bool closed_;
+  std::atomic_bool closed_;
 };
 
 }  // End namespace gcl

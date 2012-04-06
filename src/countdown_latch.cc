@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "countdown_latch.h"
-
 #include "mutex.h"
 #include "condition_variable.h"
+
+#include "countdown_latch.h"
 
 namespace gcl {
 

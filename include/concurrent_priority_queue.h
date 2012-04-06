@@ -16,13 +16,14 @@
 #define GCL_CONCURRENT_PRIORITY_QUEUE_
 
 #include <algorithm>
-#include <functional>
 #include <string>
 #include <vector>
 
-#include <condition_variable.h>
-#include <mutex.h>
-#include <thread.h>
+#include "functional.h"
+
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
 
 namespace gcl {
 
@@ -116,9 +117,8 @@ class concurrent_priority_queue {
   // thread until this operation is complete.
   // requires Swappable<Container>
   void swap(concurrent_priority_queue& other) {
-    using std::swap;
-    swap(cont_, other.cont_);
-    swap(less_, other.less_);
+    std::swap(cont_, other.cont_);
+    std::swap(less_, other.less_);
   }
 
   // Re-evaluates the order of elements in the queue, using a new

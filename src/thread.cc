@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "thread.h"
-#include "posix_errors.h"
-
 #include <assert.h>
 #include <exception>
 #include <errno.h>
@@ -22,10 +19,13 @@
 #include <time.h>
 #include <memory>
 
+#include "thread.h"
+#include "system_error.h"
+
 namespace {
 
 struct thread_bootstrap_arg {
-  std::tr1::function<void()> start_func;
+  std::function<void()> start_func;
 };
 
 static void* thread_bootstrap(void* void_arg) {
@@ -46,7 +46,7 @@ thread::~thread() {
   }
 }
 
-void thread::start(std::tr1::function<void()> f) {
+void thread::start(std::function<void()> f) {
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   thread_bootstrap_arg* arg = new (std::nothrow) thread_bootstrap_arg;

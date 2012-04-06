@@ -13,21 +13,20 @@
 // limitations under the License.
 
 #include <queue>
-#include <tr1/functional>
 
-#include "serial_executor.h"
+#include "functional.h"
 
-#include "condition_variable.h"
 #include "mutex.h"
+#include "condition_variable.h"
 #include "thread.h"
 
-namespace tr1 = std::tr1;
+#include "serial_executor.h"
 
 namespace gcl {
 
 serial_executor::serial_executor()
   : shutting_down(false),
-    run_thread(tr1::bind(&serial_executor::run, this)) {}
+    run_thread(std::bind(&serial_executor::run, this)) {}
 
 serial_executor::~serial_executor() {
   // Try to do a safe shutdown of the executor.
@@ -44,7 +43,7 @@ serial_executor::~serial_executor() {
   run_thread.join();
 }
 
-void serial_executor::execute(tr1::function<void()> fn) {
+void serial_executor::execute(std::function<void()> fn) {
   lock_guard<mutex> guard(queue_lock);
   function_queue.push(fn);
   queue_condvar.notify_one();
@@ -55,12 +54,12 @@ void serial_executor::execute(tr1::function<void()> fn) {
 void serial_executor::run() {
   while (!shutting_down) {
     unique_lock<mutex> ul(queue_lock);
-    queue_condvar.wait(ul, tr1::bind(&serial_executor::queue_ready, this));
+    queue_condvar.wait(ul, std::bind(&serial_executor::queue_ready, this));
 
     // Queue can be ready if the executor is shutting down and the runner must
     // finish up to exit.
     if (!shutting_down) {
-      tr1::function<void()> run_function = function_queue.front();
+      std::function<void()> run_function = function_queue.front();
       function_queue.pop();
       ul.unlock();
 

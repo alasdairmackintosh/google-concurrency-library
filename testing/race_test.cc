@@ -18,13 +18,13 @@
 //  - Add tests on which race detectors may potentially give false warnings.
 //  - Add tests that use dynamic annotations.
 
-#include "test_mutex.h"
+#include "functional.h"
+
 #include "thread.h"
 
-#include "gmock/gmock.h"
-#include <tr1/functional>
+#include "test_mutex.h"
 
-namespace tr1 = std::tr1;
+#include "gmock/gmock.h"
 
 static void IncrementArg1(int *arg) {
   (*arg)++;
@@ -46,8 +46,8 @@ static void SleepLockAndUnlockArg2IncrementArg1(int *arg1, mutex *mu) {
 // Simple race.
 TEST(ThreadTest, SimpleDataRaceTest) {
   int racey = 0;
-  thread thr1(tr1::bind(IncrementArg1, &racey));
-  thread thr2(tr1::bind(IncrementArg1, &racey));
+  thread thr1(std::bind(IncrementArg1, &racey));
+  thread thr2(std::bind(IncrementArg1, &racey));
   thr1.join();
   thr2.join();
   EXPECT_EQ(racey, 2);  // With a tiny probability this will fail.
@@ -58,8 +58,8 @@ TEST(ThreadTest, SimpleDataRaceTest) {
 TEST(ThreadTest, DataRaceWithLockInBetween) {
   int racey = 0;
   mutex mu;
-  thread thr1(tr1::bind(IncrementArg1LockAndUnlockArg2, &racey, &mu));
-  thread thr2(tr1::bind(SleepLockAndUnlockArg2IncrementArg1, &racey, &mu));
+  thread thr1(std::bind(IncrementArg1LockAndUnlockArg2, &racey, &mu));
+  thread thr2(std::bind(SleepLockAndUnlockArg2IncrementArg1, &racey, &mu));
   thr1.join();
   thr2.join();
   EXPECT_EQ(racey, 2);  // With a tiny probability this will fail.

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mutex.h"
-#include "test_mutex.h"
-
 #include <iostream>
 #include <stdexcept>
+
+#include "mutex.h"
+#include "test_mutex.h"
 
 using std::cerr;
 

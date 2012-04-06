@@ -23,7 +23,6 @@
 
 #include "gmock/gmock.h"
 
-namespace tr1 = std::tr1;
 using gcl::source;
 using gcl::blocking_queue;
 using testing::_;

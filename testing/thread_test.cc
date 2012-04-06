@@ -15,13 +15,12 @@
 // This file is a rudimentary test of the thread class.  It primarily
 // serves to make sure the build system works.
 
-#include "thread.h"
+#include "functional.h"
+
 #include "mutex.h"
+#include "thread.h"
 
 #include "gmock/gmock.h"
-#include <tr1/functional>
-
-namespace tr1 = std::tr1;
 
 void WaitForThenSet(mutex& mu, bool* ready, bool* signal) {
   lock_guard<mutex> l(mu);
@@ -42,7 +41,7 @@ TEST(ThreadTest, StartsNewThread) {
   bool ready = false;
   bool signal = false;
   mutex mu;
-  thread thr(tr1::bind(WaitForThenSet, tr1::ref(mu), &ready, &signal));
+  thread thr(std::bind(WaitForThenSet, std::ref(mu), &ready, &signal));
   lock_guard<mutex> l(mu);
   EXPECT_FALSE(signal);
   ready = true;
@@ -58,7 +57,7 @@ TEST(ThreadTest, JoinSynchronizes) {
   bool ready = true;
   bool signal = false;
   mutex mu;
-  thread thr(tr1::bind(WaitForThenSet, tr1::ref(mu), &ready, &signal));
+  thread thr(std::bind(WaitForThenSet, std::ref(mu), &ready, &signal));
   thr.join();
   EXPECT_TRUE(signal);
 }
@@ -66,7 +65,7 @@ TEST(ThreadTest, JoinSynchronizes) {
 TEST(ThreadTest, GetId) {
   thread::id id_set_by_thread;
   thread::id this_thread_id = this_thread::get_id();
-  thread thr(tr1::bind(SetThreadId, &id_set_by_thread));
+  thread thr(std::bind(SetThreadId, &id_set_by_thread));
   thread::id id_of_thread = thr.get_id();
   thr.join();
   // The id that was set in SetThreadId() should equal the id of the

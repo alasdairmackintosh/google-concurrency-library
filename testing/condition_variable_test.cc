@@ -16,13 +16,13 @@
 // that the test framework allows us to block until a thread is
 // waiting on a condition variable.
 
-#include "test_mutex.h"
+#include "functional.h"
+
 #include "thread.h"
 
-#include "gmock/gmock.h"
-#include <tr1/functional>
+#include "test_mutex.h"
 
-namespace tr1 = std::tr1;
+#include "gmock/gmock.h"
 
 static const int kNumThreads = 1;
 
@@ -40,8 +40,8 @@ TEST(ConditionVariableTest, WaitUntilBlocked) {
   bool ready = false;
   mutex mu;
   condition_variable cv;
-  thread thr(tr1::bind(
-      WaitOnConditionVariable, tr1::ref(mu), tr1::ref(cv), &ready));
+  thread thr(std::bind(
+      WaitOnConditionVariable, std::ref(mu), std::ref(cv), &ready));
   ThreadMonitor::GetInstance()->WaitUntilBlocked(thr.get_id());
   EXPECT_FALSE(ready);
   mu.lock();
@@ -60,9 +60,9 @@ TEST(ConditionVariableTest, WaitUntilBlockedMultiThreaded) {
   bool ready[kNumThreads];
   for (int i = 0; i < kNumThreads; i++) {
     ready[i] = false;
-    threads[i] = new thread(tr1::bind(WaitOnConditionVariable,
-                                      tr1::ref(mu),
-                                      tr1::ref(cv),
+    threads[i] = new thread(std::bind(WaitOnConditionVariable,
+                                      std::ref(mu),
+                                      std::ref(cv),
                                       ready+ i));
   }
   ThreadMonitor* monitor = ThreadMonitor::GetInstance();

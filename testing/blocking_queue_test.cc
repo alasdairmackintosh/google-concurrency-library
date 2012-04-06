@@ -13,22 +13,23 @@
 // limitations under the License.
 
 // This file is a test of the blocking_queue class
-#include "blocking_queue.h"
 
-#include "atomic.h"
-
-#include "gmock/gmock.h"
 #include <algorithm>
 #include <iterator>
 #include <string>
 #include <vector>
 
-namespace tr1 = std::tr1;
+#include "atomic.h"
+
+#include "blocking_queue.h"
+
+#include "gmock/gmock.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::InSequence;
 
-using std::atomic_int;
+using std::atomic;
 using std::memory_order_relaxed;
 using gcl::blocking_queue;
 
@@ -231,8 +232,8 @@ static void DoPopPositiveOrNegative(blocking_queue<int> *queue) {
 // Verify threaded operation
 TEST_F(BlockingQueueTest, PushPopTwoThreads) {
   blocking_queue<int> queue(kLargeSize);
-  thread thr1(tr1::bind(DoPop, &queue));
-  thread thr2(tr1::bind(DoPush, &queue));
+  thread thr1(std::bind(DoPop, &queue));
+  thread thr2(std::bind(DoPush, &queue));
   thr1.join();
   thr2.join();
  }
@@ -240,21 +241,21 @@ TEST_F(BlockingQueueTest, PushPopTwoThreads) {
 // Verify threaded operation with two writers.
 TEST_F(BlockingQueueTest, PushPopThreeThreads) {
   blocking_queue<int> queue(kLargeSize);
-  thread thr1(tr1::bind(DoPopPositiveOrNegative, &queue));
-  thread thr2(tr1::bind(DoPushNegative, &queue));
-  thread thr3(tr1::bind(DoPush, &queue));
+  thread thr1(std::bind(DoPopPositiveOrNegative, &queue));
+  thread thr2(std::bind(DoPushNegative, &queue));
+  thread thr3(std::bind(DoPush, &queue));
   thr1.join();
   thr2.join();
   thr3.join();
  }
 
-static bool at_limit(const int limit, atomic_int *value) {
+static bool at_limit(const int limit, atomic<int> *value) {
   return limit <= value->fetch_add(1, memory_order_relaxed);
 }
 
 static void DoPopPositiveOrNegativeUntilLimit(blocking_queue<int> *queue,
                                               const int limit,
-                                              atomic_int *value) {
+                                              atomic<int> *value) {
   int last_positive = -1;
   int last_negative = 0;
   // One thread is pushing increasing positive numbers, starting from 0, while
@@ -284,14 +285,14 @@ static void DoPopPositiveOrNegativeUntilLimit(blocking_queue<int> *queue,
 TEST_F(BlockingQueueTest, PushPopFourThreads) {
   blocking_queue<int> queue(kLargeSize);
   const int limit = static_cast<int>(kLargeSize) * 4;
-  atomic_int  num_popped;
+  atomic<int>  num_popped;
   num_popped = 0;
-  thread thr1(tr1::bind(DoPopPositiveOrNegativeUntilLimit,
+  thread thr1(std::bind(DoPopPositiveOrNegativeUntilLimit,
                         &queue, limit, &num_popped));
-  thread thr2(tr1::bind(DoPopPositiveOrNegativeUntilLimit,
+  thread thr2(std::bind(DoPopPositiveOrNegativeUntilLimit,
                         &queue, limit, &num_popped));
-  thread thr3(tr1::bind(DoPushNegative, &queue));
-  thread thr4(tr1::bind(DoPush, &queue));
+  thread thr3(std::bind(DoPushNegative, &queue));
+  thread thr4(std::bind(DoPush, &queue));
   thr3.join();
   thr4.join();
   queue.close();

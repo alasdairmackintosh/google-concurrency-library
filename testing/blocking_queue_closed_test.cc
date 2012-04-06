@@ -17,23 +17,25 @@
 // closed, and variousn threads are blocking waiting to add or remove
 // elements.
 
-#include "blocking_queue.h"
-
-#include "atomic.h"
-#include "test_mutex.h"
-
-#include "gmock/gmock.h"
 #include <algorithm>
 #include <iterator>
 #include <string>
 #include <vector>
 
-namespace tr1 = std::tr1;
+#include "atomic.h"
+
+#include "blocking_queue.h"
+#include "countdown_latch.h"
+#include "test_mutex.h"
+
+#include "gmock/gmock.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::InSequence;
 
 using gcl::blocking_queue;
+using gcl::countdown_latch;
 
 size_t kSize = 3;
 size_t kLargeSize = 300;
@@ -96,7 +98,7 @@ static void PopUntilClosed(blocking_queue<int>* queue,
 TEST_F(BlockingQueueClosedTest, CloseWhenWaitingToPush) {
   ThreadMonitor* monitor = ThreadMonitor::GetInstance();
   blocking_queue<int> queue(kLargeSize);
-  thread push_thread(tr1::bind(PushUntilClosed, &queue, kLargeSize));
+  thread push_thread(std::bind(PushUntilClosed, &queue, kLargeSize));
   // Wait until the thread is blocked waiting to push onto a full queue
   monitor->WaitUntilBlocked(push_thread.get_id());
   ASSERT_EQ(kLargeSize, queue.size());
@@ -107,7 +109,7 @@ TEST_F(BlockingQueueClosedTest, CloseWhenWaitingToPush) {
   ASSERT_EQ(kLargeSize, queue.size());
 
   // Verify that we can still pop the existing elements.
-  thread pop_thread(tr1::bind(PopUntilClosed, &queue, kLargeSize));
+  thread pop_thread(std::bind(PopUntilClosed, &queue, kLargeSize));
   pop_thread.join();
   // Queue should now be empty
   ASSERT_EQ(kZero, queue.size());
@@ -122,7 +124,7 @@ TEST_F(BlockingQueueClosedTest, CloseWhenWaitingToPop) {
   for (int i = 0; i < static_cast<int>(kLargeSize); i++) {
     queue.push(i);
   }
-  thread pop_thread(tr1::bind(PopUntilClosed, &queue, kLargeSize));
+  thread pop_thread(std::bind(PopUntilClosed, &queue, kLargeSize));
   // Wait until the thread is blocked waiting to pop onto a full queue
   monitor->WaitUntilBlocked(pop_thread.get_id());
   ASSERT_EQ(kZero, queue.size());

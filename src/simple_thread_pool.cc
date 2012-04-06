@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <simple_thread_pool.h>
-
 #include <limits>
 #include <set>
-#include <tr1/functional>
-
-#include <atomic.h>
-#include <condition_variable.h>
-#include <mutex.h>
-#include <mutable_thread.h>
-#include <thread.h>
 #include <time.h>
 
-namespace tr1 = std::tr1;
-using std::atomic_int;
-using std::set;
-using gcl::mutable_thread;
+#include "functional.h"
+
+#include "atomic.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
+#include "mutable_thread.h"
+
+#include "simple_thread_pool.h"
 
 namespace gcl {
 
@@ -55,7 +51,7 @@ simple_thread_pool::~simple_thread_pool() {
   }
 
   // Should be in shutting_down_ state, so it's safe to kill stuff.
-  set<mutable_thread*>::iterator iter;
+  std::set<mutable_thread*>::iterator iter;
   for (iter = active_threads_.begin();
        iter != active_threads_.end(); ++iter) {
     mutable_thread* t = *iter;
@@ -96,7 +92,7 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
 bool simple_thread_pool::donate_thread(mutable_thread* t) {
   unique_lock<mutex> ul(new_thread_mu_);
   // Check that the pool doesn't already own the thread
-  set<mutable_thread*>::iterator active_iter = active_threads_.find(t);
+  std::set<mutable_thread*>::iterator active_iter = active_threads_.find(t);
   if (active_iter != active_threads_.end()) {
     active_threads_.erase(active_iter);
     unused_threads_.insert(t);
@@ -110,7 +106,7 @@ bool simple_thread_pool::donate_thread(mutable_thread* t) {
 
 bool simple_thread_pool::release_thread(mutable_thread* t) {
   unique_lock<mutex> ul(new_thread_mu_);
-  set<mutable_thread*>::iterator iter = active_threads_.find(t);
+  std::set<mutable_thread*>::iterator iter = active_threads_.find(t);
   if (iter != active_threads_.end()) {
     active_threads_.erase(iter);
     return true;

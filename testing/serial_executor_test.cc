@@ -17,16 +17,17 @@
 
 #include <stdio.h>
 
+#include "functional.h"
+
 #include "atomic.h"
-#include "called_task.h"
+
 #include "condition_variable.h"
-#include "serial_executor.h"
 #include "thread.h"
 
-#include "gmock/gmock.h"
-#include <tr1/functional>
+#include "called_task.h"
+#include "serial_executor.h"
 
-namespace tr1 = std::tr1;
+#include "gmock/gmock.h"
 
 namespace gcl {
 namespace {
@@ -34,7 +35,7 @@ namespace {
 TEST(SerialExecutorTest, SingleExecution) {
   Called called(1);
   serial_executor exec;
-  exec.execute(tr1::bind(&Called::run, &called));
+  exec.execute(std::bind(&Called::run, &called));
   called.wait();
 
   EXPECT_EQ(1, called.count);
@@ -47,7 +48,7 @@ TEST(SerialExecutorTest, MultiExecution) {
   serial_executor exec;
   // Queue up a number of executions.
   for (int i = 0; i < num_exec; ++i) {
-    exec.execute(tr1::bind(&Called::run, &called));
+    exec.execute(std::bind(&Called::run, &called));
   }
   called.wait();
 
@@ -80,20 +81,20 @@ TEST(SerialExecutorTest, ShutdownTest) {
   LockedTask locked_task(&task_blocker);
 
   serial_executor* exec = new serial_executor();
-  exec->execute(tr1::bind(&LockedTask::run, &locked_task));
+  exec->execute(std::bind(&LockedTask::run, &locked_task));
   // Let the executor thread make some progress.
   this_thread::sleep_for(chrono::milliseconds(100));
 
   // NOTE: this should deadlock! Need to start a new thread to handle shutdown
   // since the executor will block waiting for the running task to join!
-  thread exec_deleter(tr1::bind(&delete_executor, exec));
+  thread exec_deleter(std::bind(&delete_executor, exec));
 
   // Let the deleter make some progress.
   this_thread::sleep_for(chrono::milliseconds(100));
 
   // other_task should never execute.
   Called other_task(1);
-  exec->execute(tr1::bind(&Called::run, &other_task));
+  exec->execute(std::bind(&Called::run, &other_task));
   task_blocker.unlock();
 
   // Sleep a bit to give the task a chance to run.
@@ -107,9 +108,9 @@ struct CountMaker {
   CountMaker() : next1(1), next2(2) {}
 
   void run(serial_executor* executor) {
-    executor->execute(tr1::bind(&Called::run, &next2));
-    executor->execute(tr1::bind(&Called::run, &next1));
-    executor->execute(tr1::bind(&Called::run, &next2));
+    executor->execute(std::bind(&Called::run, &next2));
+    executor->execute(std::bind(&Called::run, &next1));
+    executor->execute(std::bind(&Called::run, &next2));
   }
 
   Called next1;
@@ -119,7 +120,7 @@ struct CountMaker {
 TEST(SerialExecutorTest, InlineExecutes) {
   CountMaker inlined_counters;
   serial_executor exec;
-  exec.execute(tr1::bind(&CountMaker::run, &inlined_counters, &exec));
+  exec.execute(std::bind(&CountMaker::run, &inlined_counters, &exec));
 
   inlined_counters.next1.wait();
   inlined_counters.next2.wait();

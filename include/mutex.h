@@ -15,12 +15,13 @@
 #ifndef STD_MUTEX_
 #define STD_MUTEX_
 
-#include "posix_errors.h"
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
+
+#include "system_error.h"
 
 class condition_variable;
 
@@ -166,9 +167,8 @@ public:
 
   // 30.4.3.2.3 modiﬁers
   void swap(unique_lock& u) {
-    using std::swap;
-    swap(pm, u.pm);
-    swap(owns, u.owns);
+    std::swap(pm, u.pm);
+    std::swap(owns, u.owns);
   }
 
   mutex_type *release() {

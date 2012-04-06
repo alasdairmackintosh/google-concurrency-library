@@ -14,10 +14,11 @@
 
 #include <sstream>
 
-#include "gmock/gmock.h"
 #include "thread.h"
 
 #include "stream_mutex.h"
+
+#include "gmock/gmock.h"
 
 std::ostringstream stream;
 stream_mutex<std::ostream> mstream(stream);

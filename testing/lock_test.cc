@@ -14,12 +14,13 @@
 
 // This file is a rudimentary test of the lock classes.
 
+#include <string>
+
 #include "mutex.h"
 #include "condition_variable.h"
 #include "thread.h"
 
 #include "gmock/gmock.h"
-#include <string>
 
 using ::testing::InSequence;
 

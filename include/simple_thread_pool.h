@@ -16,18 +16,14 @@
 #define GCL_SIMPLE_THREAD_POOL_
 
 #include <set>
-#include <tr1/functional>
 
-#include <atomic.h>
-#include <condition_variable.h>
-#include <mutable_thread.h>
-#include <mutex.h>
-#include <thread.h>
+#include "functional.h"
 
-namespace tr1 = std::tr1;
-using std::atomic_int;
-using std::set;
-using gcl::mutable_thread;
+#include "atomic.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
+#include "mutable_thread.h"
 
 namespace gcl {
 
@@ -87,14 +83,14 @@ class simple_thread_pool {
   // from the pool).
   mutex new_thread_mu_;
   bool shutting_down_;
-  set<mutable_thread*> active_threads_;
-  set<mutable_thread*> unused_threads_;
+  std::set<mutable_thread*> active_threads_;
+  std::set<mutable_thread*> unused_threads_;
   size_t min_threads_;
   size_t max_threads_;
   
   // TODO: migrate this to use the worker queue since there threads can be
   // interrupted.
-  // blocking_queue<tr1::function<void()> > work_pool_;
+  // blocking_queue<std::function<void()> > work_pool_;
 };
 
 }

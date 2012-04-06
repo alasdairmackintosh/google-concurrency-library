@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "unordered_set.h"
+
 #include "atomic.h"
 #include "mutex.h"
-#include "unordered_set.h"
 
 namespace gcl {
 
@@ -35,7 +36,7 @@ Avoid situations that overflow the integer.
 
 The base of the design is an atomic_counter,
 which provides atomicity, but without really reducing increment cost
-over the plain atomic_int.
+over the plain atomic<int>.
 The counter methods are:
 
     <constructor>( integer ):
@@ -139,9 +140,6 @@ Use this counter when you do not intend to extract values.
 
 */
 
-using namespace std;
-
-
 /*
     The plain counters come in serial and atomic flavors
 
@@ -172,10 +170,13 @@ public:
     CXX0X_CONSTEXPR_CTOR counter_bumper( Integral in ) : value_( in ) {}
     counter_bumper( const counter_bumper& ) CXX0X_DELETED
     counter_bumper& operator=( const counter_bumper& ) CXX0X_DELETED
-    void inc( Integral by ) { value_.fetch_add( by, memory_order_relaxed ); }
-    void dec( Integral by ) { value_.fetch_sub( by, memory_order_relaxed ); }
+    void inc( Integral by )
+        { value_.fetch_add( by, std::memory_order_relaxed ); }
+    void dec( Integral by )
+        { value_.fetch_sub( by, std::memory_order_relaxed ); }
+
 protected:
-    atomic< Integral > value_;
+    std::atomic< Integral > value_;
 };
 
 template< typename Integral > class atomic_counter
@@ -187,9 +188,9 @@ public:
         : counter_bumper< Integral >( in ) {}
     atomic_counter( const atomic_counter& ) CXX0X_DELETED
     atomic_counter& operator=( const atomic_counter& ) CXX0X_DELETED
-    Integral load() { return value_.load( memory_order_relaxed ); }
+    Integral load() { return value_.load( std::memory_order_relaxed ); }
     Integral exchange( Integral to )
-        { return value_.exchange( to, memory_order_relaxed ); }
+        { return value_.exchange( to, std::memory_order_relaxed ); }
 private:
     using counter_bumper< Integral >::value_;
 };
@@ -231,7 +232,10 @@ public:
     atomic_counter_buffer( const atomic_counter_buffer& ) CXX0X_DELETED
     atomic_counter_buffer& operator=( const atomic_counter_buffer& )
         CXX0X_DELETED
-    void push() { prime_.inc( value_.exchange( 0, memory_order_relaxed ) ); }
+
+    void push()
+        { prime_.inc( value_.exchange( 0, std::memory_order_relaxed ) ); }
+
     ~atomic_counter_buffer() { push(); }
 private:
     counter_bumper< Integral >& prime_;
@@ -268,7 +272,7 @@ private:
     void erase( weak_counter_buffer< Integral >* child, Integral by );
     mutex serializer_;
     Integral value_;
-    typedef unordered_set< weak_counter_buffer< Integral >* > set_type;
+    typedef std::unordered_set< weak_counter_buffer< Integral >* > set_type;
     set_type children_;
 };
 
@@ -281,16 +285,16 @@ public:
     weak_counter_buffer( const weak_counter_buffer& ) CXX0X_DELETED
     weak_counter_buffer& operator=( const weak_counter_buffer& ) CXX0X_DELETED
     void inc( Integral by ) {
-        value_.store( value_.load( memory_order_relaxed ) + by,
-                      memory_order_relaxed ); }
+        value_.store( value_.load( std::memory_order_relaxed ) + by,
+                      std::memory_order_relaxed ); }
     void dec( Integral by ) {
-        value_.store( value_.load( memory_order_relaxed ) - by,
-                      memory_order_relaxed ); }
+        value_.store( value_.load( std::memory_order_relaxed ) - by,
+                      std::memory_order_relaxed ); }
     ~weak_counter_buffer();
 private:
     friend class weak_counter<Integral>;
-    Integral poll() { return value_.load( memory_order_relaxed ); }
-    atomic< Integral > value_;
+    Integral poll() { return value_.load( std::memory_order_relaxed ); }
+    std::atomic< Integral > value_;
     weak_counter< Integral >& prime_;
 };
 
@@ -310,7 +314,7 @@ private:
     void insert( duplex_counter_buffer< Integral >* child );
     void erase( duplex_counter_buffer< Integral >* child, Integral by );
     mutex serializer_;
-    typedef unordered_set< duplex_counter_buffer< Integral >* > set_type;
+    typedef std::unordered_set< duplex_counter_buffer< Integral >* > set_type;
     set_type children_;
     using counter_bumper< Integral >::value_;
 };
@@ -328,8 +332,8 @@ public:
     ~duplex_counter_buffer();
 private:
     friend class duplex_counter<Integral>;
-    Integral poll() { return value_.load( memory_order_relaxed ); }
-    Integral drain() { return value_.exchange( 0, memory_order_relaxed ); }
+    Integral poll() { return value_.load( std::memory_order_relaxed ); }
+    Integral drain() { return value_.exchange( 0, std::memory_order_relaxed ); }
     duplex_counter< Integral >& prime_;
     using counter_bumper< Integral >::value_;
 };
@@ -409,7 +413,7 @@ weak_counter_buffer< Integral >::weak_counter_buffer(
 template< typename Integral >
 weak_counter_buffer< Integral >::~weak_counter_buffer()
 {
-    prime_.erase( this, value_.load( memory_order_relaxed ) );
+    prime_.erase( this, value_.load( std::memory_order_relaxed ) );
 }
 
 template< typename Integral >
@@ -425,7 +429,7 @@ void
 duplex_counter< Integral >::erase( duplex_counter_buffer< Integral >* child,
                                    Integral by )
 {
-    value_.fetch_add( by, memory_order_relaxed );
+    value_.fetch_add( by, std::memory_order_relaxed );
     lock_guard< mutex > _( serializer_ );
     children_.erase( child );
 }
@@ -442,7 +446,7 @@ duplex_counter< Integral >::load()
         for ( ; rollcall != children_.end(); rollcall++ )
             tmp += (*rollcall)->poll();
     }
-    return tmp + value_.load( memory_order_relaxed );
+    return tmp + value_.load( std::memory_order_relaxed );
 }
 
 template< typename Integral >
@@ -457,7 +461,7 @@ duplex_counter< Integral >::exchange( Integral to )
         for ( ; rollcall != children_.end(); rollcall++ )
             tmp += (*rollcall)->drain();
     }
-    return tmp + value_.exchange( to, memory_order_relaxed );
+    return tmp + value_.exchange( to, std::memory_order_relaxed );
 }
 
 template< typename Integral >
@@ -479,7 +483,7 @@ duplex_counter_buffer< Integral >::duplex_counter_buffer(
 template< typename Integral >
 duplex_counter_buffer< Integral >::~duplex_counter_buffer()
 {
-    prime_.erase( this, value_.load( memory_order_relaxed ) );
+    prime_.erase( this, value_.load( std::memory_order_relaxed ) );
 }
 
 } // namespace gcl

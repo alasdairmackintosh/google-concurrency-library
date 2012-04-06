@@ -16,36 +16,21 @@
 #define GCL_PIPELINE_
 
 #include <iostream>
-#include <vector>
 
 #include <exception>
 #include <stdexcept>
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-#include <functional>
-#else
-#include <tr1/functional>
-#endif
 
-#include <atomic.h>
-#include <barrier.h>
-#include <buffer_queue.h>
-#include <latch.h>
-#include <queue_base.h>
-#include <simple_thread_pool.h>
+#include "functional.h"
+
+#include "atomic.h"
+#include "barrier.h"
+#include "buffer_queue.h"
+#include "countdown_latch.h"
+#include "queue_base.h"
+#include "countdown_latch.h"
+#include "simple_thread_pool.h"
 
 namespace gcl {
-
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-using std::function;
-using std::bind;
-using std::placeholders::_1;
-#else
-using std::tr1::function;
-using std::tr1::bind;
-using std::tr1::placeholders::_1;
-#endif
-
-using std::vector;
 
 // BEGIN UTILITIES
 //TODO(aberkan): Common naming scheme
@@ -61,7 +46,7 @@ template <typename T>
 PipelineTerm ignore(T t) { return PipelineTerm(); };
 
 template<typename T>
-PipelineTerm do_consume(function<void (T)> f, T t) {
+PipelineTerm do_consume(std::function<void (T)> f, T t) {
   f(t);
   return PipelineTerm();
 }
@@ -69,8 +54,8 @@ PipelineTerm do_consume(function<void (T)> f, T t) {
 template <typename IN_TYPE,
           typename INTERMEDIATE,
           typename OUT_TYPE>
-static OUT_TYPE chain(function<INTERMEDIATE (IN_TYPE in)> intermediate_fn,
-                      function<OUT_TYPE (INTERMEDIATE in)> out_fn,
+static OUT_TYPE chain(std::function<INTERMEDIATE (IN_TYPE in)> intermediate_fn,
+                      std::function<OUT_TYPE (INTERMEDIATE in)> out_fn,
                       IN_TYPE in) {
   return out_fn(intermediate_fn(in));
 }
@@ -82,7 +67,7 @@ class filter {
  public:
   virtual ~filter() {};
   virtual OUT Apply(IN in) = 0;
-  virtual bool Run(function<PipelineTerm (OUT)> r) = 0;
+  virtual bool Run(std::function<PipelineTerm (OUT)> r) = 0;
   virtual bool Run() = 0;
   virtual void Close() = 0;
   virtual filter<IN, OUT>* clone() const = 0;
@@ -116,9 +101,9 @@ class PipelineExecution {
 
   PipelinePlan* pp_;
   simple_thread_pool* pool_;
-  latch start_;
+  countdown_latch start_;
   barrier* thread_end_;
-  latch end_;
+  countdown_latch end_;
   int num_threads_;
   bool done_;
 };
@@ -144,7 +129,7 @@ class filter_chain : public filter<IN, OUT> {
     return new filter_chain<IN, MID, OUT>(first_->clone(), second_->clone());
   };
   //TODO(aberkan): Make calling run on non-runnable a compile time error.
-  virtual bool Run(function<PipelineTerm (OUT)> r);
+  virtual bool Run(std::function<PipelineTerm (OUT)> r);
   virtual bool Run();
   virtual void Close() {
     first_->Close();
@@ -157,10 +142,11 @@ class filter_chain : public filter<IN, OUT> {
 template <typename IN,
           typename MID,
           typename OUT>
-bool filter_chain<IN, MID, OUT>::Run(function<PipelineTerm (OUT)> r) {
-  function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
-  function<PipelineTerm (MID)> p
-    = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+bool filter_chain<IN, MID, OUT>::Run(std::function<PipelineTerm (OUT)> r) {
+  std::function<OUT (MID)> m = std::bind(&filter<MID, OUT>::Apply, second_,
+                                         std::placeholders::_1);
+  std::function<PipelineTerm (MID)> p
+    = std::bind(chain<MID, OUT, PipelineTerm>, m, r, std::placeholders::_1);
   return first_->Run(p);
 };
 
@@ -168,10 +154,11 @@ template <typename IN,
           typename MID,
           typename OUT>
 bool filter_chain<IN, MID, OUT>::Run() {
-  function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
-  function<PipelineTerm (OUT)> r = ignore<OUT>;
-  function<PipelineTerm (MID)> p =
-    bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+  std::function<OUT (MID)> m = std::bind(&filter<MID, OUT>::Apply, second_,
+                                         std::placeholders::_1);
+  std::function<PipelineTerm (OUT)> r = ignore<OUT>;
+  std::function<PipelineTerm (MID)> p =
+    std::bind(chain<MID, OUT, PipelineTerm>, m, r, std::placeholders::_1);
   return first_->Run(p);
 };
 
@@ -181,15 +168,15 @@ template <typename IN,
           typename OUT>
 class filter_function : public filter<IN, OUT> {
  public:
-  filter_function(function<OUT (IN)> f)
+  filter_function(std::function<OUT (IN)> f)
       : f_(f), close_(Nothing) { };
-  filter_function(function<OUT (IN)> f, function<void ()> close)
+  filter_function(std::function<OUT (IN)> f, std::function<void ()> close)
       : f_(f), close_(close) { };
   virtual ~filter_function() { };
   virtual OUT Apply(IN in) {
     return f_(in);
   }
-  virtual bool Run(function<PipelineTerm (OUT)> r) {
+  virtual bool Run(std::function<PipelineTerm (OUT)> r) {
     throw;
   }
   virtual bool Run() {
@@ -201,8 +188,8 @@ class filter_function : public filter<IN, OUT> {
   virtual class filter<IN, OUT>* clone() const {
     return new filter_function<IN, OUT>(f_, close_);
   }
-  function<OUT (IN)> f_;
-  function<void ()> close_;
+  std::function<OUT (IN)> f_;
+  std::function<void ()> close_;
 };
 
 template <typename OUT>
@@ -213,7 +200,7 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
   virtual OUT Apply(PipelineTerm IN) {
     throw;
   }
-  virtual bool Run(function<PipelineTerm (OUT)> r) {
+  virtual bool Run(std::function<PipelineTerm (OUT)> r) {
     OUT out;
     // TODO(aberkan): What if this throws?
     queue_op_status status = qb_->wait_pop(out);
@@ -332,10 +319,10 @@ template<typename IN,
          typename OUT>
 class SimplePipelinePlan {
  public:
-  SimplePipelinePlan(function<OUT (IN in)> f)
+  SimplePipelinePlan(std::function<OUT (IN in)> f)
       : f_(new filter_function<IN, OUT>(f)) { };
-  SimplePipelinePlan(function<OUT (IN in)> f,
-                     function<void ()> close)
+  SimplePipelinePlan(std::function<OUT (IN in)> f,
+                     std::function<void ()> close)
       : f_(new filter_function<IN, OUT>(f, close)) { };
   SimplePipelinePlan(filter<IN, OUT> *f)
       : f_(f) { };
@@ -366,38 +353,43 @@ SimplePipelinePlan<IN, OUT> Filter(OUT f(IN)) {
 
 template<typename IN,
          typename OUT>
-SimplePipelinePlan<IN, OUT> Filter(function<OUT (IN)> f) {
+SimplePipelinePlan<IN, OUT> Filter(std::function<OUT (IN)> f) {
   return SimplePipelinePlan<IN, OUT>(f);
 }
 
 template<typename IN>
 SimplePipelinePlan<IN, PipelineTerm> Consume(void consumer(IN)) {
-  return function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer, _1));
+  return std::function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer,
+                                               std::placeholders::_1));
 }
 
 template<typename IN>
-SimplePipelinePlan<IN, PipelineTerm> Consume(function<void (IN)> consumer,
-                                             function<void ()> close) {
+SimplePipelinePlan<IN, PipelineTerm> Consume(std::function<void (IN)> consumer,
+                                             std::function<void ()> close) {
   return SimplePipelinePlan<IN, PipelineTerm>(
-      function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer, _1)),
+      std::function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer,
+                                            std::placeholders::_1)),
       close);
 }
 
 template<typename IN>
-SimplePipelinePlan<IN, PipelineTerm> Consume(function<void (IN)> consumer) {
-  return function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer, _1));
+SimplePipelinePlan<IN, PipelineTerm> Consume(std::function<void (IN)> consumer) {
+  return std::function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer,
+                                          std::placeholders::_1));
 }
 
 template<typename IN>
 SimplePipelinePlan<IN, PipelineTerm> Sink(queue_front<IN> *front) {
-  function<void (IN)> f1 = bind(&queue_front<IN>::push, front, _1);
+  std::function<void (IN)> f1 = std::bind(&queue_front<IN>::push, front,
+                                          std::placeholders::_1);
   return Consume(f1);
 }
 
 template<typename IN>
 SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> *front) {
-  function<void (IN)> f1 = bind(&queue_front<IN>::push, front, _1);
-  function<void ()> f2 = bind(&queue_common<IN>::close, front);
+  std::function<void (IN)> f1 = std::bind(&queue_front<IN>::push, front,
+                                          std::placeholders::_1);
+  std::function<void ()> f2 = std::bind(&queue_common<IN>::close, front);
   return Consume(f1, f2);
 }
 
@@ -488,7 +480,7 @@ void RunFilter(PipelineExecution* pex,
   }
   f->Close();
 
-  pex->thread_end_->count_down_and_wait();
+  pex->thread_end_->await();
 }
 
 PipelineExecution::PipelineExecution(const PipelinePlan& pp,
@@ -498,7 +490,7 @@ PipelineExecution::PipelineExecution(const PipelinePlan& pp,
         num_threads_(0), done_(false) {
   pp_->run(this);
   thread_end_ = new barrier(num_threads_,
-                            bind(&PipelineExecution::threads_done, this));
+                            std::bind(&PipelineExecution::threads_done, this));
   start_.count_down();  // Start the threads
 }
 
@@ -510,7 +502,7 @@ PipelineExecution::~PipelineExecution() {
 
 void PipelineExecution::execute(filter<PipelineTerm, PipelineTerm> *f) {
   num_threads_++;
-  pool_->try_get_unused_thread()->execute(bind(RunFilter, this, f));
+  pool_->try_get_unused_thread()->execute(std::bind(RunFilter, this, f));
 }
 
 

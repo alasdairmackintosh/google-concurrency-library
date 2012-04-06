@@ -18,7 +18,8 @@
 #include <pthread.h>
 #include <string.h>
 #include <ostream>
-#include <tr1/functional>
+
+#include "functional.h"
 
 // This is a really simple subset of C++0X's std::thread (defined in
 // 30.3.1), that we'll use just for testing until we import or write a
@@ -38,7 +39,7 @@ class thread {
   thread(const thread&);
   void operator=(const thread&);
 
-  void start(std::tr1::function<void()> start_func);
+  void start(std::function<void()> start_func);
 
   pthread_t native_handle_;
   bool joinable_;

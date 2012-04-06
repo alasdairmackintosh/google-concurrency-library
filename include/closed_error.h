@@ -19,17 +19,14 @@
 #include <stdexcept>
 #include <string>
 
-using std::logic_error;
-using std::string;
-
 namespace gcl {
 
 // Thrown when attemmpting to read from a closed source, or write to a
 // closed sink.
-class closed_error : public logic_error {
+class closed_error : public std::logic_error {
  public:
-  explicit closed_error(const string& description)
-      : logic_error(description) {
+  explicit closed_error(const std::string& description)
+      : std::logic_error(description) {
   }
 };
 

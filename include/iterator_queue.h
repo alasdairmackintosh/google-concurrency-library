@@ -14,10 +14,12 @@
 
 #ifndef GCL_ITERATOR_QUEUE_
 #define GCL_ITERATOR_QUEUE_
+
 #include <algorithm>
 
-#include <closed_error.h>
-#include <mutex.h>
+#include "mutex.h"
+
+#include "closed_error.h"
 
 namespace gcl {
 

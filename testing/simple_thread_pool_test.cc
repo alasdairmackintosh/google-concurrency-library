@@ -16,16 +16,17 @@
 
 #include <stdio.h>
 
+#include "functional.h"
+
 #include "atomic.h"
-#include "called_task.h"
+
 #include "condition_variable.h"
+
+#include "called_task.h"
 #include "mutable_thread.h"
 #include "simple_thread_pool.h"
 
 #include "gmock/gmock.h"
-#include <tr1/functional>
-
-namespace tr1 = std::tr1;
 
 namespace gcl {
 namespace {
@@ -36,7 +37,7 @@ TEST(SimpleThreadPoolTest, GetOne) {
   EXPECT_FALSE(NULL == new_thread);
 
   Called called(1);
-  new_thread->execute(tr1::bind(&Called::run, &called));
+  new_thread->execute(std::bind(&Called::run, &called));
   called.wait();
   EXPECT_EQ(1, called.count);
 }
@@ -47,7 +48,7 @@ TEST(SimpleThreadPoolTest, GetAndReturnOne) {
   EXPECT_FALSE(NULL == new_thread);
 
   Called called(1);
-  new_thread->execute(tr1::bind(&Called::run, &called));
+  new_thread->execute(std::bind(&Called::run, &called));
   called.wait();
   EXPECT_EQ(1, called.count);
 
@@ -64,7 +65,7 @@ TEST(SimpleThreadPoolTest, MultiExecute) {
   for (int i = 0; i < num_threads; ++i) {
     mutable_thread* new_thread = thread_pool.try_get_unused_thread();
     EXPECT_FALSE(NULL == new_thread);
-    new_thread->execute(tr1::bind(&Called::run, &called));
+    new_thread->execute(std::bind(&Called::run, &called));
   }
   called.wait();
   EXPECT_EQ(10, called.count);
@@ -79,7 +80,7 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
   for (int i = 0; i < (num_threads - 1); ++i) {
     mutable_thread* new_thread = thread_pool.try_get_unused_thread();
     EXPECT_FALSE(NULL == new_thread);
-    new_thread->execute(tr1::bind(&Called::run, &called));
+    new_thread->execute(std::bind(&Called::run, &called));
 
     if (a_thread == NULL) {
       a_thread = new_thread;
@@ -96,7 +97,7 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
   thread_pool.donate_thread(a_thread);
   new_thread = thread_pool.try_get_unused_thread();
   EXPECT_FALSE(NULL == new_thread);
-  new_thread->execute(tr1::bind(&Called::run, &called));
+  new_thread->execute(std::bind(&Called::run, &called));
 
   // Should now be able to wait for one last execution
   called.wait();

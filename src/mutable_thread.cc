@@ -12,30 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mutable_thread.h>
+#include "functional.h"
 
-#include <tr1/functional>
+#include "atomic.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
 
-#include <atomic.h>
-#include <condition_variable.h>
-#include <mutex.h>
-#include <thread.h>
-
-namespace tr1 = std::tr1;
-using std::atomic_int;
+#include "mutable_thread.h"
 
 namespace gcl {
 
 mutable_thread::mutable_thread() {
   atomic_init(&thread_state_, IDLE);
-  t_ = new thread(tr1::bind(&mutable_thread::run, this));
+  t_ = new thread(std::bind(&mutable_thread::run, this));
 }
 
 template<class F>
 mutable_thread::mutable_thread(F f) {
   atomic_init(&thread_state_, IDLE);
   execute(f);
-  t_ = new thread(tr1::bind(&mutable_thread::run, this));
+  t_ = new thread(std::bind(&mutable_thread::run, this));
 }
 
 mutable_thread::~mutable_thread() {
@@ -65,7 +62,7 @@ void mutable_thread::join() {
 }
 
 // Setup function for execution if there isn't currently something executing.
-bool mutable_thread::try_execute(tr1::function<void()> fn) {
+bool mutable_thread::try_execute(std::function<void()> fn) {
   if (!run_fn_ || !queued_fn_) {
     unique_lock<mutex> ul(thread_state_mu_);
     if (!is_done() && !is_joining()) {
@@ -90,7 +87,7 @@ bool mutable_thread::try_execute(tr1::function<void()> fn) {
   }
 }
 
-bool mutable_thread::execute(tr1::function<void()> fn) {
+bool mutable_thread::execute(std::function<void()> fn) {
   while ((run_fn_ && queued_fn_) && !is_done() && !is_joining()) {
     // Currently spin -- maybe swap this with a condvar instead.
     this_thread::sleep_for(chrono::milliseconds(1));
@@ -141,7 +138,7 @@ bool mutable_thread::thread_wait() {
   unique_lock<mutex> ul(thread_state_mu_);
   // Wait for the thread to be in a state where it should do something.
   thread_paused_cond_.wait(
-      ul, tr1::bind(&mutable_thread::ready_to_continue, this));
+      ul, std::bind(&mutable_thread::ready_to_continue, this));
   if (is_joining() || is_done()) {
     return false;
   } else {
@@ -154,12 +151,12 @@ bool mutable_thread::thread_wait() {
 void mutable_thread::finish_run() {
   if (queued_fn_) {
     // If there is a queued function swap that into the run_fn.
-    tr1::function<void()> empty;
+    std::function<void()> empty;
     run_fn_.swap(queued_fn_);
     queued_fn_.swap(empty);
   } else {
     // Set the run function to an empty function.
-    tr1::function<void()> empty;
+    std::function<void()> empty;
 
     // Is swap thread safe? probably not.
     run_fn_.swap(empty);

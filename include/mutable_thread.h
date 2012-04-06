@@ -15,15 +15,12 @@
 #ifndef GCL_MUTABLE_THREAD__
 #define GCL_MUTABLE_THREAD__
 
-#include <tr1/functional>
+#include "functional.h"
 
-#include <atomic.h>
-#include <condition_variable.h>
-#include <mutex.h>
-#include <thread.h>
-
-namespace tr1 = std::tr1;
-using std::atomic_int;
+#include "atomic.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
 
 namespace gcl {
 
@@ -56,13 +53,13 @@ class mutable_thread {
   // Setup function for execution if there isn't currently something executing
   // or if there is only a single task currently executing.
   // Return false if thread is currently doing other work.
-  bool try_execute(tr1::function<void()> fn);
+  bool try_execute(std::function<void()> fn);
 
   // Like try_execute, but blocks until there is an empty spot to queue up for
   // execution.
   // Return false if the thread is in the process of joining (and thus cannot
   // accept new work).
-  bool execute(tr1::function<void()> fn);
+  bool execute(std::function<void()> fn);
 
   // Join has been called but the thread is still executing.
   bool is_joining();
@@ -102,11 +99,11 @@ class mutable_thread {
 
   mutex thread_state_mu_;
   condition_variable thread_paused_cond_;
-  atomic_int thread_state_;
+  std::atomic<int> thread_state_;
 
   // Actively running function.
-  tr1::function<void()> run_fn_;
-  tr1::function<void()> queued_fn_;
+  std::function<void()> run_fn_;
+  std::function<void()> queued_fn_;
 };
 
 }  // namespace gcl

@@ -15,9 +15,9 @@
 #ifndef STREAM_MUTEX_H
 #define STREAM_MUTEX_H
 
-#include "cxx0x.h"
-
 #include "mutex.h"
+
+#include "cxx0x.h"
 
 template <class Stream >
 class stream_mutex;

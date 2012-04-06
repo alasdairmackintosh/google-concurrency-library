@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <stdio.h>
 #include <vector>
-using std::vector;
 
 #include "pipeline.h"
 #include "blocking_queue.h"
@@ -22,13 +25,10 @@ using std::vector;
 #include "source.h"
 
 #include "gtest/gtest.h"
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <stdio.h>
 
 using std::cout;
 using std::string;
+using std::vector;
 
 using namespace gcl;
 
@@ -77,9 +77,9 @@ class PipelineTest : public testing::Test {
 TEST_F(PipelineTest, Example) {
   simple_thread_pool pool;
 
-  function <int (string input)> f1 = find_uid;
-  function <User (int uid)> f2 = get_user;
-  function <void (User user)> c = consume_user;
+  std::function <int (string input)> f1 = find_uid;
+  std::function <User (int uid)> f2 = get_user;
+  std::function <void (User user)> c = consume_user;
 
   // Simple one-stage pipeline
   SimplePipelinePlan<string, int> p1(f1);

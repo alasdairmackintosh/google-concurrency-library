@@ -15,13 +15,13 @@
 #ifndef STD_CONDITION_VARIABLE_
 #define STD_CONDITION_VARIABLE_
 
-#include "mutex.h"
-#include "posix_errors.h"
-
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
+
+#include "system_error.h"
+#include "mutex.h"
 
 struct ConditionMonitor;
 class condition_variable {

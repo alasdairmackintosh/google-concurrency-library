@@ -16,19 +16,21 @@
 
 #include <stdio.h>
 
+#include "functional.h"
+
 #include "atomic.h"
-#include "called_task.h"
 #include "condition_variable.h"
-#include "mutable_thread.h"
 #include "thread.h"
 
-#include "gmock/gmock.h"
-#include <tr1/functional>
+#include "called_task.h"
+#include "mutable_thread.h"
 
-namespace tr1 = std::tr1;
+#include "gmock/gmock.h"
 
 namespace gcl {
 namespace {
+
+//using std::bind;
 
 TEST(MutableThreadTest, TestExecute) {
   Called called(2);
@@ -36,11 +38,11 @@ TEST(MutableThreadTest, TestExecute) {
 
   // Queue up 2 units of work, though first unit will not complete until the
   // count is incremented by the test thread (wait blocks).
-  t.execute(tr1::bind(&Called::run, &called));
-  t.execute(tr1::bind(&Called::wait, &called));
+  t.execute(std::bind(&Called::run, &called));
+  t.execute(std::bind(&Called::wait, &called));
   // This call should block until the run command completes since the queue is
   // only 2 entries deep.
-  t.execute(tr1::bind(&Called::run, &called));
+  t.execute(std::bind(&Called::run, &called));
   EXPECT_EQ(1, called.count.load());
 
   // Then release the thread by calling wait() and let the count go up.
@@ -56,7 +58,7 @@ TEST(MutableThreadTest, TestJoin) {
   Called called(1);
 
   mutable_thread t;
-  t.execute(tr1::bind(&Called::run, &called));
+  t.execute(std::bind(&Called::run, &called));
   called.wait();
 
   // Join should complete at this point.

@@ -16,10 +16,11 @@
 #define GCL_SERIAL_EXECUTOR_
 
 #include <queue>
-#include <tr1/functional>
 
-#include "condition_variable.h"
+#include "functional.h"
+
 #include "mutex.h"
+#include "condition_variable.h"
 #include "thread.h"
 
 namespace gcl {
@@ -38,11 +39,11 @@ class serial_executor {
 
   // Simple execute command to execute a function at a convenient time.
   // Copies the contents of the function object and runs in the executor thread.
-  void execute(std::tr1::function<void()> fn);
+  void execute(std::function<void()> fn);
 
  private:
   // Queue of functions to execute.
-  std::queue<std::tr1::function<void()> > function_queue;
+  std::queue<std::function<void()> > function_queue;
 
   // Bool indicating that the class is in a state of shut-down. Used to wake up
   // the run thread and and finish execution.
