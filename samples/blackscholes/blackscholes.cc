@@ -25,6 +25,7 @@
 #include <tr1/functional>
 #include <vector>
 
+#include <blocking_queue.h>
 #include <thread.h>
 #include <iterator_queue.h>
 #include <source.h>
@@ -37,7 +38,6 @@ using gcl::iterator_queue;
 using gcl::simple_thread_pool;
 using gcl::source;
 using gcl::Pipeline;
-using gcl::RunnablePipeline;
 
 #define PIPELINE 1
 #define ERR_CHK 1
@@ -337,27 +337,18 @@ int main (int argc, char **argv)
     printf("Size of data: %d\n", (int)(numOptions * (sizeof(OptionData) + sizeof(int))));
 
 #ifdef PIPELINE
-    // Run the analysis in a pipeline. Use a queue based on a
-    // std::vector, as we know all of the elements that we are
-    // processing in advance.
-    vector<int> input;
+    gcl::blocking_queue<int> input_queue;
     for(int i=0; i<nThreads; i++) {
-      input.push_back(i);
+      input_queue.push(i);
     }
-
-    typedef iterator_queue<vector<int>::const_iterator> int_queue;
-    typedef source<int, int_queue> int_source;
-    int_queue input_queue(input.begin(), input.end());
-    int_source input_source(&input_queue);
-    RunnablePipeline<int, int, int_source> p =
-        Pipeline<int, int>(bs_thread)
-        .Source<int_source>(input_source)
-        .Consume(process_result)
-        .Parallel(nThreads);
+    gcl::QueueBack<int> input_source(&input_queue);
+    // TODO(aberkan) Parallelify
+    Pipeline p = gcl::Source(input_source)|
+                 gcl::Filter(bs_thread)|
+                 gcl::Consume(process_result);
     simple_thread_pool pool(nThreads, nThreads);
 
-    p.run(pool);
-    p.wait();
+    p.run(pool);//.wait();
 #else
     // Run the analysis using threads
     thread* threads[nThreads];

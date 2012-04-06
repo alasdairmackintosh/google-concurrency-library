@@ -1,16 +1,4 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #ifndef GCL_PIPELINE_
 #define GCL_PIPELINE_
@@ -23,21 +11,22 @@
 #include <tr1/functional>
 
 #include <atomic.h>
+#include <queue_base.h>
 #include <countdown_latch.h>
 #include <simple_thread_pool.h>
 
 using std::tr1::function;
 using std::tr1::bind;
+using std::vector;
 using std::tr1::placeholders::_1;
+
 
 namespace gcl {
 
-// TODO(alasdair): This API is incomplete, and subject to change.
-// Submitting as-is in order to provide a framework for future
-// discussion and development.
+// BEGIN UTILITIES
 
-// Chains an in->intermediate function with an intermediate->out function
-// to make an in->out function
+class PipelineTerm { };
+
 template <typename IN_TYPE,
           typename INTERMEDIATE,
           typename OUT_TYPE>
@@ -47,340 +36,325 @@ static OUT_TYPE chain(function<INTERMEDIATE (IN_TYPE in)> intermediate_fn,
   return out_fn(intermediate_fn(in));
 }
 
-// Chains an in->intermediate function with an intermediate consumer
-// to make an in consumer
-template <typename IN_TYPE,
-          typename INTERMEDIATE>
-static void terminate(function<INTERMEDIATE (IN_TYPE in)> intermediate_fn,
-                     function<void (INTERMEDIATE in)> out_fn,
-                     IN_TYPE in) {
-  out_fn(intermediate_fn(in));
+template <typename T>
+PipelineTerm ignore(T t) { return PipelineTerm(); };
+
+template<typename T>
+PipelineTerm do_consume(function<void (T)> f, T t) {
+  f(t);
+  return PipelineTerm();
 }
 
 template <typename IN,
-          typename OUT,
-          typename SOURCE>
-class StartablePipeline;
-
-template <typename IN,
-          typename OUT,
-          typename SOURCE>
-class RunnablePipeline;
-
-template <typename IN,
-          typename OUT = IN>
-class Pipeline {
+          typename OUT>
+class filter {
  public:
-
-  Pipeline(function<OUT (IN input)> fn) : fn_(fn) {
-  }
-
-  Pipeline(const Pipeline& other) : fn_(other.fn_) {
-  }
-
-  Pipeline& operator=(const Pipeline& other) {
-    fn_ = other.fn_;
-    return *this;
-  }
-
-  template <typename NEW_OUT>
-  Pipeline<IN, NEW_OUT> Filter(function<NEW_OUT (OUT input)>filter) {
-    function<NEW_OUT (IN input)>chain_fn = bind(chain<IN, OUT, NEW_OUT>, fn_, filter, _1);
-     return Pipeline<IN, NEW_OUT>(chain_fn);
-  }
-
-  template <typename SOURCE>
-  StartablePipeline<IN, OUT, SOURCE> Source(SOURCE source);
-
-  OUT apply(IN in) {
-    return fn_(in);
-  }
-
- protected:
-  Pipeline() : fn_(NULL) {
-  }
-
-  function<OUT (IN input)> get_fn() {
-    return fn_;
-  }
-
- private:
-  function<OUT (IN input)> fn_;
+  virtual ~filter() {};
+  virtual OUT Apply(IN in) = 0;
+  virtual bool Run(function<PipelineTerm (OUT)> r) = 0;
+  virtual bool Run() = 0;
+  virtual filter<IN, OUT>* Clone() const = 0;
 };
 
-// StartablePipeline - adds a source
 template <typename IN,
-          typename OUT,
-          typename SOURCE>
-class StartablePipeline : public Pipeline<IN, OUT> {
+          typename MID,
+          typename OUT>
+class filter_chain : public filter<IN, OUT> {
  public:
-  StartablePipeline(const Pipeline<IN, OUT>& pipeline, SOURCE source)
-      : Pipeline<IN, OUT>(pipeline), source_(source) {
-  }
-
-  StartablePipeline(SOURCE source)
-      : source_(source) {
-  }
-
-  StartablePipeline(const StartablePipeline& other)
-      : Pipeline<IN, OUT>(other),
-        source_(other.source_) {
-  }
-
-  StartablePipeline& operator=(const StartablePipeline<IN, OUT, SOURCE>& other) {
-    Pipeline<IN, OUT>::operator=(other);
-    source_ = other.source_;
-    return *this;
-  }
-
-  using Pipeline<IN,OUT>::get_fn;
-  template <typename NEW_OUT>
-  StartablePipeline<IN, NEW_OUT, SOURCE> Filter(function<NEW_OUT (OUT input)>filter) {
-    function<NEW_OUT (IN input)> chain_fn = bind(chain<IN, OUT, NEW_OUT>, get_fn(), filter, _1);
-    return StartablePipeline<IN, NEW_OUT, SOURCE>(chain_fn);
-  }
-
-  RunnablePipeline<IN, OUT, SOURCE> Consume(function<void (OUT result)> sink);
-
- protected:
-  SOURCE& get_source() {
-    return source_;
-  }
- private:
-  SOURCE source_;
-
+  filter_chain(class filter<IN, MID> *first,
+               class filter<MID, OUT> *second)
+      : first_(first),
+        second_(second) {};
+  virtual ~filter_chain() {
+    delete first_;
+    delete second_;
+  };
+  virtual OUT Apply(IN in) {
+    return second_->Apply(first_->Apply(in));
+  };
+  virtual filter<IN, OUT>* Clone() const {
+    return new filter_chain<IN, MID, OUT>(first_->Clone(), second_->Clone());
+  };
+  virtual bool Run(function<PipelineTerm (OUT)> r);
+  virtual bool Run();
+  class filter<IN, MID>* first_;
+  class filter<MID, OUT>* second_;
 };
 
-// RunnablePipeline - adds a consumer, and provides a run() method
 template <typename IN,
-          typename OUT,
-          typename SOURCE>
-class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
- public:
-  RunnablePipeline(StartablePipeline<IN, OUT, SOURCE>& start, function<void (IN input)> consumer)
-      : StartablePipeline<IN, OUT, SOURCE>(start),
-        n_threads_(0),
-        consumer_(consumer),
-        end_latch_(1) {
-    set_default_end_fn();
-  }
+          typename MID,
+          typename OUT>
+bool filter_chain<IN, MID, OUT>::Run(function<PipelineTerm (OUT)> r) {
+  function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
+  function<PipelineTerm (MID)> p = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+  return first_->Run(p);
+};
 
-  RunnablePipeline(SOURCE source)
-      : StartablePipeline<IN, OUT, SOURCE>(source),
-        n_threads_(0),
-        consumer_(NULL),
-        end_latch_(1) {
-    set_default_end_fn();
-  }
-
-  RunnablePipeline(SOURCE source, function<void (OUT output)> consumer)
-    : StartablePipeline<IN, OUT, SOURCE>(source),
-      n_threads_(0),
-      consumer_(consumer),
-      end_latch_(1) {
-    set_default_end_fn();
-  }
-
-  RunnablePipeline(const RunnablePipeline& other)
-      : StartablePipeline<IN, OUT, SOURCE>(other),
-        n_threads_(other.n_threads_),
-        consumer_(other.consumer_),
-        end_latch_(1) {
-    set_end_fn(other);
-  }
-
-  RunnablePipeline& operator=(const RunnablePipeline<IN, OUT, SOURCE>& other) {
-    StartablePipeline<IN, OUT, SOURCE>::operator=(other);
-    n_threads_ = other.n_threads_;
-    consumer_ = other.consumer_;
-    return *this;
-  }
-
-  ~RunnablePipeline() {
-    for (size_t i = 0; i < children_.size(); i++) {
-      delete children_[i];
-    }
-  }
-
- protected:
-  RunnablePipeline(const RunnablePipeline& other, function<void ()> end_fn)
-      : StartablePipeline<IN, OUT, SOURCE>(other),
-        n_threads_(other.n_threads_),
-        consumer_(other.consumer_),
-        end_fn_(end_fn),
-        default_end_(false),
-        end_latch_(0) {
-  }
-
-  RunnablePipeline(const RunnablePipeline& other, int n_threads)
-      : StartablePipeline<IN, OUT, SOURCE>(other),
-        n_threads_(n_threads),
-        consumer_(other.consumer_),
-        end_latch_(1) {
-    set_end_fn(other);
-  }
-
-  void set_end_fn(const RunnablePipeline& other) {
-    if (other.default_end_) {
-      set_default_end_fn();
-    } else {
-      end_fn_ = other.end_fn_;
-      default_end_ = false;
-    }
-  }
-
- public:
-  // Sets an explicit function to be called when the Pipeline ends.
-  // Cannot be combined with wait()
-  RunnablePipeline<IN, OUT, SOURCE> OnEnd(function<void ()> end_fn) {
-    return RunnablePipeline<IN, OUT, SOURCE>(*this, end_fn);
-  }
-
-  RunnablePipeline<IN, OUT, SOURCE> Parallel(int n_threads) {
-    return RunnablePipeline<IN, OUT, SOURCE>(*this, n_threads);
-  }
-
-  void run() {
-    if (n_threads_ > 0) {
-      std::cerr << "Warning - running in serial mode\n";
-    }
-    n_threads_ = 0;
-    run_internal();
-  }
-
-  // Runs this pipeline in a threadpool.
-  // TODO(alasdair): What kind of threadpool do we support?
-  // TODO(alasdair): How do we handle errors?
-  void run(simple_thread_pool& pool) {
-    // If we aren't running mutiple threads, then just run this
-    // pipeline in a threadpool's thread. Otherwise create mutiple
-    // children, and run each child in a separate thread. We could
-    // probably make this slightly more efficient by creating n-1
-    // children and re-sing the main object, but the whole child thing
-    // probably need rethinking anyway.
-    if (n_threads_ == 0) {
-      mutable_thread* thread = pool.try_get_unused_thread();
-      if (thread != NULL) {
-        function <void ()> f = bind(
-            &RunnablePipeline<IN, OUT, SOURCE>::run_internal, this);
-        if (!thread->execute(f)) {
-          // TODO(alasdair): What do we do here?
-          throw std::exception();
-        }
-      } else {
-        // TODO(alasdair): What do we do here?
-        throw std::exception();
-      }
-    } else {
-      // TODO(alasdair): This is a bit messy. We need to have
-      // individual source objects for each thread that is running. (A
-      // source is not threadsafe, in that it is only designed to be
-      // called from a single thread, although multiple sources
-      // pointing to the same queue can be called from different
-      // threads.) Also, when do we spawn a new thread versus running
-      // in the same thread as the previous stage?
-      atomic_init(&count_, n_threads_);
-      children_.reserve(n_threads_);
-      for (int i = 0; i < n_threads_; i++) {
-        mutable_thread* thread = pool.try_get_unused_thread();
-        if (thread != NULL) {
-          RunnablePipeline *p = new RunnablePipeline(*this);
-          p->n_threads_ = 0;
-          // Set each child to invoke the main pipeline's end_thread
-          // function. When all threads finish we will invoke the main
-          // pipeline's end_fn_.
-          p->end_fn_ = bind(&RunnablePipeline::end_thread, this);
-          children_.push_back(p);
-          function <void ()> f = bind(
-              &RunnablePipeline<IN, OUT, SOURCE>::run_internal, p);
-          if (!thread->execute(f)) {
-            // TODO(alasdair): What do we do here?
-            throw std::exception();
-          }
-        } else {
-          // TODO(alasdair): What do we do here? This shouldn't really
-          // happen, but we should probably have a consistent answer
-          // to how to handle occupied threads, and whether we want to
-          // push that question upstream -- since get_unused_thread()
-          // should theoretically return a thread which is not running
-          // anything at this point.
-          throw std::exception();
-        }
-      }
-    }
-  }
-
-  // Blocks until the pipeline has finished. Throws an exception if a
-  // custom function was defined using OnEnd
-  void wait()  throw (std::logic_error) {
-    if (!default_end_) {
-      throw std::logic_error("Cannot wait if EndFn defined.");
-    }
-    end_latch_.wait();
-  }
-
- private:
-  using StartablePipeline<IN, OUT, SOURCE>::get_source;
-  void run_internal() {
-    bool closed = false;
-    while(!closed) {
-      if (!get_source().has_value()) {
-        get_source().wait();
-      }
-      closed = get_source().is_closed();
-      if (!closed) {
-        consumer_(get_source().get());
-      }
-    }
-    end_fn_();
-  }
-
-  // Invoked when then pipeline has finished, unless a custom end_fn
-  // has been set. Counts down the end_latch, so that a thread blocked
-  // in wait() can return.
-  void default_end() {
-    end_latch_.count_down();
-  }
-
-  void set_default_end_fn() {
-    end_fn_ = bind(&RunnablePipeline::default_end, this);
-    default_end_ = true;
-  }
-
-  void end_thread() {
-    int left = --count_;
-    if (left == 0) {
-      end_fn_();
-    }
-  }
-
-  int n_threads_;
-  std::vector<RunnablePipeline<IN, OUT, SOURCE>*> children_;
-  function <void(IN input)> consumer_;
-
-  function <void()> end_fn_;
-  bool default_end_;
-  countdown_latch end_latch_;
-  atomic_int count_;
+template <typename IN,
+          typename MID,
+          typename OUT>
+bool filter_chain<IN, MID, OUT>::Run() {
+  function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
+  function<PipelineTerm (OUT)> r = ignore<OUT>;
+  function<PipelineTerm (MID)> p = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+  return first_->Run(p);
 };
 
 template <typename IN,
           typename OUT>
-template <typename SOURCE>
-StartablePipeline<IN, OUT, SOURCE> Pipeline<IN, OUT>::Source(SOURCE source) {
-  return StartablePipeline<IN, OUT, SOURCE>(*this, source);
+class filter_function : public filter<IN, OUT> {
+ public:
+  filter_function(function<OUT (IN)> f)
+      : f_(f) { };
+  virtual ~filter_function() { };
+  virtual OUT Apply(IN in) {
+    return f_(in);
+  }
+  virtual bool Run(function<PipelineTerm (OUT)> r) {
+    throw;
+  }
+  virtual bool Run() {
+    throw;
+  }
+  virtual class filter<IN, OUT>* Clone() const {
+    return new filter_function<IN, OUT>(f_);
+  }
+  function<OUT (IN)> f_;
+};
+
+template <typename OUT>
+class filter_thread_point : public filter<PipelineTerm, OUT> {
+ public:
+  filter_thread_point(queue_back<OUT> *qb) : qb_(qb) { };
+  ~filter_thread_point() { };
+  virtual OUT Apply(PipelineTerm IN) {
+    throw;
+    return qb_->pop();
+  }
+  virtual bool Run(function<PipelineTerm (OUT)> r) {
+    OUT out;
+    queue_op_status status = qb_->wait_pop(out);
+    if (status != success) {
+      return false;
+    }
+    r(out);
+    return true;
+  }
+  virtual bool Run() {
+    throw;
+  }
+
+  virtual filter<PipelineTerm, OUT>* Clone() const {
+    return new filter_thread_point<OUT>(qb_);
+  }
+  queue_back<OUT> *qb_;
+};
+
+void RunFilter(filter<PipelineTerm, PipelineTerm> *f) {
+  // Todo quitting stuff...
+  bool b = true;
+  while (b) {
+    b = f->Run();
+  }
 }
 
-template <typename IN,
-          typename OUT,
-          typename SOURCE>
-RunnablePipeline<IN, OUT, SOURCE> StartablePipeline<IN, OUT, SOURCE>::Consume(
-    function <void(OUT output)> consumer) {
-  function<OUT (IN in)> fn = get_fn();
-  function<void (IN in)> consumer_fn = bind(terminate<IN, OUT>,
-                                            fn, consumer, _1);
-  return RunnablePipeline<IN, OUT, SOURCE>(*this, consumer_fn);
+template <typename OUT>
+class pipeline_segment {
+ public:
+  pipeline_segment(filter<PipelineTerm, OUT> *f,
+                   pipeline_segment<PipelineTerm> *next)
+      : f_(f), next_(next) { };
+  virtual ~pipeline_segment() {
+    delete f_;
+    delete next_;
+  }
+  void Run(simple_thread_pool& pool);
+  pipeline_segment<OUT> *Clone() const {
+    return new pipeline_segment<OUT>(f_->Clone(), next_->Clone());
+  }
+
+  filter<PipelineTerm, OUT> *f_;
+  pipeline_segment<PipelineTerm> *next_;
+
+};
+
+template <typename OUT>
+void pipeline_segment<OUT>::Run(simple_thread_pool& pool) {
+  throw;
+}
+template <>
+void pipeline_segment<PipelineTerm>::Run(simple_thread_pool& pool) {
+  pool.try_get_unused_thread()->
+      execute(bind(RunFilter, f_));
+  if(next_) {
+    next_->Run(pool);
+  }
 }
 
+template<typename MID,
+         typename OUT>
+pipeline_segment<OUT>* Chain(const pipeline_segment<MID>* p,
+                             const filter<MID, OUT>* f) {
+  pipeline_segment<OUT> *ps = new pipeline_segment<OUT>(
+      new filter_chain<PipelineTerm, MID, OUT>(p->f_->Clone(),
+                                               f->Clone()),
+      NULL);
+  return ps;
+}
+
+// END UTILITIES
+
+// BEGIN CLASSES
+
+template<typename IN,
+         typename OUT>
+class FullPipeline {
+ public:
+  FullPipeline(filter<IN, PipelineTerm> *leading,
+               pipeline_segment<PipelineTerm> *chain,
+               pipeline_segment<OUT> *trailing)
+      : leading_(leading),
+        chain_(chain),
+        trailing_(trailing) {
+  };
+
+  ~FullPipeline() {
+    delete leading_;
+    delete chain_;
+    delete trailing_;
+  };
+  void run(simple_thread_pool& pool);
+  filter<IN, PipelineTerm> *leading_clone() const {
+    return leading_ ? leading_->Clone() : NULL;
+  }
+  pipeline_segment<PipelineTerm> *chain_clone() const {
+    return chain_ ? chain_->Clone() : NULL;
+  }
+  pipeline_segment<OUT> *trailing_clone() const {
+    return trailing_ ? trailing_->Clone() : NULL;
+  }
+
+  filter<IN, PipelineTerm> *leading_;
+  pipeline_segment<PipelineTerm> *chain_;
+  pipeline_segment<OUT> *trailing_;
+};
+
+template<typename IN,
+         typename OUT>
+class SimplePipeline {
+ public:
+  SimplePipeline(function<OUT (IN in)> f)
+      : f_(new filter_function<IN, OUT>(f)) { };
+  SimplePipeline(filter<IN, OUT> *f)
+      : f_(f) { };
+
+  OUT Apply(IN in) {
+    return f_->Apply(in);
+  }
+
+  filter<IN, OUT> *f_;
+};
+
+typedef FullPipeline<PipelineTerm, PipelineTerm> Pipeline;
+
+// END CLASSES
+
+// BEGIN CONSTRUCTORS
+
+template<typename OUT>
+FullPipeline<PipelineTerm, OUT> Source(queue_back<OUT> *b) {
+  pipeline_segment<OUT>* p =
+      new pipeline_segment<OUT>(new filter_thread_point<OUT>(b), NULL);
+  return FullPipeline<PipelineTerm, OUT>(NULL, NULL, p);
+}
+
+template<typename IN,
+         typename OUT>
+SimplePipeline<IN, OUT> Filter(OUT f(IN)) {
+  return SimplePipeline<IN, OUT>(f);
+}
+
+template<typename IN,
+         typename OUT>
+SimplePipeline<IN, OUT> Filter(function<OUT (IN)> f) {
+  return SimplePipeline<IN, OUT>(f);
+}
+
+template<typename IN>
+SimplePipeline<IN, PipelineTerm> Consume(void consumer(IN)) {
+  return function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer, _1));
+}
+
+template<typename IN>
+SimplePipeline<IN, PipelineTerm> Consume(function<void (IN)> consumer) {
+  return function<PipelineTerm (IN)>(bind(do_consume<IN>, consumer, _1));
+}
+
+template<typename IN>
+SimplePipeline<IN, PipelineTerm> Sink(queue_front<IN> front) {
+  function<void (IN)> f1 = bind(&queue_front<IN>::put, front, _1);
+  return Consume(f1);
+}
+
+// END CONSTRUCTORS
+
+// BEGIN PIPES
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+SimplePipeline<IN, OUT> operator|(const SimplePipeline<IN, MID>& p1,
+                                  const SimplePipeline<MID, OUT>& p2) {
+  return SimplePipeline<IN, OUT>(
+      new filter_chain<IN, MID, OUT>(p1.f_->Clone(),
+                                     p2.f_->Clone()));
+}
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+FullPipeline<IN, OUT> operator|(const FullPipeline<IN, MID>& p1,
+                                const SimplePipeline<MID, OUT>& p2) {
+  return FullPipeline<IN, OUT>(p1.leading_clone(),
+                               p1.chain_clone(),
+                               Chain(p1.trailing_, p2.f_));
+}
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+FullPipeline<IN, OUT> operator|(const SimplePipeline<IN, MID>& p1,
+                                const FullPipeline<MID, OUT>& p2) {
+  filter<IN, PipelineTerm> *leading =
+      filter_chain<IN, MID, PipelineTerm>(p1.f_, p2.leading_);
+  return FullPipeline<IN, OUT>(leading,
+                               p2.chain_clone(),
+                               p2.trailing_clone());
+}
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+FullPipeline<IN, OUT> operator|(const FullPipeline<IN, MID>& p1,
+                                const FullPipeline<MID, OUT>& p2) {
+  pipeline_segment<PipelineTerm> *p =
+      Chain(p1.trailing_, p2.leading_)->chain(p2->chain_clone());
+  if (p1.chain_) {
+    p = p1.chain_clone()->chain(p);
+  }
+  return FullPipeline<IN, OUT>(p1.leading_clone(),
+                               p,
+                               p2.trailing_clone());
+}
+
+// END PIPES
+
+template<>
+void FullPipeline<PipelineTerm, PipelineTerm>::run(simple_thread_pool& pool) {
+  if(chain_) {
+    chain_->Run(pool);
+  }
+  trailing_->Run(pool);
+}
 }
 #endif  // GCL_PIPELINE_

@@ -128,6 +128,12 @@ counter_test: CppFlags += -Iinclude
 counter_test: $(COUNTER_TEST_OBJS) std_atomic.a std_mutex.a
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
 
+# The pipeline tests.
+PIPELINE_TEST_OBJS := testing/pipeline_test.o $(STD_THREAD_OBJS)
+pipeline_test: CppFlags += -Iinclude -Itesting $(GTEST_I)
+pipeline_test: $(PIPELINE_TEST_OBJS) std_atomic.a std_mutex.a $(GTEST_MAIN_A)
+	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
+
 RawTests: atomic_c_test atomic_cpp_test counter_test
 	./atomic_c_test
 	./atomic_cpp_test
