@@ -1,4 +1,16 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #ifndef GCL_PIPELINE_
 #define GCL_PIPELINE_
@@ -8,22 +20,32 @@
 
 #include <exception>
 #include <stdexcept>
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+#include <functional>
+#else
 #include <tr1/functional>
+#endif
 
 #include <atomic.h>
 #include <barrier.h>
 #include <buffer_queue.h>
-#include <countdown_latch.h>
+#include <latch.h>
 #include <queue_base.h>
-#include <countdown_latch.h>
 #include <simple_thread_pool.h>
 
 namespace gcl {
 
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+using std::function;
+using std::bind;
+using std::placeholders::_1;
+#else
 using std::tr1::function;
 using std::tr1::bind;
-using std::vector;
 using std::tr1::placeholders::_1;
+#endif
+
+using std::vector;
 
 // BEGIN UTILITIES
 //TODO(aberkan): Common naming scheme
@@ -94,9 +116,9 @@ class PipelineExecution {
 
   PipelinePlan* pp_;
   simple_thread_pool* pool_;
-  countdown_latch start_;
+  latch start_;
   barrier* thread_end_;
-  countdown_latch end_;
+  latch end_;
   int num_threads_;
   bool done_;
 };
@@ -137,7 +159,8 @@ template <typename IN,
           typename OUT>
 bool filter_chain<IN, MID, OUT>::Run(function<PipelineTerm (OUT)> r) {
   function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
-  function<PipelineTerm (MID)> p = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+  function<PipelineTerm (MID)> p
+    = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
   return first_->Run(p);
 };
 
@@ -147,7 +170,8 @@ template <typename IN,
 bool filter_chain<IN, MID, OUT>::Run() {
   function<OUT (MID)> m = bind(&filter<MID, OUT>::Apply, second_, _1);
   function<PipelineTerm (OUT)> r = ignore<OUT>;
-  function<PipelineTerm (MID)> p = bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
+  function<PipelineTerm (MID)> p =
+    bind(chain<MID, OUT, PipelineTerm>, m, r, _1);
   return first_->Run(p);
 };
 
@@ -193,7 +217,7 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
     OUT out;
     // TODO(aberkan): What if this throws?
     queue_op_status status = qb_->wait_pop(out);
-    if (status != success) {
+    if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
       return false;
     }
     r(out);

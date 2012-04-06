@@ -16,7 +16,7 @@
 #include "iterator_queue.h"
 
 #include "atomic.h"
-#include "countdown_latch.h"
+#include "latch.h"
 #include "thread.h"
 
 #include "gmock/gmock.h"
@@ -28,13 +28,13 @@ using testing::_;
 
 using std::vector;
 using gcl::iterator_queue;
-using gcl::countdown_latch;
+using gcl::latch;
 
 class IteratorQueueTest : public testing::Test {
 };
 
 typedef std::vector<int> int_vector;
-typedef std::vector<countdown_latch*> latch_vector;
+typedef std::vector<latch*> latch_vector;
 
 // Verifies that we can create a queue from a basic vector, and read
 // its values.
@@ -58,9 +58,9 @@ TEST_F(IteratorQueueTest, BasicRead) {
 }
 
 static void GetAndBlock(iterator_queue<latch_vector::const_iterator>* queue,
-                        countdown_latch* started) {
+                        latch* started) {
   while (!queue->is_closed()) {
-    countdown_latch* latch = queue->pop();
+    latch* latch = queue->pop();
     started->count_down();
     latch->wait();
   }
@@ -70,12 +70,12 @@ static void GetAndBlock(iterator_queue<latch_vector::const_iterator>* queue,
 TEST_F(IteratorQueueTest, ThreadedRead) {
   latch_vector latches;
   for (int i = 0; i < 4; i++) {
-    latches.push_back(new countdown_latch(1));
+    latches.push_back(new latch(1));
   }
   iterator_queue<latch_vector::const_iterator> queue(latches.begin(), latches.end());
-  countdown_latch latch1(1);
-  countdown_latch latch2(1);
-  countdown_latch latch3(1);
+  latch latch1(1);
+  latch latch2(1);
+  latch latch3(1);
   thread thread1(tr1::bind(GetAndBlock, &queue, &latch1));
   thread thread2(tr1::bind(GetAndBlock, &queue, &latch2));
   thread thread3(tr1::bind(GetAndBlock, &queue, &latch3));

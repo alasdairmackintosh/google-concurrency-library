@@ -17,11 +17,11 @@
 
 #include "mutex.h"
 #include "thread.h"
-#include "countdown_latch.h"
+#include "latch.h"
 #include "test_mutex.h"
 #include <iostream>
 
-using gcl::countdown_latch;
+using gcl::latch;
 
 // A ThreadBlocker will block when it is invoked from a given thread,
 // but will not block when invoked from other threads. It enables the
@@ -89,8 +89,8 @@ private:
   thread::id id_;
   mutex count_mutex_;
   int count_;
-  countdown_latch block_latch_;
-  countdown_latch start_latch_;
+  latch block_latch_;
+  latch start_latch_;
 };
 
 // A thread used in conjunction with a ThreadBlocker

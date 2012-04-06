@@ -19,7 +19,6 @@
 
 #include "blocking_queue.h"
 
-#include "countdown_latch.h"
 #include "atomic.h"
 #include "test_mutex.h"
 
@@ -35,7 +34,6 @@ using testing::Invoke;
 using testing::InSequence;
 
 using gcl::blocking_queue;
-using gcl::countdown_latch;
 
 size_t kSize = 3;
 size_t kLargeSize = 300;

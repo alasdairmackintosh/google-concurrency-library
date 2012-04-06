@@ -18,41 +18,29 @@ namespace tr1 = std::tr1;
 namespace gcl {
 
 barrier::barrier(size_t num_threads) throw (std::invalid_argument)
-    : num_to_block_left_(num_threads),
-      num_to_exit_(num_threads),
+    : latch_(num_threads, tr1::bind(&barrier::wait_function, this)),
       function_(NULL) {
-  if (num_threads == 0) {
-    throw std::invalid_argument("num_threads must be > 0");
-  }
 }
 
 barrier::barrier(size_t num_threads, tr1::function<void()> function)
-    throw (std::invalid_argument)
-    : num_to_block_left_(num_threads),
-      num_to_exit_(num_threads),
+  throw (std::invalid_argument)
+    : latch_(num_threads, tr1::bind(&barrier::wait_function, this)),
       function_(function) {
-  if (num_threads == 0) {
-    throw std::invalid_argument("num_threads must be > 0");
-  }
 }
 
-bool barrier::await()  throw (std::logic_error) {
-  unique_lock<mutex> ul(lock_);
-  if (num_to_block_left_ == 0) {
-    throw std::logic_error("called too many times.");
-  }
-  if (--num_to_block_left_ > 0) {
-    while (num_to_block_left_ != 0) {
-      cv_.wait(ul);
-    }
-  } else {
-    if (function_ != NULL) {
-      function_();
-    }
-    cv_.notify_all();
-  }
-  num_to_exit_--;
-  return (num_to_exit_ == 0);
+barrier::~barrier() {
 }
 
+void barrier::await()  throw (std::logic_error) {
+  latch_.count_down_and_wait();
+}
+
+void barrier::wait_function() {
+  if (function_ != NULL) {
+    function_();
+  }
+}
+void barrier::set_num_threads(size_t num_threads) {
+  latch_.reset(num_threads);
+}
 }  // End namespace gcl

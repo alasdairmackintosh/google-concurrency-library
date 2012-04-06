@@ -33,25 +33,9 @@ using std::atomic_int;
 using gcl::barrier;
 
 static size_t kNumThreads = 3;
-static size_t kZero = 0;
 
 class BarrierTest : public testing::Test {
 };
-
-// Verifies that we cannot create a barrier with an illegal number of
-// threads.
-TEST_F(BarrierTest, InvalidConstructorArg) {
-  try {
-    barrier b(kZero);
-    FAIL();
-  } catch (std::invalid_argument expected) {
-  }
-  try {
-    barrier b(kZero, NULL);
-    FAIL();
-  } catch (std::invalid_argument expected) {
-  }
-}
 
 // Invokes await() on a barrier, and counts the number of exceptions
 // thrown. If progress_count is non-null, it is incremented before
@@ -64,12 +48,9 @@ static void WaitForBarrierCountExceptions(barrier* b,
     if (progress_count != NULL) {
       (*progress_count)++;
     }
-    bool result = b->await();
+    b->await();
     if (progress_count != NULL) {
       (*progress_count)++;
-      if (result) {
-        (*progress_count)++;
-      }
     }
   } catch (std::logic_error e) {
     (*exception_count)++;
@@ -150,23 +131,44 @@ TEST_F(BarrierTest, FunctionInvocation) {
   }
   EXPECT_EQ(0, num_exceptions.load());
 
-  // We expect one of the threads to have incremented its progress
-  // count to 3, because await() returned true. All other threads will
-  // have incremented to 2.
-  size_t num_at_2 = 0;
-  int num_at_3 = 0;
   for (size_t i = 0; i < kNumThreads; i++) {
     int progress = counters[i].load();
-    if (progress == 2) {
-      num_at_2++;
-    } else if (progress == 3) {
-      num_at_3++;
-    }
+    EXPECT_EQ(2, progress);
   }
-  EXPECT_EQ(1, num_at_3);
-  EXPECT_EQ(kNumThreads - 1, num_at_2);
 
   for (size_t i = 0; i < kNumThreads; i++) {
+    delete threads[i];
+  }
+}
+
+TEST_F(BarrierTest, Reset) {
+  barrier b(kNumThreads);
+  atomic_int num_exceptions;
+  num_exceptions = 0;
+
+  thread* threads[kNumThreads];
+  for (size_t i = 0; i < kNumThreads; i++) {
+    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
+                                      &b, static_cast<atomic_int*>(NULL),
+                                      &num_exceptions));
+  }
+  for (size_t i = 0; i < kNumThreads; i++) {
+    threads[i]->join();
+  }
+  EXPECT_EQ(0, num_exceptions.load());
+
+  b.set_num_threads(kNumThreads - 1);
+  for (size_t i = 0; i < kNumThreads - 1; i++) {
+    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
+                                      &b, static_cast<atomic_int*>(NULL),
+                                      &num_exceptions));
+  }
+  for (size_t i = 0; i < kNumThreads - 1; i++) {
+    threads[i]->join();
+  }
+  EXPECT_EQ(0, num_exceptions.load());
+
+  for (size_t i = 0; i < kNumThreads - 1; i++) {
     delete threads[i];
   }
 }

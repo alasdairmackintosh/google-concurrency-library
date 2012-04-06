@@ -15,6 +15,7 @@
 #ifndef QUEUE_BASE_H
 #define QUEUE_BASE_H
 
+#include <stddef.h>
 #include <iterator>
 #include <iostream>
 
@@ -105,8 +106,11 @@ class queue_common
     virtual const char* name() = 0;
 
   protected:
-    virtual ~queue_common() CXX0X_DEFAULTED_EASY
+    virtual ~queue_common();
 };
+
+template <typename Element>
+queue_common<Element>::~queue_common() CXX0X_DEFAULTED_EASY
 
 template <typename Element>
 class queue_front
@@ -127,8 +131,11 @@ class queue_front
     virtual queue_op_status wait_push(const Element& x) = 0;
 
   protected:
-    virtual ~queue_front() CXX0X_DEFAULTED_EASY
+    virtual ~queue_front();
 };
+
+template <typename Element>
+queue_front<Element>::~queue_front() CXX0X_DEFAULTED_EASY
 
 template <typename Element>
 class queue_back
@@ -149,8 +156,11 @@ class queue_back
     virtual queue_op_status wait_pop(Element&) = 0;
 
   protected:
-    virtual ~queue_back() CXX0X_DEFAULTED_EASY
+    virtual ~queue_back();
 };
+
+template <typename Element>
+queue_back<Element>::~queue_back() CXX0X_DEFAULTED_EASY
 
 template <typename Element>
 queue_front_iter<Element>&

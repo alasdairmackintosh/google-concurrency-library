@@ -67,7 +67,7 @@ TEST(LockGuardTest, Adopt) {
 
 TEST(UniqueLockTest, DefaultConstructor) {
   unique_lock<MockMutex> l;
-  EXPECT_EQ(NULL, l.mutex());
+  EXPECT_EQ((MockMutex*)NULL, l.mutex());
   EXPECT_FALSE(l.owns_lock());
 }
 
@@ -146,8 +146,8 @@ TEST(UniqueLockTest, ReleaseUnlocked) {
   unique_lock<MockMutex> l(mu, defer_lock);
   EXPECT_EQ(&mu, l.mutex());
   EXPECT_EQ(&mu, l.release());
-  EXPECT_EQ(NULL, l.mutex());
-  EXPECT_EQ(NULL, l.release());
+  EXPECT_EQ((MockMutex*)NULL, l.mutex());
+  EXPECT_EQ((MockMutex*)NULL, l.release());
 }
 
 TEST(UniqueLockTest, ReleaseLocked) {
@@ -166,8 +166,8 @@ TEST(UniqueLockTest, ReleaseLocked) {
   cp.Check("locked");
   EXPECT_EQ(&mu, l.release());
   cp.Check("unlocked");
-  EXPECT_EQ(NULL, l.mutex());
-  EXPECT_EQ(NULL, l.release());
+  EXPECT_EQ((MockMutex*)NULL, l.mutex());
+  EXPECT_EQ((MockMutex*)NULL, l.release());
 }
 
 

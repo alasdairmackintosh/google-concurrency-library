@@ -17,20 +17,81 @@
 
 // See ../testing/cxx0x_test.cc for examples of use.
 
-#if defined(__GNUC__) && defined(__GXX_EXPERIMENTAL_CXX0X__) && __GNUC__ == 4
+#if defined(__GNUC__) && __GNUC__ == 4
+
+#ifndef __APPLE__
+#define HAS_CXX0X_PRIMITIVE_THREAD_LOCAL
+#endif
+
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
 #if __GNUC_MINOR__ >= 3
 #define HAS_CXX0X_STATIC_ASSERT
 #define HAS_CXX0X_RVREF
+#define HAS_CXX0X_VARIADIC_TMPL
+#define HAS_CXX0X_DFLT_FUNC_TMPL_ARGS
+#define HAS_CXX0X_DECL_TYPE
+#define HAS_CXX0X_EXTERN_TEMPLATE
+#define HAS_CXX0X___FUNC__
+#define HAS_CXX0X_C99_PREPROCESSOR
+#define HAS_CXX0X_LONG_LONG
 #endif
 #if __GNUC_MINOR__ >= 4
 #define HAS_CXX0X_DEFAULTED
 #define HAS_CXX0X_DELETED
 #define HAS_CXX0X_AUTO_VAR
+#define HAS_CXX0X_NEW_FUNC_SYNTAX
 #define HAS_CXX0X_EXPLICIT_AGGR_INIT
 #define HAS_CXX0X_STRONG_ENUM
+#define HAS_CXX0X_VARIADIC_TMPL_TMPL
+#define HAS_CXX0X_INIT_LIST
+#define HAS_CXX0X_EXPR_SFINAE
+#define HAS_CXX0X_NEW_CHAR_TYPES
+#define HAS_CXX0X_EXTENDED_SIZEOF
+#define HAS_CXX0X_INLINE_NAMESPACE
+#define HAS_CXX0X_ATOMIC_OPS
+#define HAS_CXX0X_PROPOGATE_EXCEPT
 #endif
 #if __GNUC_MINOR__ >= 5
 #define HAS_CXX0X_EXPLICIT_CONV
+#define HAS_CXX0X_LAMBDA
+#define HAS_CXX0X_UNICODE_STRING_LIT
+#define HAS_CXX0X_RAW_STRING_LIT
+#define HAS_CXX0X_UCN_NAME_LIT
+#define HAS_CXX0X_STANDARD_LAYOUT
+#define HAS_CXX0X_LOCAL_TMPL_ARGS
+#endif
+#if __GNUC_MINOR__ >= 6
+#define HAS_CXX0X_MOVE_SPECIAL
+#define HAS_CXX0X_NULLPTR
+#define HAS_CXX0X_FORWARD_ENUM
+#define HAS_CXX0X_CONSTEXPR_VAR
+#define HAS_CXX0X_CONSTEXPR_FLD
+#define HAS_CXX0X_CONSTEXPR_FUN
+#define HAS_CXX0X_CONSTEXPR_CTOR
+#define HAS_CXX0X_UNRESTRICT_UNION
+#define HAS_CXX0X_RANGE_FOR
+#define HAS_CXX0X_CORE_NOEXCEPT
+#endif
+#if __GNUC_MINOR__ >= 7
+#define HAS_CXX0X_EXTENDED_FRIEND
+#define HAS_CXX0X_EXPLICIT_OVERRIDE
+#endif
+/* Unimplemented:
+// #define HAS_CXX0X_RVREF_THIS
+// #define HAS_CXX0X_FIELD_INIT
+// #define HAS_CXX0X_TMPL_ALIAS
+// #define HAS_CXX0X_USER_DEFINED_LIT
+// #define HAS_CXX0X_GARBAGE_COLLECTION
+// #define HAS_CXX0X_SEQUENCE_POINTS
+// #define HAS_CXX0X_DEPENDENCY_ORDERING
+// #define HAS_CXX0X_QUICK_EXIT
+// #define HAS_CXX0X_ATOMIC_IN_SIGNAL
+// #define HAS_CXX0X_TRIVIAL_THREAD_LOCAL
+// #define HAS_CXX0X_NON_TRIVIAL_THREAD_LOCAL
+// #define HAS_CXX0X_DYNAMIC_INIT_CONCUR
+// #define HAS_CXX0X_EXTENDED_INTEGRAL
+// #define HAS_CXX0X_TRIVIAL_PRIVATE
+*/
 #endif
 #endif
 
@@ -60,6 +121,14 @@ static std::static_asserter<EXPR> VARNAME;
 #define CXX0X_DEFAULTED_HARD( BODY ) BODY
 #endif
 
+// deleted functions
+
+#ifdef HAS_CXX0X_DELETED
+#define CXX0X_DELETED =delete;
+#else
+#define CXX0X_DELETED ;
+#endif
+
 // aggregate initialization
 
 #ifdef HAS_CXX0X_EXPLICIT_AGGR_INIT
@@ -68,14 +137,6 @@ static std::static_asserter<EXPR> VARNAME;
 #else
 #define CXX0X_AGGR_INIT( DECLS )
 #define CXX0X_NO_AGGR_INIT( DECLS ) DECLS
-#endif
-
-// deleted functions
-
-#ifdef HAS_CXX0X_DELETED
-#define CXX0X_DELETED =delete;
-#else
-#define CXX0X_DELETED ;
 #endif
 
 // private members in trivial classes
@@ -122,16 +183,22 @@ private:
 #define CXX0X_CONSTEXPR_VAR static const
 #endif
 
+#ifdef HAS_CXX0X_CONSTEXPR_FLD
+#define CXX0X_CONSTEXPR_FLD constexpr
+#else
+#define CXX0X_CONSTEXPR_FLD const
+#endif
+
 #ifdef HAS_CXX0X_CONSTEXPR_FUN
 #define CXX0X_CONSTEXPR_FUN constexpr
 #else
-#define CXX0X_CONSTEXPR_FUN const
+#define CXX0X_CONSTEXPR_FUN inline
 #endif
 
 #ifdef HAS_CXX0X_CONSTEXPR_CTOR
 #define CXX0X_CONSTEXPR_CTOR constexpr
 #else
-#define CXX0X_CONSTEXPR_CTOR
+#define CXX0X_CONSTEXPR_CTOR inline
 #endif
 
 // explicit conversions
@@ -142,20 +209,18 @@ private:
 #define CXX0X_EXPLICIT_CONV
 #endif
 
-// thread-local storage
-// TODO(alasdair): Fix MacOS (__APPLE__) handling of thread_local. Currently
-// commented out to enable some development on Mac.
+// thread local variables
 
-// Note that we cannot rely on constructors and destructors.
-#ifdef HAS_CXX0X_TLS
-#define CXX0X_THREAD_LOCAL thread_local
-#else
-#ifdef __APPLE__
-#define CXX0X_THREAD_LOCAL
-#else
-#define CXX0X_THREAD_LOCAL __thread
+#if defined HAS_CXX0X_NON_TRIVIAL_THREAD_LOCAL
+#define CXX0X_NON_TRIVIAL_THREAD_LOCAL thread_local
+#define CXX0X_TRIVIAL_THREAD_LOCAL thread_local
+#elif defined HAS_CXX0X_TRIVIAL_THREAD_LOCAL
+#define CXX0X_TRIVIAL_THREAD_LOCAL thread_local
+#elif defined HAS_CXX0X_PRIMITIVE_THREAD_LOCAL
+#define HAS_CXX0X_TRIVIAL_THREAD_LOCAL
+#define CXX0X_TRIVIAL_THREAD_LOCAL __thread
 #endif
-#endif
+
 // rvalue reference declarations
 
 #ifdef HAS_CXX0X_RVREF
@@ -163,6 +228,14 @@ private:
 #else
 #define CXX0X_RVREF( x )
 #endif
+
+#ifdef HAS_CXX0X_MOVE_SPECIAL
+#define CXX0X_MOVE_SPECIAL( x ) x
+#else
+#define CXX0X_MOVE_SPECIAL( x )
+#endif
+
+// strong enums and their qualification
 
 #ifdef HAS_CXX0X_STRONG_ENUM
 #define CXX0X_ENUM_CLASS enum class

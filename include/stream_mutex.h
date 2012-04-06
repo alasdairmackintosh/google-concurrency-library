@@ -32,7 +32,7 @@ class stream_guard
     ~stream_guard();
     Stream& bypass() const;
   private:
-    mutable stream_mutex<Stream>& mtx_;
+    stream_mutex<Stream>& mtx_;
 };
 
 template <class Stream >

@@ -78,6 +78,7 @@ CXX0X_CONSTEXPR_FUN bool identity( bool b ) { return b; }
 
 struct aggrinit {
     int val;
+    static CXX0X_CONSTEXPR_FLD int one = 1;
     CXX0X_AGGR_INIT(
     aggrinit() CXX0X_DEFAULTED_EASY
     CXX0X_CONSTEXPR_CTOR aggrinit( int v ) : val(v) { }
@@ -139,14 +140,17 @@ public:
         { val = old.val; old.val = CXX0X_NULLPTR; } )
 };
 
-// THREAD_LOCAL expands to thread_local (C++0x)
+// NON_TRIVIAL_THREAD_LOCAL expands to thread_local (C++0x).
+// TRIVIAL_THREAD_LOCAL expands to thread_local (C++0x)
 // or __thread (common C++98 extension).
 // Use it for namespace-scope variables, static class variables,
 // or static function-local variables.
-// Do not use it with any variable that has a non-trivial constructor
-// or a non-trivial destructor; they are not yet supported.
+// Do not use the latter with any variable that has a non-trivial constructor
+// or a non-trivial destructor.
 
-CXX0X_THREAD_LOCAL int thread_local_var;
+#ifdef HAS_CXX0X_TRIVIAL_THREAD_LOCAL
+CXX0X_TRIVIAL_THREAD_LOCAL int thread_local_var;
+#endif
 
 
 int main()

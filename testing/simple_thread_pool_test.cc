@@ -86,7 +86,7 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
     }
   }
   mutable_thread* new_thread = thread_pool.try_get_unused_thread();
-  EXPECT_EQ(NULL, new_thread);
+  EXPECT_EQ((gcl::mutable_thread*)NULL, new_thread);
   
   // Now try to release a thread and return it to the unused pile.
   while (called.count < (num_threads - 1)) {
