@@ -2,18 +2,18 @@
 
 #include "counter.h"
 
-std::serial_counter<int> sc( 1 );
-std::atomic_counter<int> ac( 1 );
-std::serial_counter_buffer<int> scb( ac );
-std::atomic_counter_buffer<int> acb( ac );
-std::weak_counter<int> wc( 1 );
-std::weak_counter_buffer<int> wcb( wc );
-std::duplex_counter<int> dc( 1 );
-std::duplex_counter_buffer<int> dcb1( dc );
-std::atomic_counter_buffer<int> dcb1b( dcb1 );
-std::atomic_counter_buffer<int> dcb2( dc );
-std::atomic_counter_buffer<int> dcb2b(
-		static_cast<std::counter_bumper<int>&>(dcb2) );
+gcl::serial_counter<int> sc( 1 );
+gcl::atomic_counter<int> ac( 1 );
+gcl::serial_counter_buffer<int> scb( ac );
+gcl::atomic_counter_buffer<int> acb( ac );
+gcl::weak_counter<int> wc( 1 );
+gcl::weak_counter_buffer<int> wcb( wc );
+gcl::duplex_counter<int> dc( 1 );
+gcl::duplex_counter_buffer<int> dcb1( dc );
+gcl::atomic_counter_buffer<int> dcb1b( dcb1 );
+gcl::atomic_counter_buffer<int> dcb2( dc );
+gcl::atomic_counter_buffer<int> dcb2b(
+		static_cast<gcl::counter_bumper<int>&>(dcb2) );
 
 int main()
 {

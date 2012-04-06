@@ -2,7 +2,7 @@
 #include "mutex.h"
 #include "unordered_set.h"
 
-namespace std {
+namespace gcl {
 
 /*
 
@@ -125,6 +125,7 @@ Use this counter when you do not intend to extract values.
 
 */
 
+using namespace std;
 
 
 /*
@@ -137,7 +138,6 @@ Use this counter when you do not intend to extract values.
 
 template< typename Integral > class serial_counter
 {
-    Integral value_;
 public:
     CXX0X_CONSTEXPR_CTOR serial_counter() : value_( 0 ) {}
     CXX0X_CONSTEXPR_CTOR serial_counter( Integral in ) : value_( in ) {}
@@ -148,26 +148,25 @@ public:
     Integral load() { return value_; }
     Integral exchange( Integral to )
         { Integral tmp = value_; value_ = to; return tmp; }
+private:
+    Integral value_;
 };
 
 template< typename Integral > class counter_bumper
 {
-protected:
-    atomic< Integral > value_;
 public:
     CXX0X_CONSTEXPR_CTOR counter_bumper( Integral in ) : value_( in ) {}
     counter_bumper( const counter_bumper& ) CXX0X_DELETED
     counter_bumper& operator=( const counter_bumper& ) CXX0X_DELETED
-    void inc( Integral by )
-        { value_.fetch_add( by, memory_order_relaxed ); }
-    void dec( Integral by )
-        { value_.fetch_sub( by, memory_order_relaxed ); }
+    void inc( Integral by ) { value_.fetch_add( by, memory_order_relaxed ); }
+    void dec( Integral by ) { value_.fetch_sub( by, memory_order_relaxed ); }
+protected:
+    atomic< Integral > value_;
 };
 
 template< typename Integral > class atomic_counter
 : public counter_bumper< Integral >
 {
-    using counter_bumper< Integral >::value_;
 public:
     CXX0X_CONSTEXPR_CTOR atomic_counter() : counter_bumper< Integral >( 0 ) {}
     CXX0X_CONSTEXPR_CTOR atomic_counter( Integral in )
@@ -177,6 +176,8 @@ public:
     Integral load() { return value_.load( memory_order_relaxed ); }
     Integral exchange( Integral to )
         { return value_.exchange( to, memory_order_relaxed ); }
+private:
+    using counter_bumper< Integral >::value_;
 };
 
 /*
@@ -190,8 +191,6 @@ public:
 
 template< typename Integral > class serial_counter_buffer
 {
-    Integral value_;
-    atomic_counter< Integral >& prime_;
 public:
     serial_counter_buffer( atomic_counter< Integral >& p )
         : value_( 0 ), prime_( p ) {}
@@ -203,13 +202,14 @@ public:
     void dec( Integral by ) { value_ -= by; }
     void push() { prime_.inc( value_ ); value_ = 0; }
     ~serial_counter_buffer() { push(); }
+private:
+    Integral value_;
+    atomic_counter< Integral >& prime_;
 };
 
 template< typename Integral > class atomic_counter_buffer
 : public counter_bumper< Integral >
 {
-    counter_bumper< Integral >& prime_;
-    using counter_bumper< Integral >::value_;
 public:
     atomic_counter_buffer( counter_bumper< Integral >& p )
         : counter_bumper< Integral >( 0 ), prime_( p ) {}
@@ -219,6 +219,9 @@ public:
         CXX0X_DELETED
     void push() { prime_.inc( value_.exchange( 0, memory_order_relaxed ) ); }
     ~atomic_counter_buffer() { push(); }
+private:
+    counter_bumper< Integral >& prime_;
+    using counter_bumper< Integral >::value_;
 };
 
 
@@ -238,10 +241,6 @@ template< typename Integral > class weak_counter_buffer;
 
 template< typename Integral > class weak_counter
 {
-    mutex serializer_;
-    Integral value_;
-    typedef unordered_set< weak_counter_buffer< Integral >* > set_type;
-    set_type children_;
 public:
     weak_counter() : value_( 0 ) {}
     weak_counter( Integral in ) : value_( in ) {}
@@ -253,13 +252,15 @@ private:
     friend class weak_counter_buffer<Integral>;
     void insert( weak_counter_buffer< Integral >* child );
     void erase( weak_counter_buffer< Integral >* child, Integral by );
+    mutex serializer_;
+    Integral value_;
+    typedef unordered_set< weak_counter_buffer< Integral >* > set_type;
+    set_type children_;
 };
 
 template< typename Integral >
 class weak_counter_buffer
 {
-    atomic< Integral > value_;
-    weak_counter< Integral >& prime_;
 public:
     weak_counter_buffer( weak_counter< Integral >& p );
     weak_counter_buffer() CXX0X_DELETED
@@ -275,6 +276,8 @@ public:
 private:
     friend class weak_counter<Integral>;
     Integral poll() { return value_.load( memory_order_relaxed ); }
+    atomic< Integral > value_;
+    weak_counter< Integral >& prime_;
 };
 
 template< typename Integral > class duplex_counter_buffer;
@@ -282,10 +285,6 @@ template< typename Integral > class duplex_counter_buffer;
 template< typename Integral > class duplex_counter
 : public counter_bumper< Integral >
 {
-    mutex serializer_;
-    typedef unordered_set< duplex_counter_buffer< Integral >* > set_type;
-    set_type children_;
-    using counter_bumper< Integral >::value_;
 public:
     duplex_counter() : counter_bumper< Integral >( 0 ) {}
     duplex_counter( Integral in ) : counter_bumper< Integral >( in ) {}
@@ -296,14 +295,16 @@ private:
     friend class duplex_counter_buffer<Integral>;
     void insert( duplex_counter_buffer< Integral >* child );
     void erase( duplex_counter_buffer< Integral >* child, Integral by );
+    mutex serializer_;
+    typedef unordered_set< duplex_counter_buffer< Integral >* > set_type;
+    set_type children_;
+    using counter_bumper< Integral >::value_;
 };
 
 template< typename Integral >
 class duplex_counter_buffer
 : public counter_bumper< Integral >
 {
-    duplex_counter< Integral >& prime_;
-    using counter_bumper< Integral >::value_;
 public:
     duplex_counter_buffer( duplex_counter< Integral >& p );
     duplex_counter_buffer() CXX0X_DELETED
@@ -315,6 +316,8 @@ private:
     friend class duplex_counter<Integral>;
     Integral poll() { return value_.load( memory_order_relaxed ); }
     Integral drain() { return value_.exchange( 0, memory_order_relaxed ); }
+    duplex_counter< Integral >& prime_;
+    using counter_bumper< Integral >::value_;
 };
 
 /*
@@ -465,4 +468,4 @@ duplex_counter_buffer< Integral >::~duplex_counter_buffer()
     prime_.erase( this, value_.load( memory_order_relaxed ) );
 }
 
-} // namespace std
+} // namespace gcl

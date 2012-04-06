@@ -4,6 +4,8 @@
 using namespace std;
 #endif
 
+//TODO(Crowl): Add more meaningful tests.
+
 atomic_flag af = ATOMIC_FLAG_INIT;
 
 void flag_example( void )
