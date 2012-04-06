@@ -2,6 +2,9 @@
 #define QUEUE_BASE_H
 
 #include <iterator>
+#include <iostream>
+
+#include "cxx0x.h"
 
 namespace gcl {
 
@@ -39,22 +42,33 @@ class queue_back_iter
                          ptrdiff_t, const Element*, const Element&>
 {
   public:
-    queue_back_iter( queue_back<Element>* q) : q_(q) { }
+    class value
+    {
+      public:
+        value( Element v) : v_(v) { }
+        Element operator *() const { return v_; }
+      private:
+        Element v_;
+    };
+
+    queue_back_iter( queue_back<Element>* q) : q_(q) { if ( q ) next(); }
 
     const Element& operator *() const { return v_; }
     const Element* operator ->() const { return &v_; }
-    queue_back_iter& operator ++();
-    queue_back_iter& operator ++(int) { return ++(*this); }
+    queue_back_iter& operator ++() { next(); return *this; }
+    value operator ++(int) { value t = v_; next(); return t; }
 
     bool operator ==(const queue_back_iter<Element>& y) { return q_ == y.q_; }
     bool operator !=(const queue_back_iter<Element>& y) { return q_ != y.q_; }
 
   private:
+    void next();
+
     queue_back<Element>* q_;
     Element v_;
 };
 
-enum class queue_op_status
+CXX0X_ENUM_CLASS queue_op_status
 {
     success = 0,
     empty,
@@ -74,8 +88,10 @@ class queue_common
     virtual bool is_closed() = 0;
     virtual bool is_empty() = 0;
 
+    virtual const char* name() = 0;
+
   protected:
-    virtual ~queue_common() = default;
+    virtual ~queue_common() CXX0X_DEFAULTED_EASY
 };
 
 template <typename Element>
@@ -97,10 +113,7 @@ class queue_front
     virtual queue_op_status wait_push(const Element& x) = 0;
 
   protected:
-    queue_front() = default;
-    queue_front(const queue_front&) = default;
-    queue_front& operator =(const queue_front&) = default;
-    virtual ~queue_front() = default;
+    virtual ~queue_front() CXX0X_DEFAULTED_EASY
 };
 
 template <typename Element>
@@ -122,10 +135,7 @@ class queue_back
     virtual queue_op_status wait_pop(Element&) = 0;
 
   protected:
-    queue_back() = default;
-    queue_back(const queue_back&) = default;
-    queue_back& operator =(const queue_back&) = default;
-    virtual ~queue_back() = default;
+    virtual ~queue_back() CXX0X_DEFAULTED_EASY
 };
 
 template <typename Element>
@@ -133,21 +143,35 @@ queue_front_iter<Element>&
 queue_front_iter<Element>::operator =(const Element& value)
 {
     queue_op_status s = q_->wait_push(value);
-    if ( s != queue_op_status::success )
+    if ( s != CXX0X_ENUM_QUAL(queue_op_status)success ) {
         q_ = NULL;
+        throw s;
+    }
     return *this;
-    /* FIX Note that if the assignment fails, the value is not pushed,
-       and hence may be lost.  It is unclear which solution is best.  */
+}
+
+
+template <typename Element>
+void
+queue_back_iter<Element>::next()
+{
+    queue_op_status s = q_->wait_pop(v_);
+    if ( s == CXX0X_ENUM_QUAL(queue_op_status)closed )
+        q_ = NULL;
 }
 
 template <typename Element>
-queue_back_iter<Element>&
-queue_back_iter<Element>::operator ++()
+class queue_base
+:
+    public virtual queue_front<Element>, public queue_back<Element>
 {
-    queue_op_status s = q_->wait_pop(v_);
-    if ( s == queue_op_status::closed )
-        q_ = NULL;
-    return *this;
+  public:
+    virtual ~queue_base();
+};
+
+template <typename Element>
+queue_base<Element>::~queue_base()
+{
 }
 
 } // namespace gcl

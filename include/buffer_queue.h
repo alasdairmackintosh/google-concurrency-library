@@ -10,15 +10,18 @@ namespace gcl {
 template <typename Element>
 class buffer_queue
 :
-    public queue_front<Element>, public queue_back<Element>
+    public queue_base<Element>
 {
   public:
-    buffer_queue() = delete;
-    buffer_queue(const buffer_queue&) = delete;
-    buffer_queue(size_t max_elems);
+    buffer_queue() CXX0X_DELETED
+    buffer_queue(const buffer_queue&) CXX0X_DELETED
+    buffer_queue(size_t max_elems, const char* name);
+    explicit buffer_queue(size_t max_elems);
+    template <typename Iter>
+    buffer_queue(size_t max_elems, Iter first, Iter last, const char* name);
     template <typename Iter>
     buffer_queue(size_t max_elems, Iter first, Iter last);
-    buffer_queue& operator =(const buffer_queue&) = delete;
+    buffer_queue& operator =(const buffer_queue&) CXX0X_DELETED
     virtual ~buffer_queue();
 
     virtual void close();
@@ -33,44 +36,73 @@ class buffer_queue
     virtual queue_op_status try_push(const Element& x);
     virtual queue_op_status wait_push(const Element& x);
 
+    virtual const char* name();
+
   private:
     mutex mtx_;
     condition_variable not_empty_;
     condition_variable not_full_;
+    size_t waiting_full_;
+    size_t waiting_empty_;
     Element* buffer_;
     size_t push_index_;
     size_t pop_index_;
     size_t num_slots_;
     bool closed_;
+    const char* name_;
 
     size_t next(size_t idx) { return (idx + 1) % num_slots_; }
 
-    void pop_from(Element& elem, size_t idx, size_t hdx)
+    void pop_from(Element& elem, size_t pdx, size_t hdx)
     {
-        pop_index_ = next( idx );
-        elem = buffer_[idx];
-        if ( next( hdx ) == idx )
+        pop_index_ = next( pdx );
+        elem = buffer_[pdx];
+        if ( waiting_full_ > 0 ) {
+            --waiting_full_;
             not_full_.notify_one();
+        }
     }
 
-    void push_at(const Element& elem, size_t idx, size_t nxt)
+    void push_at(const Element& elem, size_t hdx, size_t nxt, size_t pdx)
     {
-        buffer_[idx] = elem;
+        buffer_[hdx] = elem;
         push_index_ = nxt;
-        if ( idx == pop_index_ )
+        if ( waiting_empty_ > 0 ) {
+            --waiting_empty_;
             not_empty_.notify_one();
+        }
     }
 
 };
 
 template <typename Element>
-buffer_queue<Element>::buffer_queue(size_t max_elems)
+buffer_queue<Element>::buffer_queue(size_t max_elems, const char* name)
 :
+    waiting_full_( 0 ),
+    waiting_empty_( 0 ),
     buffer_( new Element[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
-    closed_( false )
+    closed_( false ),
+    name_( name )
+{
+    if ( max_elems < 1 )
+        throw std::invalid_argument("number of elements must be at least one");
+}
+
+template <typename Element>
+buffer_queue<Element>::buffer_queue(size_t max_elems)
+:
+    // would rather do buffer_queue(max_elems, "")
+    waiting_full_( 0 ),
+    waiting_empty_( 0 ),
+    buffer_( new Element[max_elems+1] ),
+    push_index_( 0 ),
+    pop_index_( 0 ),
+    num_slots_( max_elems+1 ),
+    closed_( false ),
+    name_( "" )
 {
     if ( max_elems < 1 )
         throw std::invalid_argument("number of elements must be at least one");
@@ -78,21 +110,52 @@ buffer_queue<Element>::buffer_queue(size_t max_elems)
 
 template <typename Element>
 template <typename Iter>
-buffer_queue<Element>::buffer_queue(size_t num_elems, Iter first, Iter last)
+buffer_queue<Element>::buffer_queue(size_t num_elems, Iter first, Iter last,
+                                    const char* name)
 :
+    // would rather do buffer_queue(max_elems, name)
+    waiting_full_( 0 ),
+    waiting_empty_( 0 ),
     buffer_( new Element[num_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( num_elems+1 ),
-    closed_( false )
+    closed_( false ),
+    name_( name )
 {
-    size_t idx = 0;
+    size_t hdx = 0;
     for ( Iter cur = first; cur != last; ++cur ) {
-        if ( idx >= num_elems )
+        if ( hdx >= num_elems )
             throw std::invalid_argument("two few slots for iterator");
-        size_t nxt = idx + 1;
-        push_at( *cur, idx, nxt );
-        idx = nxt;
+        size_t nxt = hdx + 1; // more efficient than next(hdx)
+        size_t pdx = pop_index_;
+        push_at( *cur, hdx, nxt, pdx );
+        hdx = nxt;
+    }
+}
+
+template <typename Element>
+template <typename Iter>
+buffer_queue<Element>::buffer_queue(size_t num_elems, Iter first, Iter last)
+:
+    // would rather do buffer_queue(max_elems, first, last, "")
+    waiting_full_( 0 ),
+    waiting_empty_( 0 ),
+    buffer_( new Element[num_elems+1] ),
+    push_index_( 0 ),
+    pop_index_( 0 ),
+    num_slots_( num_elems+1 ),
+    closed_( false ),
+    name_( "" )
+{
+    size_t hdx = 0;
+    for ( Iter cur = first; cur != last; ++cur ) {
+        if ( hdx >= num_elems )
+            throw std::invalid_argument("two few slots for iterator");
+        size_t nxt = hdx + 1; // more efficient than next(hdx)
+        size_t pdx = pop_index_;
+        push_at( *cur, hdx, nxt, pdx );
+        hdx = nxt;
     }
 }
 
@@ -129,43 +192,44 @@ template <typename Element>
 queue_op_status buffer_queue<Element>::try_pop(Element& elem)
 {
     lock_guard<mutex> hold( mtx_ );
-    size_t idx = pop_index_;
+    size_t pdx = pop_index_;
     size_t hdx = push_index_;
-    if ( idx == hdx ) {
+    if ( pdx == hdx ) {
         if ( closed_ )
-            return queue_op_status::closed;
+            return CXX0X_ENUM_QUAL(queue_op_status)closed;
         else
-            return queue_op_status::empty;
+            return CXX0X_ENUM_QUAL(queue_op_status)empty;
     }
-    pop_from( elem, idx, hdx );
-    return queue_op_status::success;
+    pop_from( elem, pdx, hdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
 }
 
 template <typename Element>
 queue_op_status buffer_queue<Element>::wait_pop(Element& elem)
 {
     unique_lock<mutex> hold( mtx_ );
-    size_t idx;
+    size_t pdx;
     size_t hdx;
     for (;;) {
-        if ( closed_ )
-            return queue_op_status::closed;
-        idx = pop_index_;
+        pdx = pop_index_;
         hdx = push_index_;
-        if ( idx != hdx )
+        if ( pdx != hdx )
             break;
+        if ( closed_ )
+            return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        ++waiting_empty_;
         not_empty_.wait( hold );
     }
-    pop_from( elem, idx, hdx );
-    return queue_op_status::success;
+    pop_from( elem, pdx, hdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
 }
 
 template <typename Element>
 Element buffer_queue<Element>::pop()
 {
     Element elem;
-    if ( wait_pop( elem ) == queue_op_status::closed )
-        throw queue_op_status::closed;
+    if ( wait_pop( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
+        throw CXX0X_ENUM_QUAL(queue_op_status)closed;
     return elem;
 }
 
@@ -174,40 +238,49 @@ queue_op_status buffer_queue<Element>::try_push(const Element& elem)
 {
     lock_guard<mutex> hold( mtx_ );
     if ( closed_ )
-        return queue_op_status::closed;
-    size_t idx = push_index_;
-    size_t nxt = next( idx );
-    if ( nxt == pop_index_ ) {
-        return queue_op_status::full;
-    }
-    push_at( elem, idx, nxt );
-    return queue_op_status::success;
+        return CXX0X_ENUM_QUAL(queue_op_status)closed;
+    size_t hdx = push_index_;
+    size_t nxt = next( hdx );
+    size_t pdx = pop_index_;
+    if ( nxt == pdx )
+        return CXX0X_ENUM_QUAL(queue_op_status)full;
+    push_at( elem, hdx, nxt, pdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
 }
 
 template <typename Element>
 queue_op_status buffer_queue<Element>::wait_push(const Element& elem)
 {
     unique_lock<mutex> hold( mtx_ );
-    size_t idx;
+    size_t hdx;
     size_t nxt;
+    size_t pdx;
     for (;;) {
         if ( closed_ )
-            return queue_op_status::closed;
-        idx = push_index_;
-        nxt = next( idx );
-        if ( nxt != pop_index_ )
+            return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        hdx = push_index_;
+        nxt = next( hdx );
+        pdx = pop_index_;
+        if ( nxt != pdx )
             break;
+        ++waiting_full_;
         not_full_.wait( hold );
     }
-    push_at( elem, idx, nxt );
-    return queue_op_status::success;
+    push_at( elem, hdx, nxt, pdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
 }
 
 template <typename Element>
 void buffer_queue<Element>::push(const Element& elem)
 {
-    if ( wait_push( elem ) == queue_op_status::closed )
-        throw queue_op_status::closed;
+    if ( wait_push( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
+        throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+}
+
+template <typename Element>
+const char* buffer_queue<Element>::name()
+{
+    return name_;
 }
 
 } // namespace gcl

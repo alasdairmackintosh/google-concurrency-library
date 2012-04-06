@@ -32,7 +32,8 @@ all: std_atomic.a std_thread.a
 
 clean:
 	find * -name '*.a' -o -name '*.o' -o -name '*.d' | xargs $(RM)
-	$(RM) Tests NativeTests
+	$(RM) include/atomic.h testing/atomic_c_test.c
+	$(RM) Tests NativeTests atomic_c_test atomic_cpp_test counter_test
 
 AllTests: all Tests NativeTests RawTests CompileTests
 
@@ -104,7 +105,7 @@ STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o \
     testing/simple_thread_pool_test.o testing/source_test.o \
     testing/barrier_test.o testing/mutable_thread_test.o \
     testing/pipeline_test.o testing/iterator_queue_test.o \
-    testing/buffer_queue_test.o
+    testing/stream_mutex_test.o testing/buffer_queue_test.o
 
 NativeTests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
 NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a std_atomic.a \

@@ -13,6 +13,7 @@
 #define HAS_CXX0X_DELETED
 #define HAS_CXX0X_AUTO_VAR
 #define HAS_CXX0X_EXPLICIT_AGGR_INIT
+#define HAS_CXX0X_STRONG_ENUM
 #endif
 #if __GNUC_MINOR__ >= 5
 #define HAS_CXX0X_EXPLICIT_CONV
@@ -147,6 +148,14 @@ private:
 #define CXX0X_RVREF( x ) x
 #else
 #define CXX0X_RVREF( x )
+#endif
+
+#ifdef HAS_CXX0X_STRONG_ENUM
+#define CXX0X_ENUM_CLASS enum class
+#define CXX0X_ENUM_QUAL( e ) e::
+#else
+#define CXX0X_ENUM_CLASS enum
+#define CXX0X_ENUM_QUAL( e )
 #endif
 
 } // namespace std
