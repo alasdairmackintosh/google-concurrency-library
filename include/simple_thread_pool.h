@@ -19,6 +19,21 @@ using gcl::mutable_thread;
 
 namespace gcl {
 
+// Basic thread aggregating class. Acts as a thread factory for mutable-thread
+// objects. Threads created are still owned by the thread pool until
+// release_thread is called. Threads can also be donated back into the pool to
+// allow them to be re-used by other callers.
+//
+// NOTE: the basic behavior here is to support adding/removing threads with the
+// ability to cap the number of threads created as well as to re-use previously
+// created threads if available.
+//
+// TODO: The behavior here is more like that of a thread-factory, so this will
+// need to be be better refined to see if there is a good way to queue up work
+// into the pool as well as just adding/removing threads from it (current
+// thinking is to have a separate "thread manager" class to handle
+// re-allocation of threads as well as supporting queued thread pools which
+// actually handle task queueing and execution).
 class simple_thread_pool {
  public:
   // Ubounded form of the simple_thread_pool
@@ -43,11 +58,13 @@ class simple_thread_pool {
   mutable_thread* try_get_unused_thread();
 
   // Donates a mutable thread to the thread pool for re-use.
-  // Returns false if the thread pool is full and cannot receive any more threads.
+  // Returns false if the thread pool is full and cannot receive any more
+  // threads.
   bool donate_thread(mutable_thread* t);
 
   // Releases a thread from being tracked by this pool.
-  // Should only release an active thread (one created by try_get_unused_thread).
+  // Should only release an active thread (one created by
+  // try_get_unused_thread).
   // Returns false if the thread is not active.
   bool release_thread(mutable_thread* t);
 

@@ -22,11 +22,10 @@ TEST(MutableThreadTest, TestExecute) {
   Called called(2);
   mutable_thread t;
 
-  // Queue up 2 units of work. The first will run, but the second unit
-  // will not complete until the count is incremented (by calling
-  // wait).
+  // Queue up 2 units of work, though first unit will not complete until the
+  // count is incremented (by calling wait).
   t.execute(tr1::bind(&Called::run, &called));
-  t.execute(tr1::bind(&Called::wait, &called));
+  t.execute(tr1::bind(&Called::run, &called));
 
   // Short sleep just to give the threads some time to execute.
   this_thread::sleep_for(chrono::milliseconds(1));
@@ -39,8 +38,8 @@ TEST(MutableThreadTest, TestExecute) {
   // Short sleep just to give the threads some time to execute.
   this_thread::sleep_for(chrono::milliseconds(1));
 
-  // Count should go up to 2.
-  EXPECT_EQ(2, called.count.load());
+  // Count should go up to 3 (the 2 queued calls and the one run() call here).
+  EXPECT_EQ(1, called.count.load());
 }
 
 TEST(MutableThreadTest, TestJoin) {
