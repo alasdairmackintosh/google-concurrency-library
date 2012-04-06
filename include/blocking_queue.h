@@ -104,11 +104,11 @@ class blocking_queue {
     // We need to notify any threads that may be waiting to push or
     // pop elements.
     {
-      unique_lock<mutex> el(empty_lock_);
+      unique_lock<mutex> el(container_lock_);
       empty_condition_.notify_all();
     }
     {
-      unique_lock<mutex> fl(full_lock_);
+      unique_lock<mutex> el(container_lock_);
       full_condition_.notify_all();
     }
   }
@@ -128,40 +128,6 @@ class blocking_queue {
   // Returns the maximum size of the queue
   size_type max_size() const { return max_size_; }
 
-  // Adds a new element to the rear of the queue. If the queue is
-  // already at maximum capacity, blocks until an element has been
-  // removed from the front. If the queue is closed, throws a
-  // closed_error.
-  void push(const value_type& x) {
-    if (is_closed()) {
-      throw closed_error("Queue is closed");
-    }
-    while(!try_push(x)) {
-      unique_lock<mutex> ul(full_lock_);
-      full_condition_.wait(ul);
-    }
-  }
-
-  // Tries to add a new element to the rear of the queue. If the queue is
-  // already at maximum capacity, returns false. Otherwise adds the element and
-  // returns true. If the queue is closed, throws a closed_error.
-  bool try_push(const value_type& x) {
-    if (is_closed()) {
-      throw closed_error("Queue is closed");
-    }
-    {
-      unique_lock<mutex> ul(container_lock_);
-      if (size() >= max_size()) {
-        return false;
-      } else {
-        cont_.push_back(x);
-      }
-    }
-    unique_lock<mutex> ul(empty_lock_);
-    empty_condition_.notify_all();
-    return true;
-  }
-
 #if 0
   // TODO(alasdair): Implement when we have C++0x compatibility mode.
   void push(value_type&& x) {
@@ -169,28 +135,67 @@ class blocking_queue {
   }
 #endif
 
- // Tries to pop an element off the front of the queue. Returns true
- // on success, or false if the queue is currently empty.
-  bool try_pop(value_type& out) {
-    {
-      unique_lock<mutex> ul(container_lock_);
-      if (cont_.empty()) {
-        return false;
-      } else {
-        out = cont_.front();
-        cont_.pop_front();
-      }
+  // Tries to add a new element to the rear of the queue. If the queue
+  // is already at maximum capacity, returns false. Otherwise adds the
+  // element and returns true. If the queue is closed, throws a
+  // closed_error.
+  bool try_push(const value_type& x) {
+    unique_lock<mutex> ul(container_lock_);
+    if (!try_push_internal(x)) {
+      return false;
     }
-    unique_lock<mutex> ul(full_lock_);
-    full_condition_.notify_all();
+    empty_condition_.notify_all();
     return true;
   }
 
+  // Adds a new element to the rear of the queue. If the queue is
+  // already at maximum capacity, blocks until an element has been
+  // removed from the front. If the queue is closed, throws a
+  // closed_error.
+  void push(const value_type& x) {
+    unique_lock<mutex> ul(container_lock_);
+    {
+      while(!try_push_internal(x)) {
+        full_condition_.wait(ul);
+      }
+    }
+    empty_condition_.notify_all();
+  }
+
+ private :
+  // Internal implementation used by push and try_push. Attempts to
+  // push an item onto the queue. The caller should hold the
+  // container_lock_ before calling, and should notify the
+  // empty_condition_ after calling.
+  bool try_push_internal(const value_type& x) {
+    if (is_closed()) {
+      throw closed_error("Queue is closed");
+    }
+    if (size() >= max_size()) {
+      return false;
+    } else {
+      cont_.push_back(x);
+      return true;
+    }
+  }
+
+ public:
 #if 0
   // TODO(alasdair): Add this when we have the timeout type.
   // See also concurrent_priority_queue.
   bool wait_pop(value_type& out, timeout t);
 #endif
+
+ // Tries to pop an element off the front of the queue. Returns true
+ // on success, or false if the queue is currently empty.
+  bool try_pop(value_type& out) {
+    unique_lock<mutex> ul(container_lock_);
+    if (!try_pop_internal(out)) {
+      return false;
+    }
+    full_condition_.notify_all();
+    return true;
+  }
 
   // Returns the element at the front of the queue. This will be the
   // element with the highest priority. Blocks until an element is
@@ -198,15 +203,33 @@ class blocking_queue {
   //
   // If the queue is empty and closed, throws a closed_error
   value_type pop() {
+    unique_lock<mutex> ul(container_lock_);
     value_type result;
-    while(!try_pop(result)) {
+    {
+      while(!try_pop_internal(result)) {
+        empty_condition_.wait(ul);
+      }
+    }
+    full_condition_.notify_all();
+    return result;
+  }
+
+ private:
+  // Internal implementation used by pop and try_pop. Attempts to pop
+  // an item off the queue. The caller should hold the container_lock_
+  // before calling, and should notify the full_condition_ after
+  // calling.
+  bool try_pop_internal(value_type& out) {
+    if (cont_.empty()) {
       if (is_closed()) {
         throw closed_error("Queue is closed and empty");
       }
-      unique_lock<mutex> ul(empty_lock_);
-      empty_condition_.wait(ul);
+      return false;
+    } else {
+      out = cont_.front();
+      cont_.pop_front();
+      return true;
     }
-    return result;
   }
 
   // TODO(alasdair): Consider how to shut down a long-running thread
@@ -228,7 +251,6 @@ class blocking_queue {
 
   // When the queue is full, block waiting on this condition. Notify
   // this condition when an element is removed.
-  mutex full_lock_;
   condition_variable full_condition_;
 
   // When the queue is empty, block waiting on this condition. Notify
@@ -236,7 +258,6 @@ class blocking_queue {
   // conditions are required for reading and writing, to prevent a
   // thread that is repeatedly adding to the queue from aquiring the
   // lock mutex at the expense of waiting threads.
-  mutex empty_lock_;
   condition_variable empty_condition_;
 
   atomic_bool closed_;
