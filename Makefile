@@ -55,7 +55,7 @@ GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
 # The std_atomic library.
 include/atomic.h : util/atomic.sh
-	/bin/bash util/atomic.sh > include/atomic.h
+	sh util/atomic.sh > include/atomic.h
 
 src/atomic.o : include/atomic.h
 STD_ATOMIC_OBJS := src/atomic.o
@@ -82,7 +82,7 @@ atomic_cpp_test: $(STD_ATOMIC_CPP_TEST_OBJS) std_atomic.a
 # All of the components of the std_thread library, apart from the 
 # mutex/condition_variable
 STD_THREAD_OBJS := src/thread.o src/countdown_latch.o src/serial_executor.o \
-    src/barrier.o src/mutable_thread.o src/simple_thread_pool.o
+    src/barrier.o src/mutable_thread.o src/simple_thread_pool.cc
 std_thread.a: CppFlags += -Iinclude
 std_thread.a: $(STD_THREAD_OBJS)
 
@@ -101,11 +101,8 @@ test_mutex.a: $(TEST_MUTEX_OBJS)
 # mutex/condition_variable classes.
 STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o \
     testing/blocking_queue_test.o testing/serial_executor_test.o \
-    testing/simple_thread_pool_test.o testing/source_test.o \
-    testing/barrier_test.o testing/mutable_thread_test.o \
-    testing/pipeline_test.o
- 
-NativeTests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
+    testing/source_test.o testing/barrier_test.o
+NativeTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
 NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a std_atomic.a \
              $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)

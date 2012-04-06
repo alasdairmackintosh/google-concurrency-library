@@ -27,9 +27,7 @@ mutable_thread::mutable_thread(F f) {
 }
 
 mutable_thread::~mutable_thread() {
-  if (!is_done() && !is_joining()) {
-    join();
-  }
+  join();
   delete t_;
 }
 
@@ -49,7 +47,7 @@ void mutable_thread::join() {
 
 // Setup function for execution if there isn't currently something executing.
 bool mutable_thread::try_execute(tr1::function<void()> fn) {
-  if (!run_fn_ || !queued_fn_) {
+  if (!run_fn_ || !queued_fun_) {
     unique_lock<mutex> ul(thread_state_mu_);
     if (!is_done() && !is_joining()) {
       // Thread can still execute, so check if we want to queue up some work or

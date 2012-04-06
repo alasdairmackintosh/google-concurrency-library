@@ -1,8 +1,5 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
 
-#ifndef GCL_MUTABLE_THREAD__
-#define GCL_MUTABLE_THREAD__
-
 #include <tr1/functional>
 
 #include <atomic.h>
@@ -18,16 +15,9 @@ namespace gcl {
 // Variation on the thread class which allows threads to be put to sleep when
 // not working on anything and awoken again with new work. The class allows
 // work to be queued up one-deep (a single extra item of execution). The thread
-//
+// will not join until all work has completed.
 // This is a building block for more complex thread execution classes which
-// need to be able to stop and restart threads with new work as well as to
-// re-allocate threads to new work queues or tasks.
-//
-// TODO: Refine the execute behavior slightly to see if it should be extended
-// to allow the thread to enqueue arbitrary numbers of items or not. The
-// current behavior allows only a single task to enqueue which means behavior
-// is slightly inconsistent (execute will return even if the task is not
-// guaranteed to be able to execute).
+// need to be able to stop and restart threads with new work.
 class mutable_thread {
  public:
   // Mutable thread works a little differently from a normal thread in that it
@@ -37,8 +27,6 @@ class mutable_thread {
 
   template<class F>explicit mutable_thread(F f);
 
-  // Thread join. Will not complete joining until all queued work is completed
-  // (makes no guarantees that the thread will terminate).
   void join();
 
   // Setup function for execution if there isn't currently something executing
@@ -46,19 +34,13 @@ class mutable_thread {
   // Return false if thread is currently doing other work.
   bool try_execute(tr1::function<void()> fn);
 
-  // Like try_execute, but blocks until there is an empty spot to queue up for
-  // execution.
+  // Like try_execute, but blocks until there is an empty spot to queue up for execution.
   // Return false if the thread is in the process of joining (and thus cannot
   // accept new work).
   bool execute(tr1::function<void()> fn);
 
-  // Join has been called but the thread is still executing.
   bool is_joining();
-
-  // Thread has fully joined and will not accept any more work.
   bool is_done();
-
-  thread::id get_id();
 
  private:
   enum thread_state {
@@ -96,5 +78,3 @@ class mutable_thread {
 };
 
 }  // namespace gcl
-
-#endif
