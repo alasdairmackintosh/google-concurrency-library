@@ -1,7 +1,19 @@
 // Copyright 2009 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-#ifndef STD_CONCURRENT_PRIORITY_QUEUE_
-#define STD_CONCURRENT_PRIORITY_QUEUE_
+#ifndef GCL_CONCURRENT_PRIORITY_QUEUE_
+#define GCL_CONCURRENT_PRIORITY_QUEUE_
 
 #include <algorithm>
 #include <functional>
@@ -11,6 +23,8 @@
 #include <condition_variable.h>
 #include <mutex.h>
 #include <thread.h>
+
+namespace gcl {
 
 // TODO(alasdair): Initial version being checked in without
 // locking. Make this genuinely threadsafe. Document exact details of
@@ -195,4 +209,5 @@ class concurrent_priority_queue {
   condition_variable pop_var_; 
 };
 
-#endif  // STD_CONCURRENT_PRIORITY_QUEUE_
+}  // End namespace gcl
+#endif  // GCL_CONCURRENT_PRIORITY_QUEUE_
