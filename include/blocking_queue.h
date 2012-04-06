@@ -30,7 +30,8 @@
 
 using std::atomic_bool;
 using std::memory_order;
-using std::memory_order_relaxed;
+using std::memory_order_acquire;
+using std::memory_order_release;
 
 namespace gcl {
 
@@ -111,31 +112,32 @@ class blocking_queue {
   // Closes this queue. No further attempts may be made to push
   // elements onto the queue. Existing elements may still be popped.
   void close() {
-    closed_.store(true, memory_order_relaxed);
+    closed_.store(true, memory_order_release);
 
     // We need to notify any threads that may be waiting to push or
     // pop elements.
-    {
-      unique_lock<mutex> el(container_lock_);
-      empty_condition_.notify_all();
-    }
-    {
-      unique_lock<mutex> el(container_lock_);
-      full_condition_.notify_all();
-    }
+    unique_lock<mutex> el(container_lock_);
+    empty_condition_.notify_all();
+    full_condition_.notify_all();
   }
 
   // Returns true if the queue has been closed, and it is no longer
   // possible to push new elements.
   bool is_closed() {
-    return closed_.load(memory_order_relaxed);
+    return closed_.load(memory_order_acquire);
   }
 
  // Returns true if this queue is empty
-  bool empty() const { return cont_.empty(); }
+  bool empty() const {
+    unique_lock<mutex> ul(container_lock_);
+    return cont_.empty();
+  }
 
   // Returns the number of elements in the queue
-  size_type size() const { return cont_.size(); }
+  size_type size() const {
+    unique_lock<mutex> ul(container_lock_);
+    return cont_.size();
+  }
 
   // Returns the maximum size of the queue
   size_type max_size() const { return max_size_; }
@@ -183,7 +185,7 @@ class blocking_queue {
     if (is_closed()) {
       throw closed_error("Queue is closed");
     }
-    if (size() >= max_size()) {
+    if (cont_.size() >= max_size()) {
       return false;
     } else {
       cont_.push_back(x);
@@ -259,7 +261,7 @@ class blocking_queue {
  private:
   size_type max_size_;
   Container cont_;
-  mutex container_lock_;
+  mutable mutex container_lock_;
 
   // When the queue is full, block waiting on this condition. Notify
   // this condition when an element is removed.
