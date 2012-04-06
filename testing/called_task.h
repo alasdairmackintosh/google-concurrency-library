@@ -16,6 +16,7 @@ struct Called {
   Called(int ready_count) : ready_count(ready_count) {
     atomic_init(&count, 0);
   }
+
   void run() {
     unique_lock<mutex> wait_lock(ready_lock);
     count.fetch_add(1, memory_order_relaxed);
