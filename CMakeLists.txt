@@ -2,7 +2,12 @@
 cmake_minimum_required(VERSION 2.4)
 project(GoogleConcurrencyLibrary)
 
-enable_testing()
+# Add srcdir/cmake to the search path for include() statements.
+set(CMAKE_MODULE_PATH
+  ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
+
+include(cmake-config)
+include(dependencies)
 
 add_subdirectory(third_party/googletest)
 add_subdirectory(third_party/googlemock)
@@ -13,6 +18,7 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party/googlemock/include)
 
 # Main libraries
 add_library(std_thread src/thread.cc src/mutex.cc)
+target_link_libraries(std_thread ${system_libs})
 
 
 # Unit Tests  (TODO: Define helpful macros)

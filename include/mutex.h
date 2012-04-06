@@ -2,8 +2,9 @@
 #define STD_MUTEX_
 
 #include <assert.h>
-#include <pthread.h>
 #include <errno.h>
+#include <pthread.h>
+#include <stdlib.h>
 
 class mutex {
 public:
