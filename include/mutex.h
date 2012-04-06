@@ -8,13 +8,14 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-class mutex {
-public:
-  mutex();
-  ~mutex();
+namespace MutexInternal {
+class _posix_mutex {
+ public:
+  _posix_mutex(int mutex_type);
+  ~_posix_mutex();
 
   void lock() {
-    assert(pthread_mutex_lock(&native_handle_) == 0);
+    handle_err_return(pthread_mutex_lock(&native_handle_));
   }
 
   bool try_lock() {
@@ -24,24 +25,43 @@ public:
     else if (result == EBUSY)
       return false;
     else
-      abort();
+      handle_err_return(result);
   }
 
   void unlock() {
-    assert(pthread_mutex_unlock(&native_handle_) == 0);
+    handle_err_return(pthread_mutex_unlock(&native_handle_));
   }
 
   typedef pthread_mutex_t* native_handle_type;
   native_handle_type native_handle() { return &native_handle_; }
 
-private:
+ private:
+  pthread_mutex_t native_handle_;
+};
+}  // namespace MutexInternal
+
+class recursive_mutex : public MutexInternal::_posix_mutex {
+ public:
+  recursive_mutex() :
+      MutexInternal::_posix_mutex(PTHREAD_MUTEX_RECURSIVE) {
+  }
+
+ private:
+  // Deleted.
+  recursive_mutex(const recursive_mutex&);
+  recursive_mutex& operator=(const recursive_mutex&);
+};
+
+class mutex : public MutexInternal::_posix_mutex {
+ public:
+  mutex() : MutexInternal::_posix_mutex(PTHREAD_MUTEX_DEFAULT) {
+  }
+
+ private:
   // Deleted.
   mutex(const mutex&);
   mutex& operator=(const mutex&);
-
-  pthread_mutex_t native_handle_;
 };
-
 
 // Locks, from 30.4.3
 

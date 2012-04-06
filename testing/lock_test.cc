@@ -199,3 +199,11 @@ TEST(ConditionVariableTest, Waits) {
   // Would deadlock here if notify didn't work...
   waiter.join();
 }
+
+TEST(RecursiveLockTest, Simple) {
+  recursive_mutex r_mu;
+  r_mu.lock();
+  r_mu.lock();
+  r_mu.unlock();
+  r_mu.unlock();
+}
