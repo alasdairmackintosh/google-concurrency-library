@@ -17,15 +17,14 @@ serial_executor::serial_executor()
 
 serial_executor::~serial_executor() {
   // Try to do a safe shutdown of the executor.
-  // Unfortunately, this will still wait for executions to complete
-  // (particularly whatever is currently executing).
+  // This will still wait for the currently executing task to complete, but
+  // drops any future execution.
   queue_lock.lock();
   shutting_down = true;
   while (!function_queue.empty()) {
     function_queue.pop();
   }
 
-  // Unlock the queue before notifying waiters on the condvar.
   queue_condvar.notify_one();
   queue_lock.unlock();
   run_thread.join();
@@ -33,10 +32,6 @@ serial_executor::~serial_executor() {
 
 void serial_executor::execute(tr1::function<void()> fn) {
   lock_guard<mutex> guard(queue_lock);
-  if (shutting_down) {
-    return;
-  }
-
   function_queue.push(fn);
   queue_condvar.notify_one();
 }

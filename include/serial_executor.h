@@ -30,9 +30,8 @@ class serial_executor {
   // Queue of functions to execute.
   std::queue<std::tr1::function<void()> > function_queue;
 
-  // Bool indicating that the class is in a state of shut-down. Needed as the
-  // executor may be in the process of being deleted. This acts to prevent
-  // other activity on the executor while it destroys itself.
+  // Bool indicating that the class is in a state of shut-down. Used to wake up
+  // the run thread and and finish execution.
   bool shutting_down;
 
   // Lock to serialize accesses to the function queue.
