@@ -1,0 +1,130 @@
+﻿#summary How to get started using or contributing to GCL
+
+== Dependencies ==
+  * Mercurial: http://mercurial.selenic.com/wiki/Download
+  * The standard make utility
+  * A C++ compiler, ideally one like [http://gcc.gnu.org/gcc-4.4/cxx0x_status.html gcc-4.4] that can be configured to conform to either the C++98 standard or the draft C++0X standard.
+  * [http://codereview.appspot.com/static/upload.py Reitveld's upload.py]: For getting patches code reviewed. Put this in your path.
+
+== How to build ==
+
+You can build using the supplied `Makefile`.
+
+{{{
+$ mkdir gcl-whatever
+$ cd gcl-whatever
+$ hg clone https://google-concurrency-library.googlecode.com/hg/ src
+# build libraries
+$ make
+# run tests
+$ make test
+}}}
+
+== How to develop ==
+
+In case you're not familiar with Mercurial, here are a few useful commands:
+
+  * `hg help`: Get a list of other commands to run. `hg help <command>` will give help on that command.
+  * `hg pull -u`: Update the local repository and working directory to the main repository's tip.
+  * `hg st`: See a list of files you've changed but haven't committed locally yet.
+  * `hg diff`: See the changes you've made but haven't committed locally yet.
+  * `hg commit`: Make a local commit. This won't affect the central repository until you do an `hg push`.
+  * `hg push`: Push local commits up to the central repository. Get your password from http://code.google.com/hosting/settings.
+
+You'll want to create [http://www.selenic.com/mercurial/hgrc.5.html ~/.hgrc] to set your username. One example looks like:
+{{{
+[ui]
+username = Jeffrey Yasskin <jyasskin@gmail.com>
+
+[extensions]
+hgext.mq =
+}}}
+
+== How to contribute ==
+
+=== Overview ===
+Before committing changes to the central repository, you will need to have them reviewed. To do this, use http://codereview.appspot.com/use_uploadpy to
+upload your patch to Reitveld so someone can review it. Running
+`upload.py` with no arguments will create a new patch from your local
+uncommitted changes. If you've already uploaded a patch, say to http://codereview.appspot.com/164050, then run `upload.py -i 164050` to update it.  
+
+=== Handling revisions in Mercurial ===
+Mercurial has a command set similar to svn, but it also adds the concept of a local repository. There are (at least) three ways you can use Mercurial:
+  # Make all your changes locally
+  # Make changes locally, and commit to a local repository
+  # Use patch queues
+
+Making changes locally without committing them is very similar to using SVN, in that you can change your files on disk, and then use `hg diff` to compare your changes with the checked-out version. The `upload.py` script will automatically pick up your latest changes and upload them to Reitveld. Once approved, you can use `hg commit` followed by `hg push` to commit the changes to the main repository.
+
+However, if the code in the main repository changes, and you want to merge those changes in with your local changes, you will get an error if you try to run 'hg pull -u', telling you that you have uncommitted local changes. If this happens, you may prefer to use `hg commit`, which commits your local changes to a local copy of your repository.
+
+Using `hg commit` also allows you to track local sets of changes, and may be useful when implementing a new feature in multiple stages. You may also find it helpful to use `hg commit` to manage reviews, by committing the initial set of changes, and then committing an update if you make further changes in response to the reviewer's comments.
+
+However, note that `hg diff` will only show the differences between your local source files and your local repository, NOT the local repository and the central one. (In other words, immediately after running `hg commit`, `hg diff` will show no changes.)    
+
+This is important because, by default, `upload.py` will only upload the local diffs. If you've committed locally, you MUST specify the correct local revision tag, otherwise you will only upload the differences between your local on-disk files and your local repository.
+
+Finding the correct local revision tag can be complicated if you have made several local changes and have also merged in changes from the main repository. Consider the following scenario:
+  # You make a local change, run hg commit, and send that off for review
+  # In response to the reviewers comments, you make another change, and run hg commit once more.
+  # A separate change is submitted to the main repository
+  # You pull the central local changes and merge them.
+
+Your local repository will now contain 4 log entries, one for each of the above steps. Running `hg log -l 5` will print out something like this:
+
+{{{
+changeset:   5:7bd2484f4d32
+tag:         tip
+parent:      3:2353fb31bfe0
+parent:      4:e55ebb60ad7f
+user:        Jeffrey Yasskin <jyasskin@gmail.com>
+summary:     merge changes
+
+changeset:   4:e55ebb60ad7f
+user:        Alasdair Mackintosh <alasdair.mackintosh@gmail.com>
+summary:     Change signatures of some methods
+
+changeset:   3:2353fb31bfe0
+user:        Jeffrey Yasskin <jyasskin@gmail.com>
+summary:     Update after review
+
+changeset:   2:c7d8e48ec69c
+user:        Jeffrey Yasskin <jyasskin@gmail.com>
+summary:     Add new feature
+
+changeset:   1:ad56e23098dc
+user:        Alasdair Mackintosh <alasdair.mackintosh@gmail.com>
+summary:     Initial version of class
+
+}}}
+
+To find the correct tag, look at the tip revision, and find the parent that you did not create. In this case, that parent is 4. Run `hg diff -r 4` (or `hg diff -r e55ebb60ad7f`) and you should see the full set of changes that you have made, but without the changes submitted to the main repository at revision 4. If you type `hg diff -r 3` you would see your changes plus the central ones.
+
+To upload your latest changes from review, run: `upload.py --rev=e55ebb60ad7f -i 164050`
+
+If you are in doubt, run `hg diff` first to verify that you are uploading the correct diffs.
+
+If you know enough about Mercurial to understand patch queues, you probably don't need this guide...
+
+=== Getting changes approved ===
+When using upload.py with no arguments, it won't
+send email to let anyone know there's a review waiting for them. Go to
+the codereview.appspot.com URL it gives you, click "Edit Issue" to
+fill in the description and reviewers (make sure this includes
+`google-concurrency-library@googlegroups.com` to archive all reviews),
+and then click the "Publish+Mail Comments  ('m')" link to send the
+review request. The first mail will automatically include the change's
+description.
+
+If you're not a committer, all you have to do is keep uploading new versions until the reviewers are happy, and then they'll commit it for you.
+
+If you are a committer, once your change is reviewed, run `hg commit` to commit your local
+changes to your local repository. Then run `hg push` with your password from http://code.google.com/hosting/settings to push them out
+to the public one. See http://hgbook.red-bean.com/read/ for more
+details.
+=== Editing wiki ===
+If you don't want to edit the wiki from the browser, do this:
+  * `hg clone https://wiki.google-concurrency-library.googlecode.com/hg/ wiki` (this will create a new directory with all wiki pages. Do it once)
+  * Edit the wiki page using your favourite editor.
+  * `hg pull -u` in case some one edited the same page recently. If there are new changes, you may need `hg merge`
+  * `hg commit -m "Edited wiki" && hg push`
