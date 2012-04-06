@@ -338,7 +338,7 @@ int main (int argc, char **argv)
 
 #ifdef PIPELINE
     // Run the analysis in a pipeline. Use a queue based on a
-    // std::vector, as we know all of the elemetns thast we are
+    // std::vector, as we know all of the elements that we are
     // processing in advance.
     vector<int> input;
     for(int i=0; i<nThreads; i++) {

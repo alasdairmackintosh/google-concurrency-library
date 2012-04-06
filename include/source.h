@@ -37,7 +37,9 @@ namespace gcl {
 template <typename T, class S>
 class source {
  private:
-  // TODO(alasdair): Make this a scoped enum when we have support for this.
+  // TODO(alasdair): Make this a scoped enum when we have support for
+  // this.  TODO(alasdair): Determine if unknown state is
+  // necessary. Document states and transitions.
   enum state {unknown, empty, value, closed};
 
  public:

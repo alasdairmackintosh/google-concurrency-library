@@ -249,7 +249,8 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     if (n_threads_ == 0) {
       mutable_thread* thread = pool.try_get_unused_thread();
       if (thread != NULL) {
-        function <void ()> f = bind(&RunnablePipeline<IN, OUT, SOURCE>::run_internal, this);
+        function <void ()> f = bind(
+            &RunnablePipeline<IN, OUT, SOURCE>::run_internal, this);
         if (!thread->execute(f)) {
           // TODO(alasdair): What do we do here?
           throw std::exception();
@@ -264,7 +265,8 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
       // source is not threadsafe, in that it is only designed to be
       // called from a single thread, although multiple sources
       // pointing to the same queue can be called from different
-      // threads.)
+      // threads.) Also, when do we spawn a new thread versus running
+      // in the same thread as the previous stage?
       atomic_init(&count_, n_threads_);
       children_.reserve(n_threads_);
       for (int i = 0; i < n_threads_; i++) {
@@ -277,13 +279,19 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
           // pipeline's end_fn_.
           p->end_fn_ = bind(&RunnablePipeline::end_thread, this);
           children_.push_back(p);
-          function <void ()> f = bind(&RunnablePipeline<IN, OUT, SOURCE>::run_internal, p);
+          function <void ()> f = bind(
+              &RunnablePipeline<IN, OUT, SOURCE>::run_internal, p);
           if (!thread->execute(f)) {
             // TODO(alasdair): What do we do here?
             throw std::exception();
           }
         } else {
-          // TODO(alasdair): What do we do here?
+          // TODO(alasdair): What do we do here? This shouldn't really
+          // happen, but we should probably have a consistent answer
+          // to how to handle occupied threads, and whether we want to
+          // push that question upstream -- since get_unused_thread()
+          // should theoretically return a thread which is not running
+          // anything at this point.
           throw std::exception();
         }
       }
@@ -357,7 +365,8 @@ template <typename IN,
 RunnablePipeline<IN, OUT, SOURCE> StartablePipeline<IN, OUT, SOURCE>::Consume(
     function <void(OUT output)> consumer) {
   function<OUT (IN in)> fn = get_fn();
-  function<void (IN in)> consumer_fn = bind(terminate<IN, OUT>, fn, consumer, _1);
+  function<void (IN in)> consumer_fn = bind(terminate<IN, OUT>,
+                                            fn, consumer, _1);
   return RunnablePipeline<IN, OUT, SOURCE>(*this, consumer_fn);
 }
 
