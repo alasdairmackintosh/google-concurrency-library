@@ -12,9 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <barrier.h>
+#include <thread.h>
+
+#include "barrier.h"
+#include "debug.h"
 
 namespace gcl {
+using std::atomic;
+using std::memory_order;
 #if defined(__GXX_EXPERIMENTAL_CXX0X__)
 using std::bind;
 #else
@@ -23,40 +28,48 @@ using std::tr1::bind;
 
 barrier::barrier(size_t num_threads) throw (std::invalid_argument)
     : thread_count_(num_threads),
-      latch1_(num_threads),
-      latch2_(num_threads),
-      current_latch_(&latch1_) {
+      new_thread_count_(num_threads),
+      num_waiting_(0),
+      num_to_leave_(0),
+      latch_(num_threads) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
-  latch1_.reset(bind(&barrier::on_countdown, this));
-  latch2_.reset(bind(&barrier::on_countdown, this));
-}
-
-barrier::barrier(size_t num_threads,
-                 function<void()> completion_fn) throw (std::invalid_argument)
-    : thread_count_(num_threads),
-      latch1_(num_threads),
-      latch2_(num_threads),
-      current_latch_(&latch1_),
-      completion_fn_(completion_fn) {
-  if (num_threads == 0) {
-    throw std::invalid_argument("num_threads is 0");
-  }
-  latch1_.reset(bind(&barrier::on_countdown, this));
-  latch2_.reset(bind(&barrier::on_countdown, this));
+  latch_.reset(bind(&barrier::on_countdown, this));
 }
 
 barrier::~barrier() {
 }
 
+// These methods could be implemented as C++11 lambdas, but are written as
+// member functions for C++98 compatibility.
+bool barrier::all_threads_exited() {
+  return num_to_leave_ == 0;
+}
+
+bool barrier::all_threads_waiting() {
+  return num_waiting_ == thread_count_;
+}
+
 void barrier::count_down_and_wait()  throw (std::logic_error) {
-  current_latch_->count_down_and_wait();
+  unique_lock<mutex> lock(mutex_);
+  idle_.wait(lock, bind(&barrier::all_threads_exited, this));
+  ++num_waiting_;
+  if (num_waiting_ == thread_count_) {
+    num_to_leave_ = thread_count_;
+    on_countdown();
+    ready_.notify_all();
+  } else {
+    ready_.wait(lock, bind(&barrier::all_threads_waiting, this));
+  }
+  if (--num_to_leave_ == 0) {
+    thread_count_ = new_thread_count_;
+    num_waiting_ = 0;
+    idle_.notify_all();
+  }
 }
 
 void barrier::on_countdown() {
-  current_latch_ = (current_latch_ == &latch1_ ? &latch2_ : &latch1_);
-  current_latch_->reset(thread_count_);
   if (completion_fn_) {
     completion_fn_();
   }
@@ -65,14 +78,7 @@ void barrier::on_countdown() {
 void barrier::reset(size_t num_threads) {
   // TODO(alasdair): Consider adding a check that we are either in the
   // completion function, or have not yet called wait()
-  thread_count_ = num_threads;
-  current_latch_->reset(num_threads);
-}
-
-void barrier::reset(function<void()> completion_fn) {
-  // TODO(alasdair): Consider adding a check that we are either in the
-  // completion function, or have not yet called wait()
-  completion_fn_ = completion_fn;
+  new_thread_count_ = num_threads;
 }
 
 }  // End namespace gcl

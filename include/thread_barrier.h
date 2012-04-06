@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GCL_BARRIER_
-#define GCL_BARRIER_
+#ifndef GCL_THREAD_BARRIER_
+#define GCL_THREAD_BARRIER_
 
 #include <stddef.h>
 #include <stdexcept>
 
-#include <atomic.h>
 #include <condition_variable.h>
+#include <latch_base.h>
 #include <mutex.h>
-
-#include "latch_base.h"
 
 #if defined(__GXX_EXPERIMENTAL_CXX0X__)
 #include <functional>
@@ -31,65 +29,64 @@
 #endif
 
 namespace gcl {
-using std::atomic;
 #if defined(__GXX_EXPERIMENTAL_CXX0X__)
-using std::bind;
 using std::function;
+using std::bind;
 #else
 using std::tr1::function;
 using std::tr1::bind;
 #endif
 
-// Allows a set of threads to wait until all threads have reached a
-// common point.
-class barrier {
+// Allows a set of threads to wait until all threads have reached a common
+// point. Once this occurs, the thread_barrier will reset itself, and each
+// thread will continue to run.
+//
+// The thread_barrier is designed to be used with a fixed set of threads.
+class thread_barrier {
  public:
-  // Creates a new barrier that will block until num_threads threads are waiting
-  // on it. When the barrier is released, it will be reset, so that it can be
+  // Creates a new thread_barrier that will block until num_threads threads are waiting
+  // on it. When the thread_barrier is released, it will be reset, so that it can be
   // used again.
   // Throws invalid_argument if num_threads == 0.
-  explicit barrier(size_t num_threads) throw (std::invalid_argument);
+  explicit thread_barrier(size_t num_threads) throw (std::invalid_argument);
 
-  // Creates a new barrier that will block until num_threads threads are waiting
-  // on it. When the barrier is released, completion will be invoked. If the
-  // completion is NULL, no function will be invoked upon completion.
+  // Creates a new thread_barrier that will block until num_threads threads are
+  // waiting on it. When the thread_barrier is released, completion_fn will be
+  // invoked. If the completion is NULL, no function will be invoked upon
+  // completion.
   // Throws invalid_argument if num_threads == 0.
   template <typename C>
-  barrier(size_t num_threads, C completion) throw (std::invalid_argument)
+  thread_barrier(size_t num_threads, C completion)
+      throw (std::invalid_argument)
       : thread_count_(num_threads),
-        num_waiting_(0),
-        num_to_leave_(0),
-        latch_(num_threads),
+        latch1_(num_threads),
+        latch2_(num_threads),
+        current_latch_(&latch1_),
         completion_fn_(completion) {
     if (num_threads == 0) {
       throw std::invalid_argument("num_threads is 0");
     }
-    latch_.reset(bind(&barrier::on_countdown, this));
+    latch1_.reset(bind(&thread_barrier::on_countdown, this));
+    latch2_.reset(bind(&thread_barrier::on_countdown, this));
   }
 
-  ~barrier();
+
+  ~thread_barrier();
 
   // Blocks until num_threads have call count_down_and_wait(). Before releasing
-  // any thread, invokes the completion function specified in the constructor.
-  // If no completion function is registered, resets itself with the original
-  // num_threads count.
+  // any thread, invokes the completion function specified in the constructor,
+  // if any. Resets itself with the original num_threads count.
   //
   // Memory ordering: For threads X and Y that call await(), the call
   // to await() in X happens before the return from await() in Y.
   void count_down_and_wait() throw (std::logic_error);
 
-  // Resets the barrier with the specified number of threads. This method should
+  // Resets the thread_barrier with the specified completion_fn.  This method should
   // only be invoked when there are no other threads currently inside the wait()
   // method. It is also safe to invoke this method from within the registered
   // completion_fn.
-  void reset(size_t num_threads);
-
-  // Resets the barrier with the specified completion.  This method should
-  // only be invoked when there are no other threads currently inside the wait()
-  // method. It is also safe to invoke this method from within the registered
-  // completion.
   //
-  // If completion is NULL, then the barrier behaves as if no completion
+  // If completion_fn is NULL, then the thread_barrier behaves as if no completion_fn
   // were registered in the constructor.
   template <typename C>
   void reset(C completion) {
@@ -97,21 +94,13 @@ class barrier {
   }
 
  private:
-  bool all_threads_exited();
-  bool all_threads_waiting();
   void on_countdown();
 
-  size_t thread_count_;
-  size_t new_thread_count_;
-
-  mutex mutex_;
-  condition_variable idle_;
-  condition_variable ready_;
-  size_t num_waiting_;
-  size_t num_to_leave_;
-
-  latch_base latch_;
+  const size_t thread_count_;
+  latch_base latch1_;
+  latch_base latch2_;
+  latch_base* current_latch_;
   function<void()> completion_fn_;
 };
 }
-#endif // GCL_BARRIER_
+#endif // GCL_THREAD_BARRIER_

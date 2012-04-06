@@ -31,7 +31,7 @@ extern stream_mutex<std::ostream> dbg_stream;
 //
 //  DBG << "Unlocking " << this << std::eol;
 //
-#define DBG std::cerr << this_thread::get_id() << " : "
+#define DBG dbg_stream << this_thread::get_id() << " : "
 
 }  // namespace gcl
 #endif
