@@ -1,0 +1,54 @@
+// Copyright 2010 Google Inc. All Rights Reserved.
+
+#ifndef STD_SERIAL_EXECUTOR_
+#define STD_SERIAL_EXECUTOR_
+
+#include <queue>
+#include <tr1/functional>
+
+#include "condition_variable.h"
+#include "mutex.h"
+#include "thread.h"
+
+// Simple executor which creates a new thread for controlling and executing
+// parameter-free function objects.
+
+// TODO(mysen): The simple interface should allow the caller to indicate which
+// queueing mechanism to use to select objects to run.
+class serial_executor {
+ public:
+  // Standard executor interface which creates a FIFO queue of objects to
+  // execute.
+  serial_executor();
+  ~serial_executor();
+
+  // Simple execute command to execute a function at a convenient time.
+  // Copies the contents of the function object and runs in the executor thread.
+  void execute(std::tr1::function<void()> fn);
+
+ private:
+  // Queue of functions to execute.
+  std::queue<std::tr1::function<void()> > function_queue;
+
+  // Bool indicating that the class is in a state of shut-down. Needed as the
+  // executor may be in the process of being deleted. This acts to prevent
+  // other activity on the executor while it destroys itself.
+  bool shutting_down;
+
+  // Lock to serialize accesses to the function queue.
+  mutex queue_lock;
+  condition_variable queue_condvar;
+
+  // Thread used by the executor to do all its work.
+  thread run_thread;
+
+  // Internal run function which handles all the execution logic.
+  void run();
+
+  // Function which indicates that a job is ready to execute.
+  // Does not do any locking, so it assumes that the caller will take ownership
+  // of the queue_lock var before calling this.
+  bool queue_ready();
+};
+
+#endif

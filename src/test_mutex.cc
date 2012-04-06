@@ -178,27 +178,40 @@ condition_variable::~condition_variable() {
 }
 
 void condition_variable::notify_one() {
+  THREAD_DBG << "Cv notify_one " << this << ENDL;
   CompoundLockGuard guard(&monitor()->cv);
-  monitor()->cv.notify_all();
+  monitor()->cv.notify_one();
+  THREAD_DBG << "Cv notify_one done " << this << ENDL;
 }
 
 void condition_variable::notify_all() {
+  THREAD_DBG << "Cv notify_all " << this << ENDL;
   CompoundLockGuard guard(&monitor()->cv);
-  monitor()->cv.notify_one();
+  monitor()->cv.notify_all();
+  THREAD_DBG << "Cv notify_all done" << this << ENDL;
 }
 
 void condition_variable::wait(unique_lock<mutex>& lock) {
   THREAD_DBG << "Cv wait " << ENDL;
 
   assert(lock.owns_lock());
-  CompoundLockGuard guard(&monitor()->cv);
-  lock.unlock();
-  ThreadMonitor::GetInstance()->OnThreadBlocked(this_thread::get_id());
-  THREAD_DBG << "Cv waiting on  " << this << " -> " << &monitor()->cv << ENDL;
-  monitor()->cv.wait();
-  THREAD_DBG << "Cv done waiting on  " << this << " -> "
-             << &monitor()->cv << ENDL;
 
+  // When we have finished waiting on the condition variable, we need
+  // re-acquire 'lock' before returning. However, we need to contend
+  // fairly for this lock with other threads that may be trying to
+  // acquire it. By keeping a CompoundLockGuard on this
+  // condition_variable's monitor, we may be interfering with other
+  // threads. So, we hold the CompoundLockGuard inside an inner block,
+  // and release it before trying to re-acquire 'lock'.
+  {
+    CompoundLockGuard guard(&monitor()->cv);
+    lock.unlock();
+    ThreadMonitor::GetInstance()->OnThreadBlocked(this_thread::get_id());
+    THREAD_DBG << "Cv waiting on  " << this << " -> " << &monitor()->cv << ENDL;
+    monitor()->cv.wait();
+    THREAD_DBG << "Cv done waiting on  " << this << " -> "
+               << &monitor()->cv << ENDL;
+  }
   lock.lock();
   ThreadMonitor::GetInstance()->OnThreadReleased(this_thread::get_id());
 }
