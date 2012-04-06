@@ -128,14 +128,19 @@ private:
 #endif
 
 // thread-local storage
+// TODO(alasdair): Fix MacOS (__APPLE__) handling of thread_local. Currently
+// commented out to enable some development on Mac.
 
 // Note that we cannot rely on constructors and destructors.
 #ifdef HAS_CXX0X_TLS
 #define CXX0X_THREAD_LOCAL thread_local
 #else
+#ifdef __APPLE__
+#define CXX0X_THREAD_LOCAL
+#else
 #define CXX0X_THREAD_LOCAL __thread
 #endif
-
+#endif
 // rvalue reference declarations
 
 #ifdef HAS_CXX0X_RVREF
