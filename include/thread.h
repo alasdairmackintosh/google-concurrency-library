@@ -2,6 +2,8 @@
 #define STD_THREAD_
 
 #include <pthread.h>
+#include <string.h>
+#include <ostream>
 #include <tr1/functional>
 
 // This is a really simple subset of C++0X's std::thread (defined in

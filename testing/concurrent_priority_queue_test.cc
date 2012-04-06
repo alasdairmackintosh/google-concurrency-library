@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <test_mutex.h>
+
 using namespace std;
 using testing::_;
 using testing::Invoke;
@@ -360,7 +362,47 @@ TEST_F(PriorityQueueTest, Update) {
   ASSERT_EQ(head, "A");
 }
 
-// TODO(alasdair): Add multithreaded tests once we have a wait/notify mechanism
+
+void PopElement(concurrent_priority_queue<string>& queue,
+                const vector<string>& expected, size_t* num_popped) {
+  for (size_t  i = 0; i < expected.size(); i++) {
+    string popped = queue.pop();
+    EXPECT_EQ(expected[i], popped);
+    (*num_popped)++;
+  }
+}
+
+// Verifies that a thread popping elements off the queue will block
+// waiting when no elements are available.
+TEST_F(PriorityQueueTest, Pop) {
+  const string last = "ZZ";
+  vector<string> expected_values = create_values();
+  concurrent_priority_queue<string> queue(expected_values);
+
+  // Reverse sort the expected_values to represent the order in which
+  // we expect them to be popped. (Highest priority element is popped
+  // first.)  Finally, add the 'last' element to the expected_values
+  // vector. We will push this onto the queue later.
+  sort(expected_values.begin(), expected_values.end());
+  reverse(expected_values.begin(), expected_values.end());
+  expected_values.push_back(last);
+
+  size_t num_popped = 0;
+  thread thr(tr1::bind(PopElement, tr1::ref(queue),
+                       tr1::ref(expected_values), &num_popped));
+  ThreadMonitor::GetInstance()->WaitUntilBlocked(thr.get_id());
+
+  // PopElement should pop all of the elements from the queue, and
+  // then block waiting. Verify that it has done this, and then push
+  // the final element.
+  EXPECT_EQ(expected_values.size() - 1, num_popped);
+  queue.push(last);
+  thr.join();
+  EXPECT_EQ(expected_values.size(), num_popped);
+}
+
+// TODO(alasdair): Add more multithreaded tests to verify pushing from
+// multiple threads.
 
 // TODO(alasdair): Add additional tests for the methods currently
 // commented out because of C++0x incompatibility.

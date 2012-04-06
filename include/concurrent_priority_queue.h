@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include <condition_variable.h>
+#include <mutex.h>
 #include <thread.h>
 
 // TODO(alasdair): Initial version being checked in without
@@ -123,8 +125,10 @@ class concurrent_priority_queue {
 
   // Adds a new element to the queue.
   void push(const value_type& x) {
+    unique_lock<mutex> l(pop_mutex_);
     cont_.push_back(x);
     push_heap(cont_.begin(), cont_.end(), less_);
+    pop_var_.notify_all();
   }
 
 #if 0
@@ -144,14 +148,8 @@ class concurrent_priority_queue {
 
   // requires MoveAssignable<value_type>
   bool try_pop(value_type& out) {
-    if (cont_.empty()) {
-      return false;
-    } else {
-      pop_heap(cont_.begin(), cont_.end(), less_);
-      out = cont_.back();
-      cont_.pop_back();
-      return true;
-    }
+    unique_lock<mutex> lock(pop_mutex_);
+    return do_pop(out);
   }
 
 #if 0
@@ -165,10 +163,10 @@ class concurrent_priority_queue {
   // available.
   // requires MoveConstructible<value_type>
   value_type pop() {
+    unique_lock<mutex> lock(pop_mutex_);
     value_type result;
-    // TODO(alasdair): Add a proper implementation of this.
-    while (!try_pop(result)) {
-      this_thread::sleep_for(chrono::milliseconds(10));
+    while (!do_pop(result)) {
+      pop_var_.wait(lock);
     }
     return result;
   }
@@ -178,8 +176,23 @@ class concurrent_priority_queue {
     std::make_heap(cont_.begin(), cont_.end(), less_);
   }
 
+  // Pops a value off the front of the queue. Used internally by pop
+  // and try_pop. Caller must lock pop_mutex_ before calling.
+  bool do_pop(value_type& out) {
+    if (cont_.empty()) {
+      return false;
+    } else {
+      pop_heap(cont_.begin(), cont_.end(), less_);
+      out = cont_.back();
+      cont_.pop_back();
+      return true;
+    }
+  }
+ 
   Less less_;
   Container cont_;
+  mutex pop_mutex_;
+  condition_variable pop_var_; 
 };
 
 #endif  // STD_CONCURRENT_PRIORITY_QUEUE_
