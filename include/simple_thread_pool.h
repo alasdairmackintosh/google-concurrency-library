@@ -1,14 +1,21 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
 
+#ifndef GCL_SIMPLE_THREAD_POOL_
+#define GCL_SIMPLE_THREAD_POOL_
+
+#include <set>
 #include <tr1/functional>
 
 #include <atomic.h>
 #include <condition_variable.h>
+#include <mutable_thread.h>
 #include <mutex.h>
 #include <thread.h>
 
 namespace tr1 = std::tr1;
 using std::atomic_int;
+using std::set;
+using gcl::mutable_thread;
 
 namespace gcl {
 
@@ -61,3 +68,5 @@ class simple_thread_pool {
 };
 
 }
+
+#endif  // GCL_SIMPLE_THREAD_POOL_

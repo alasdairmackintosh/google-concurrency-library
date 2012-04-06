@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #include "atomic.h"
-#include "called_task.h"
 #include "condition_variable.h"
 #include "mutable_thread.h"
 #include "simple_thread_pool.h"
@@ -15,8 +14,40 @@
 
 namespace tr1 = std::tr1;
 
-namespace gcl {
-namespace {
+using std::atomic_int;
+using std::memory_order_relaxed;
+
+using gcl::mutable_thread;
+using gcl::simple_thread_pool;
+
+struct Called {
+  Called(int ready_count) : ready_count(ready_count) {
+    atomic_init(&count, 0);
+  }
+
+  void run() {
+    unique_lock<mutex> wait_lock(ready_lock);
+    count.fetch_add(1, memory_order_relaxed);
+    ready_condvar.notify_one();
+  }
+
+  // Blocking wait function which returns when count reaches ready_count
+  void wait() {
+    unique_lock<mutex> wait_lock(ready_lock);
+    ready_condvar.wait(wait_lock, tr1::bind(&Called::is_done, this));
+  }
+
+  atomic_int count;
+
+  int ready_count;
+  mutex ready_lock;
+  condition_variable ready_condvar;
+
+ private:
+  bool is_done() {
+    return ready_count == count.load(memory_order_relaxed);
+  }
+};
 
 TEST(SimpleThreadPoolTest, GetAndReturnOne) {
   simple_thread_pool thread_pool;
@@ -44,7 +75,7 @@ TEST(SimpleThreadPoolTest, MultiExecute) {
     new_thread->execute(tr1::bind(&Called::run, &called));
   }
   called.wait();
-  EXPECT_EQ(10, called.count);
+  EXPECT_EQ(1, called.count);
 }
 
 TEST(SimpleThreadPoolTest, OutOfThreads) {
@@ -64,7 +95,7 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
   }
   mutable_thread* new_thread = thread_pool.try_get_unused_thread();
   EXPECT_EQ(NULL, new_thread);
-
+  
   // Now try to release a thread and return it to the unused pile.
   while (called.count < (num_threads - 1)) {
     // wait
@@ -78,6 +109,3 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
   called.wait();
   EXPECT_EQ(num_threads, called.count);
 }
-
-}
-}  // namespace gcl

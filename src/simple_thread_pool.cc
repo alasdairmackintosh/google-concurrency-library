@@ -1,5 +1,7 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
 
+#include <simple_thread_pool.h>
+
 #include <limits>
 #include <set>
 #include <tr1/functional>
@@ -7,12 +9,14 @@
 #include <atomic.h>
 #include <condition_variable.h>
 #include <mutex.h>
+#include <mutable_thread.h>
 #include <thread.h>
 #include <time.h>
 
 namespace tr1 = std::tr1;
 using std::atomic_int;
 using std::set;
+using gcl::mutable_thread;
 
 namespace gcl {
 
@@ -26,7 +30,7 @@ simple_thread_pool::simple_thread_pool(size_t min_threads, size_t max_threads)
   : shutting_down_(false), min_threads_(min_threads),
     max_threads_(max_threads) {
   for (size_t i = 0; i < min_threads; ++i) {
-    unused_threads_.push_back(new mutable_thread());
+    unused_threads_.insert(new mutable_thread());
   }
 }
 
@@ -39,16 +43,15 @@ simple_thread_pool::~simple_thread_pool() {
   }
 
   // Should be in shutting_down_ state, so it's safe to kill stuff.
-  for (list<mutable_thread*>::iterator iter = active_threads_.begin();
-       iter != active_threads_.end(); ++iter); {
+  set<mutable_thread*>::iterator iter;
+  for (iter = active_threads_.begin(); iter != active_threads_.end(); ++iter); {
     (*iter)->join();
     delete (*iter);
   }
 
-  for (list<mutable_thread*>::iterator iter = unused_threads_.begin();
-       iter != unused_threads_.end(); ++iter); {
+  for (iter = unused_threads_.begin(); iter != unused_threads_.end(); ++iter); {
     (*iter)->join();
-    delete (*iter)
+    delete (*iter);
   }
 }
 
@@ -76,8 +79,12 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
 bool simple_thread_pool::donate_thread(mutable_thread* t) {
   unique_lock<mutex> ul(new_thread_mu_);
   // Check that the pool doesn't already own the thread
-  if (active_threads_.find(t) != active_threads_.end() ||
-      unused_threads_.find(t) != unused_threads_.end()) {
+  set<mutable_thread*>::iterator active_iter = active_threads_.find(t);
+  if (active_iter != active_threads_.end()) {
+    active_threads_.erase(active_iter);
+    unused_threads_.insert(t);
+    return true;
+  } else if (unused_threads_.find(t) != unused_threads_.end()) {
     unused_threads_.insert(t);
     return true;
   }

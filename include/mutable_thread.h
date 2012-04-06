@@ -1,5 +1,8 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
 
+#ifndef GCL_MUTABLE_THREAD__
+#define GCL_MUTABLE_THREAD__
+
 #include <tr1/functional>
 
 #include <atomic.h>
@@ -34,7 +37,8 @@ class mutable_thread {
   // Return false if thread is currently doing other work.
   bool try_execute(tr1::function<void()> fn);
 
-  // Like try_execute, but blocks until there is an empty spot to queue up for execution.
+  // Like try_execute, but blocks until there is an empty spot to queue up for
+  // execution.
   // Return false if the thread is in the process of joining (and thus cannot
   // accept new work).
   bool execute(tr1::function<void()> fn);
@@ -78,3 +82,5 @@ class mutable_thread {
 };
 
 }  // namespace gcl
+
+#endif
