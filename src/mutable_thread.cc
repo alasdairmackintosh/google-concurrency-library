@@ -2,6 +2,7 @@
 
 #include <mutable_thread.h>
 
+#include <stdio.h>
 #include <tr1/functional>
 
 #include <atomic.h>
@@ -27,7 +28,9 @@ mutable_thread::mutable_thread(F f) {
 }
 
 mutable_thread::~mutable_thread() {
-  join();
+  if (thread_state_.load() != JOINED) {
+    join();
+  }
   delete t_;
 }
 
@@ -43,6 +46,7 @@ void mutable_thread::join() {
   }
 
   t_->join();
+  thread_state_.store(JOINED);
 }
 
 // Setup function for execution if there isn't currently something executing.
@@ -98,7 +102,8 @@ bool mutable_thread::is_joining() {
 }
 
 bool mutable_thread::is_done() {
-  return thread_state_.load() == DONE;
+  int thread_state = thread_state_.load();
+  return thread_state == DONE || thread_state == JOINED;
 }
 
 bool mutable_thread::ready_to_continue() {

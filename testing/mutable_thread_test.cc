@@ -23,23 +23,21 @@ TEST(MutableThreadTest, TestExecute) {
   mutable_thread t;
 
   // Queue up 2 units of work, though first unit will not complete until the
-  // count is incremented (by calling wait).
+  // count is incremented by the test thread (wait blocks).
   t.execute(tr1::bind(&Called::run, &called));
+  t.execute(tr1::bind(&Called::wait, &called));
+  // This call should block until the run command completes since the queue is
+  // only 2 entries deep.
   t.execute(tr1::bind(&Called::run, &called));
-
-  // Short sleep just to give the threads some time to execute.
-  this_thread::sleep_for(chrono::milliseconds(1));
-
   EXPECT_EQ(1, called.count.load());
 
   // Then release the thread by calling wait() and let the count go up.
   called.run();
 
-  // Short sleep just to give the threads some time to execute.
   this_thread::sleep_for(chrono::milliseconds(1));
 
   // Count should go up to 3 (the 2 queued calls and the one run() call here).
-  EXPECT_EQ(1, called.count.load());
+  EXPECT_EQ(3, called.count.load());
 }
 
 TEST(MutableThreadTest, TestJoin) {
@@ -54,5 +52,6 @@ TEST(MutableThreadTest, TestJoin) {
 
   EXPECT_TRUE(t.is_done());
 }
+
 }
 }  // namespace gcl

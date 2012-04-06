@@ -18,6 +18,17 @@ namespace tr1 = std::tr1;
 namespace gcl {
 namespace {
 
+TEST(SimpleThreadPoolTest, GetOne) {
+  simple_thread_pool thread_pool;
+  mutable_thread* new_thread = thread_pool.try_get_unused_thread();
+  EXPECT_FALSE(NULL == new_thread);
+
+  Called called(1);
+  new_thread->execute(tr1::bind(&Called::run, &called));
+  called.wait();
+  EXPECT_EQ(1, called.count);
+}
+
 TEST(SimpleThreadPoolTest, GetAndReturnOne) {
   simple_thread_pool thread_pool;
   mutable_thread* new_thread = thread_pool.try_get_unused_thread();
@@ -44,7 +55,7 @@ TEST(SimpleThreadPoolTest, MultiExecute) {
     new_thread->execute(tr1::bind(&Called::run, &called));
   }
   called.wait();
-  EXPECT_EQ(1, called.count);
+  EXPECT_EQ(10, called.count);
 }
 
 TEST(SimpleThreadPoolTest, OutOfThreads) {
@@ -69,6 +80,7 @@ TEST(SimpleThreadPoolTest, OutOfThreads) {
   while (called.count < (num_threads - 1)) {
     // wait
   }
+
   thread_pool.donate_thread(a_thread);
   new_thread = thread_pool.try_get_unused_thread();
   EXPECT_FALSE(NULL == new_thread);

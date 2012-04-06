@@ -4,6 +4,7 @@
 
 #include <limits>
 #include <set>
+#include <stdio.h>
 #include <tr1/functional>
 
 #include <atomic.h>
@@ -44,14 +45,18 @@ simple_thread_pool::~simple_thread_pool() {
 
   // Should be in shutting_down_ state, so it's safe to kill stuff.
   set<mutable_thread*>::iterator iter;
-  for (iter = active_threads_.begin(); iter != active_threads_.end(); ++iter); {
-    (*iter)->join();
-    delete (*iter);
+  for (iter = active_threads_.begin();
+       iter != active_threads_.end(); ++iter) {
+    mutable_thread* t = *iter;
+    t->join();
+    delete t;
   }
 
-  for (iter = unused_threads_.begin(); iter != unused_threads_.end(); ++iter); {
-    (*iter)->join();
-    delete (*iter);
+  for (iter = unused_threads_.begin();
+       iter != unused_threads_.end(); ++iter) {
+    mutable_thread* t = *iter;
+    t->join();
+    delete t;
   }
 }
 
@@ -69,6 +74,7 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
       } else {
           next_thread = *unused_threads_.begin();
           active_threads_.insert(next_thread);
+          unused_threads_.erase(unused_threads_.find(next_thread));
       }
     }
   }
@@ -84,7 +90,7 @@ bool simple_thread_pool::donate_thread(mutable_thread* t) {
     active_threads_.erase(active_iter);
     unused_threads_.insert(t);
     return true;
-  } else if (unused_threads_.find(t) != unused_threads_.end()) {
+  } else if (unused_threads_.find(t) == unused_threads_.end()) {
     unused_threads_.insert(t);
     return true;
   }

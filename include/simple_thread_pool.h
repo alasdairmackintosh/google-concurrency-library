@@ -42,7 +42,8 @@ class simple_thread_pool {
   // Bounded thread-pool (cap on the number of threads).
   simple_thread_pool(size_t min_threads, size_t max_threads);
 
-  // Deleting the thread pool should wait for all threads to complete their work.
+  // Deleting the thread pool should wait for all threads to complete their
+  // work.
   ~simple_thread_pool();
 
   // Attempt to get a new mutable thread for execution, blocks if there is no

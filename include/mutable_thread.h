@@ -60,10 +60,11 @@ class mutable_thread {
 
  private:
   enum thread_state {
-    IDLE = 0,
-    RUNNING = 1,
-    JOINING = 2,
-    DONE = 3
+    IDLE = 0,    // Ready to run
+    RUNNING = 1, // Running a task
+    JOINING = 2, // Running but with tasks waiting to join
+    DONE = 3,    // Running completed
+    JOINED = 4   // Running complete and join call completed
   };
 
   // Run function for the thread -- this is a wrapper around the work which
