@@ -49,7 +49,7 @@ gmock_main.a: third_party/googlemock/src/gmock_main.o
 GMOCK_A := gtest.a gmock.a
 GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
-STD_THREAD_OBJS := src/thread.o src/mutex.o src/condition_variable.o src/countdown_latch.o
+STD_THREAD_OBJS := src/thread.o src/mutex.o src/condition_variable.o
 std_thread.a: CppFlags += -Iinclude
 std_thread.a: $(STD_THREAD_OBJS)
 

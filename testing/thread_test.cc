@@ -57,8 +57,8 @@ TEST(ThreadTest, GetId) {
   thr.join();
   // The id that was set in SetThreadId() should equal the id of the
   // thread we created, and should not equal the current thread id.
-  EXPECT_EQ(id_set_by_thread, id_of_thread);
-  EXPECT_NE(id_set_by_thread, this_thread_id);
+  EXPECT_TRUE(id_set_by_thread == id_of_thread);
+  EXPECT_FALSE(id_set_by_thread == this_thread_id);
 
   thread::id greater, lesser;
   if (this_thread_id < id_of_thread) {
@@ -68,11 +68,17 @@ TEST(ThreadTest, GetId) {
     lesser = id_of_thread;
     greater = this_thread_id;
   }
-  EXPECT_GT(greater, lesser);
-  EXPECT_GE(greater, lesser);
-  EXPECT_LE(lesser, greater);
-  EXPECT_GE(lesser, lesser);
-  EXPECT_LE(lesser, lesser);
+  EXPECT_TRUE(greater > lesser);
+  EXPECT_TRUE(lesser < greater);
+
+  EXPECT_TRUE(greater >= lesser);
+  EXPECT_FALSE(lesser >= greater);
+
+  EXPECT_TRUE(lesser <= greater);
+  EXPECT_FALSE(greater <= lesser);
+
+  EXPECT_TRUE(lesser >= lesser);
+  EXPECT_TRUE(lesser <= lesser);
 
   // The null/empty thread id should not equal the id of any real
   // thread.
@@ -81,12 +87,24 @@ TEST(ThreadTest, GetId) {
   EXPECT_NE(this_thread_id, null_id);
 
   // After a join, a thread should no longer have an id.
-  EXPECT_EQ(null_id, thr.get_id());
+  EXPECT_TRUE(null_id == thr.get_id());
 
   // Verify behaviour of null id in comparisons
-  EXPECT_EQ(null_id, null_id);
-  EXPECT_NE(null_id, id_set_by_thread);
-  EXPECT_LT(null_id, this_thread_id);
-  EXPECT_GT(this_thread_id, null_id);
+  EXPECT_TRUE(null_id == null_id);
+  EXPECT_FALSE(null_id == id_set_by_thread);
+
+  EXPECT_TRUE(null_id < this_thread_id);
+  EXPECT_FALSE(this_thread_id < null_id);
+
+  EXPECT_TRUE(this_thread_id > null_id);
+  EXPECT_FALSE(null_id > this_thread_id);
+
+  EXPECT_TRUE(null_id <= this_thread_id);
+  EXPECT_FALSE(this_thread_id <= null_id);
+
+  EXPECT_TRUE(this_thread_id >= null_id);
+  EXPECT_FALSE(null_id >= this_thread_id);
+
   EXPECT_FALSE(null_id < null_id);
+  EXPECT_TRUE(null_id <= null_id);
 }
