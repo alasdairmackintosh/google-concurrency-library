@@ -33,10 +33,8 @@ public:
   // Creates a new latch with the given count.
   explicit latch(size_t count);
 
-  // Destroys the latch. If the latch is destroyed while other threads are
-  // blocked in wait(), or are invoking count_down(), the behaviour is
-  // undefined. Note that a single waiter can safely destroy the latch as soon
-  // as it returns from wait().
+  // Destroys the latch. If the latch is destroyed while other threads are in
+  // wait(), or are invoking count_down(), the behaviour is undefined.
   ~latch() {
   }
 

@@ -13,34 +13,68 @@
 // limitations under the License.
 
 #include <barrier.h>
-namespace tr1 = std::tr1;
 
 namespace gcl {
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+using std::bind;
+#else
+using std::tr1::bind;
+#endif
 
 barrier::barrier(size_t num_threads) throw (std::invalid_argument)
-    : latch_(num_threads, tr1::bind(&barrier::wait_function, this)),
-      function_(NULL) {
+    : thread_count_(num_threads),
+      latch1_(num_threads),
+      latch2_(num_threads),
+      current_latch_(&latch1_),
+      completion_fn_(NULL) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+  latch1_.reset(bind(&barrier::on_countdown, this));
+  latch2_.reset(bind(&barrier::on_countdown, this));
 }
 
-barrier::barrier(size_t num_threads, tr1::function<void()> function)
-  throw (std::invalid_argument)
-    : latch_(num_threads, tr1::bind(&barrier::wait_function, this)),
-      function_(function) {
+barrier::barrier(size_t num_threads,
+                 function<void()> completion_fn) throw (std::invalid_argument)
+    : thread_count_(num_threads),
+      latch1_(num_threads),
+      latch2_(num_threads),
+      current_latch_(&latch1_),
+      completion_fn_(completion_fn) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+  if (completion_fn == NULL) {
+    throw std::invalid_argument("completion_fn is NULL");
+  }
+  latch1_.reset(bind(&barrier::on_countdown, this));
+  latch2_.reset(bind(&barrier::on_countdown, this));
 }
 
 barrier::~barrier() {
 }
 
-void barrier::await()  throw (std::logic_error) {
-  latch_.count_down_and_wait();
+void barrier::count_down_and_wait()  throw (std::logic_error) {
+  current_latch_->count_down_and_wait();
 }
 
-void barrier::wait_function() {
-  if (function_ != NULL) {
-    function_();
+void barrier::on_countdown() {
+  current_latch_ = (current_latch_ == &latch1_ ? &latch2_ : &latch1_);
+  if (completion_fn_ != NULL) {
+    completion_fn_();
   }
 }
-void barrier::set_num_threads(size_t num_threads) {
-  latch_.reset(num_threads);
+
+void barrier::reset(size_t num_threads) {
+  // TODO(alasdair): Consider adding a check that we are either in the
+  // completion function, or have not yet called wait()
+  current_latch_->reset(num_threads);
 }
+
+void barrier::reset(function<void()> completion_fn) {
+  // TODO(alasdair): Consider adding a check that we are either in the
+  // completion function, or have not yet called wait()
+  completion_fn_ = completion_fn;
+}
+
 }  // End namespace gcl

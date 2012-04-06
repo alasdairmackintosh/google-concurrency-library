@@ -64,7 +64,7 @@ build : stdfake.a lower.a
 
 stdfake.a : atomic.o mutex.o condition_variable.o thread.o
 
-lower.a : latch.o latch_base.o serial_executor.o barrier.o \
+lower.a : debug.o latch.o latch_base.o serial_executor.o barrier.o \
 	mutable_thread.o simple_thread_pool.o
 
 ######## Testing

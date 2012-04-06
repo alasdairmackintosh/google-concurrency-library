@@ -15,6 +15,8 @@
 // This file is a test of the barrier class
 #include "barrier.h"
 
+#include "debug.h"
+
 #include "atomic.h"
 #include "thread.h"
 
@@ -24,7 +26,14 @@
 #include <string>
 #include <vector>
 
-namespace tr1 = std::tr1;
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+using std::bind;
+using std::function;
+#else
+using std::tr1::bind;
+using std::tr1::function;
+#endif
+
 using testing::_;
 using testing::Invoke;
 using testing::InSequence;
@@ -37,9 +46,9 @@ static size_t kNumThreads = 3;
 class BarrierTest : public testing::Test {
 };
 
-// Invokes await() on a barrier, and counts the number of exceptions
+// Invokes count_down_and_wait() on a barrier, and counts the number of exceptions
 // thrown. If progress_count is non-null, it is incremented before
-// calling await(), and again afterwards. The thread in which await()
+// calling count_down_and_wait(), and again afterwards. The thread in which count_down_and_wait()
 // returnsd true will increment progress_count one additional time.
 static void WaitForBarrierCountExceptions(barrier* b,
                                           atomic_int *progress_count,
@@ -48,7 +57,7 @@ static void WaitForBarrierCountExceptions(barrier* b,
     if (progress_count != NULL) {
       (*progress_count)++;
     }
-    b->await();
+    b->count_down_and_wait();
     if (progress_count != NULL) {
       (*progress_count)++;
     }
@@ -57,7 +66,7 @@ static void WaitForBarrierCountExceptions(barrier* b,
   }
 }
 
-// Invoked by a barrier after all threads have called await(), but
+// Invoked by a barrier after all threads have called count_down_and_wait(), but
 // before any are released. The value of each counter should be 1.
 // (See the handling of progress_count in WaitForBarrierCountExceptions)
 static void WaitFn(atomic_int* counters) {
@@ -73,37 +82,15 @@ TEST_F(BarrierTest, CorrectNumberOfThreads) {
 
   thread* threads[kNumThreads];
   for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic_int*>(NULL),
-                                      &num_exceptions));
+    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
+                                 &b, static_cast<atomic_int*>(NULL),
+                                 &num_exceptions));
   }
   for (size_t i = 0; i < kNumThreads; i++) {
     threads[i]->join();
   }
   EXPECT_EQ(0, num_exceptions.load());
 
-  for (size_t i = 0; i < kNumThreads; i++) {
-    delete threads[i];
-  }
-}
-
-// Verify that if we try to call await with too many threads, we get
-// an exception
-TEST_F(BarrierTest, TooManyThreads) {
-  barrier b(kNumThreads - 1);
-  atomic_int num_exceptions;
-  num_exceptions = 0;
-
-  thread* threads[kNumThreads];
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic_int*>(NULL),
-                                      &num_exceptions));
-  }
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i]->join();
-  }
-  EXPECT_EQ(1, num_exceptions.load());
   for (size_t i = 0; i < kNumThreads; i++) {
     delete threads[i];
   }
@@ -119,12 +106,12 @@ TEST_F(BarrierTest, FunctionInvocation) {
   for (size_t i = 0; i < kNumThreads; i++) {
     counters[i] = 0;
   }
-  std::tr1::function<void()> wait_fn = tr1::bind(WaitFn, counters);
+  function<void()> wait_fn = bind(WaitFn, counters);
 
   thread* threads[kNumThreads];
   for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
-                                      &b, counters + i, &num_exceptions));
+    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
+                                 &b, counters + i, &num_exceptions));
   }
   for (size_t i = 0; i < kNumThreads; i++) {
     threads[i]->join();
@@ -141,14 +128,19 @@ TEST_F(BarrierTest, FunctionInvocation) {
   }
 }
 
+static void ResetBarrier(barrier* b, int n_threads) {
+  b->reset(n_threads);
+}
+
 TEST_F(BarrierTest, Reset) {
   barrier b(kNumThreads);
+  b.reset(bind(ResetBarrier, &b, kNumThreads - 1));
   atomic_int num_exceptions;
   num_exceptions = 0;
 
   thread* threads[kNumThreads];
   for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
+    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
                                       &b, static_cast<atomic_int*>(NULL),
                                       &num_exceptions));
   }
@@ -156,10 +148,10 @@ TEST_F(BarrierTest, Reset) {
     threads[i]->join();
   }
   EXPECT_EQ(0, num_exceptions.load());
-
-  b.set_num_threads(kNumThreads - 1);
+  // Barrier will be reset by the call to ResetBarrier(). The number of threads
+  // will be decremented
   for (size_t i = 0; i < kNumThreads - 1; i++) {
-    threads[i] = new thread(tr1::bind(WaitForBarrierCountExceptions,
+    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
                                       &b, static_cast<atomic_int*>(NULL),
                                       &num_exceptions));
   }
@@ -171,4 +163,19 @@ TEST_F(BarrierTest, Reset) {
   for (size_t i = 0; i < kNumThreads - 1; i++) {
     delete threads[i];
   }
+
+  b.reset(kNumThreads);
+  for (size_t i = 0; i < kNumThreads; i++) {
+    threads[i] = new thread(bind(WaitForBarrierCountExceptions,
+                                      &b, static_cast<atomic_int*>(NULL),
+                                      &num_exceptions));
+  }
+  for (size_t i = 0; i < kNumThreads; i++) {
+    threads[i]->join();
+  }
+  EXPECT_EQ(0, num_exceptions.load());
+  for (size_t i = 0; i < kNumThreads - 1; i++) {
+    delete threads[i];
+  }
+
 }
