@@ -122,22 +122,28 @@ public:
 
   // 30.4.3.2.2 locking
   void lock() {
-    if (pm == NULL)
-      throw std::system_error(std::make_error_code(EPERM));
+    if (pm == NULL) {
+      throw std::system_error(std::make_error_code(
+                                std::errc::operation_not_permitted));
+    }
     pm->lock();
     owns = true;
   }
 
   bool try_lock() {
-    if (pm == NULL)
-      throw std::system_error(std::make_error_code(EPERM));
+    if (pm == NULL) {
+      throw std::system_error(std::make_error_code(
+                                std::errc::operation_not_permitted));
+    }
     owns = pm->try_lock();
     return owns;
   }
 
   void unlock() {
-    if (!owns)
-      throw std::system_error(std::make_error_code(EPERM));
+    if (!owns) {
+      throw std::system_error(std::make_error_code(
+                                std::errc::operation_not_permitted));
+    }
     owns = false;
     pm->unlock();
   }

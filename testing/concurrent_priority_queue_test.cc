@@ -226,7 +226,7 @@ TEST_F(PriorityQueueTest, AssignmentOperator) {
   vector<string> values = create_values();
   concurrent_priority_queue<string> queue(values);
   concurrent_priority_queue<string> new_queue;
-  ASSERT_EQ(0, new_queue.size());
+  ASSERT_EQ(0U, new_queue.size());
   new_queue = queue;
   // Pop an element off the original queue. Should not affect the new
   // queue

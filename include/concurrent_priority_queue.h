@@ -88,6 +88,7 @@ class concurrent_priority_queue {
   concurrent_priority_queue& operator=(const concurrent_priority_queue& other) {
     this->cont_ = other.cont_;
     this->less_ = other.less_;
+    return *this;
   }
 
   // Exchanges the contents of this queue with the contents of
