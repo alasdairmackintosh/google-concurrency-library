@@ -1,0 +1,5 @@
+syntax: glob
+AllTests
+*.d
+*.o
+*.a

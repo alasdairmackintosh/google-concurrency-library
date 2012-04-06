@@ -3,13 +3,11 @@ internal C++ Google concurrency libraries in a form that the C++
 standard committee may accept for TR2.
 
 
-This project uses cmake as its build system, so you'll need to install
-it from http://cmake.org/cmake/resources/software.html or your
-distribution.
+cd to the directory into which you've checked out the Google
+Concurrency Library, and run:
 
-If you've checked out the Google Concurrency Library to $SRCDIR, then
-cd to a build directory and run:
-
-  $ cmake $SRCDIR
   $ make
-  $ make test  # or `ctest -V` for full output.
+  $ make test
+
+
+`make clean` will take you back to a pristine checkout.
