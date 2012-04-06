@@ -31,6 +31,9 @@ void condition_variable::notify_all() {
 }
 
 void condition_variable::wait(unique_lock<mutex>& lock) {
-  handle_err_return(pthread_cond_wait(native_handle(),
-                                      lock.mutex()->native_handle()));
+  int result = pthread_cond_wait(native_handle(),
+                                 lock.mutex()->native_handle());
+  if (result == EINTR)
+    result = 0;
+  handle_err_return(result);
 }
