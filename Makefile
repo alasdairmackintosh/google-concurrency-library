@@ -17,7 +17,7 @@
 MAKE_JOBS := $(shell sh util/makejobs.sh)
 FLAGS_MAKE = $(MAKE_JOBS) -f ../util/Makefile
 FLAGS_98 = CXXFLAGS=-std=c++98
-FLAGS_0x = CC=gcc CXX= CXXFLAGS=-std=c++0x
+FLAGS_0x = CC=gcc-4.6 CXX=gcc-4.6 CXXFLAGS=-std=c++0x
 FLAGS_DBG = BFLAGS=-g3
 FLAGS_OPT = BFLAGS=-O3
 
