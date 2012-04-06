@@ -2,6 +2,7 @@
 #include "test_mutex.h"
 
 #include <iostream>
+#include <stdexcept>
 
 using std::cerr;
 
@@ -44,7 +45,10 @@ class CompoundConditionVariable {
   void wait() {
     locked_ = true;
     while(locked_) {
-      handle_err_return(pthread_cond_wait(&cond_, &lock_));
+      int e = pthread_cond_wait(&cond_, &lock_);
+      if (e != 0) {
+        throw std::system_error(std::make_error_code(static_cast<std::errc>(e)));
+      }
     }
   }
 
@@ -99,8 +103,8 @@ _posix_mutex::~_posix_mutex() {
 
 void _posix_mutex::lock() {
   CompoundLockGuard guard(&monitor()->cv);
-  THREAD_DBG << "mutex locking " << this << " locked by "
-             << monitor()->locker << ENDL;
+  THREAD_DBG << "mutex locking " << this << " -> " << &monitor()->cv
+             << " locked by " << monitor()->locker << ENDL;
 
   if (monitor()->type == PTHREAD_MUTEX_RECURSIVE) {
     if (monitor()->locker == this_thread::get_id()) {
@@ -108,18 +112,18 @@ void _posix_mutex::lock() {
       return;
     }
   }
-  if (isNull(monitor()->locker)) {
-    monitor()->locker = this_thread::get_id();
-  } else {
+  while (!isNull(monitor()->locker)) {
     ThreadMonitor::GetInstance()->OnThreadBlocked(this_thread::get_id());
     THREAD_DBG << "mutex waiting on  " << this << " -> "
-               << &monitor()->cv << ENDL;
+               << &monitor()->cv  << " locked by " << monitor()->locker << ENDL;
     monitor()->cv.wait();
     THREAD_DBG << "mutex waited on  " << this << " -> "
                << &monitor()->cv << ENDL;
     ThreadMonitor::GetInstance()->OnThreadReleased(this_thread::get_id());
   }
-  THREAD_DBG << "mutex : finished locking" << ENDL;
+  monitor()->locker = this_thread::get_id();
+  THREAD_DBG << "mutex : finished locking " << this
+             << " -> " << &monitor()->cv << ENDL;
 }
 
 bool _posix_mutex::try_lock() {
@@ -133,11 +137,17 @@ bool _posix_mutex::try_lock() {
 
 void _posix_mutex::unlock() {
   CompoundLockGuard guard(&monitor()->cv);
-  THREAD_DBG << "mutex unlocking " << this << " locked by " << monitor()->locker
-             << " in thread " << this_thread::get_id() << ENDL;
+  THREAD_DBG << "mutex unlocking " << this << " -> " << &monitor()->cv
+             << " locked by " << monitor()->locker << ENDL;
+  if (monitor()->locker != this_thread::get_id()) {
+    if (!(monitor()->type == PTHREAD_MUTEX_RECURSIVE &&
+          isNull(monitor()->locker))) {
+      throw std::logic_error("Unlocking from thread that does not hold the lock");
+    }
+  }
   monitor()->locker = thread::id();
-  THREAD_DBG << "mutex notifying " << this << " locked by " << monitor()->locker
-             << " -> " << &monitor()->cv << ENDL;
+  THREAD_DBG << "mutex notifying " << this  << " -> " << &monitor()->cv
+             << " locked by " << monitor()->locker << ENDL;
 
   monitor()->cv.notify_all();
 }
@@ -185,10 +195,10 @@ void condition_variable::notify_one() {
 }
 
 void condition_variable::notify_all() {
-  THREAD_DBG << "Cv notify_all " << this << ENDL;
+  THREAD_DBG << "Cv notify_all " << this <<  " -> " << &monitor()->cv << ENDL;
   CompoundLockGuard guard(&monitor()->cv);
   monitor()->cv.notify_all();
-  THREAD_DBG << "Cv notify_all done" << this << ENDL;
+  THREAD_DBG << "Cv notify_all done " << this <<  " -> " << &monitor()->cv << ENDL;
 }
 
 void condition_variable::wait(unique_lock<mutex>& lock) {

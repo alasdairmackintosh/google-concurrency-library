@@ -102,15 +102,18 @@ STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o \
     testing/blocking_queue_test.o testing/serial_executor_test.o \
     testing/source_test.o
 NativeTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
-NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a $(GMOCK_MAIN_A)
+NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a std_atomic.a \
+             $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
 
 # Tests that rely on the test mutex classes.
 TEST_MUTEX_TEST_OBJS := testing/test_mutex_test.o \
     testing/condition_variable_test.o testing/lock_test.o testing/race_test.o \
-    testing/concurrent_priority_queue_test.o testing/blockable_thread.o
+    testing/concurrent_priority_queue_test.o testing/blockable_thread.o \
+    testing/blocking_queue_closed_test.o
 Tests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
-Tests: $(TEST_MUTEX_TEST_OBJS) std_thread.a test_mutex.a $(GMOCK_MAIN_A)
+Tests: $(TEST_MUTEX_TEST_OBJS) std_thread.a test_mutex.a std_atomic.a \
+       $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
 
 # The counter tests.

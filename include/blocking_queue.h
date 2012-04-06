@@ -1,7 +1,7 @@
 // Copyright 2010 Google Inc. All Rights Reserved.
 
-#ifndef STD_BLOCKING_QUEUE_
-#define STD_BLOCKING_QUEUE_
+#ifndef GCL_BLOCKING_QUEUE_
+#define GCL_BLOCKING_QUEUE_
 
 #include <algorithm>
 #include <functional>
@@ -10,9 +10,17 @@
 #include <string>
 #include <tr1/functional>
 
+#include <atomic.h>
+#include <closed_error.h>
 #include <condition_variable.h>
 #include <mutex.h>
 #include <thread.h>
+
+using std::atomic_bool;
+using std::memory_order;
+using std::memory_order_relaxed;
+
+namespace gcl {
 
 // A queue of elements. A calling thread that attempts to remove an element from
 // the front of an empty queue will block until an element is added to the
@@ -21,7 +29,6 @@
 // This class is thread safe. Elements may be added and removed from multiple
 // threads. If multiple threads attempt to remove an element from the queue, it
 // is undefined as to which thread will retrieve the next element.
-
 template <typename T,
           class Container = std::deque<T> >
 class blocking_queue {
@@ -33,14 +40,18 @@ class blocking_queue {
 
   // Creates a blocking queue with an unlimited maximum size
   blocking_queue() : max_size_((size_t) - 1) {
+    // TODO(alasdair): Initialise closed_ in the init list when we
+    // have support for the necessary C++0x mechanism.
+    atomic_init(&closed_, false);
   }
 
   // Creates a blocking queue with the specified maximum size. The size cannot
   // be zero.
-  explicit blocking_queue(size_type max_size)  : max_size_(max_size) {
+  explicit blocking_queue(size_type max_size) : max_size_(max_size) {
     if (max_size == 0) {
       throw std::invalid_argument("Size cannot be zero");
     }
+    atomic_init(&closed_, false);
   }
 
   // TODO(alasdair): consider having thread-safe iterators for copy
@@ -52,7 +63,8 @@ class blocking_queue {
   // operation.
   // requires MoveConstructible<Container>
   blocking_queue(const blocking_queue& other)
-     : max_size_(other.max_size_), cont_(other.cont_) {
+      : max_size_(other.max_size_), cont_(other.cont_) {
+    atomic_init(&closed_, other.closed_.load());
   }
 
   // Creates a new blocking queue from a range of elements defined by
@@ -68,6 +80,7 @@ class blocking_queue {
     if (max_size < size()) {
       throw std::invalid_argument("Max size less than iterator size");
     }
+    atomic_init(&closed_, false);
   }
 
   // Copies the contents of another queue into this queue.
@@ -79,10 +92,34 @@ class blocking_queue {
   blocking_queue& operator=(const blocking_queue& other) {
     this->cont_ = other.cont_;
     this->max_size_ = other.max_size_;
+    atomic_init(&this->closed_, other.closed_.load());
     return *this;
   }
 
-  // Returns true if this queue is empty
+  // Closes this queue. No further attempts may be made to push
+  // elements onto the queue. Existing elements may still be popped.
+  void close() {
+    closed_.store(true, memory_order_relaxed);
+
+    // We need to notify any threads that may be waiting to push or
+    // pop elements.
+    {
+      unique_lock<mutex> el(empty_lock_);
+      empty_condition_.notify_all();
+    }
+    {
+      unique_lock<mutex> fl(full_lock_);
+      full_condition_.notify_all();
+    }
+  }
+
+  // Returns true if the queue has been closed, and it is no longer
+  // possible to push new elements.
+  bool is_closed() {
+    return closed_.load(memory_order_relaxed);
+  }
+
+ // Returns true if this queue is empty
   bool empty() const { return cont_.empty(); }
 
   // Returns the number of elements in the queue
@@ -91,9 +128,14 @@ class blocking_queue {
   // Returns the maximum size of the queue
   size_type max_size() const { return max_size_; }
 
-  // Adds a new element to the rear of the queue. If the queue is already at
-  // maximum capacity, blocks until an element has been removed from the front.
+  // Adds a new element to the rear of the queue. If the queue is
+  // already at maximum capacity, blocks until an element has been
+  // removed from the front. If the queue is closed, throws a
+  // closed_error.
   void push(const value_type& x) {
+    if (is_closed()) {
+      throw closed_error("Queue is closed");
+    }
     while(!try_push(x)) {
       unique_lock<mutex> ul(full_lock_);
       full_condition_.wait(ul);
@@ -102,8 +144,11 @@ class blocking_queue {
 
   // Tries to add a new element to the rear of the queue. If the queue is
   // already at maximum capacity, returns false. Otherwise adds the element and
-  // returns true.
+  // returns true. If the queue is closed, throws a closed_error.
   bool try_push(const value_type& x) {
+    if (is_closed()) {
+      throw closed_error("Queue is closed");
+    }
     {
       unique_lock<mutex> ul(container_lock_);
       if (size() >= max_size()) {
@@ -150,9 +195,14 @@ class blocking_queue {
   // Returns the element at the front of the queue. This will be the
   // element with the highest priority. Blocks until an element is
   // available.
+  //
+  // If the queue is empty and closed, throws a closed_error
   value_type pop() {
     value_type result;
     while(!try_pop(result)) {
+      if (is_closed()) {
+        throw closed_error("Queue is closed and empty");
+      }
       unique_lock<mutex> ul(empty_lock_);
       empty_condition_.wait(ul);
     }
@@ -188,6 +238,9 @@ class blocking_queue {
   // lock mutex at the expense of waiting threads.
   mutex empty_lock_;
   condition_variable empty_condition_;
+
+  atomic_bool closed_;
 };
 
-#endif  // STD_BLOCKING_QUEUE_
+}  // End namespace gcl
+#endif  // GCL_BLOCKING_QUEUE_

@@ -2,7 +2,8 @@
 
 // This file is a test of the blocking_queue class
 #include "blocking_queue.h"
-#include "test_mutex.h"
+
+#include "atomic.h"
 
 #include "gmock/gmock.h"
 #include <algorithm>
@@ -14,6 +15,10 @@ namespace tr1 = std::tr1;
 using testing::_;
 using testing::Invoke;
 using testing::InSequence;
+
+using std::atomic_int;
+using std::memory_order_relaxed;
+using gcl::blocking_queue;
 
 size_t kSize = 3;
 size_t kLargeSize = 300;
@@ -141,6 +146,34 @@ TEST_F(BlockingQueueTest, TryPush) {
   ASSERT_EQ(kZero, queue.size());
 }
 
+// Verify that we cannot write to a closed queue
+TEST_F(BlockingQueueTest, TryPushClosed) {
+  blocking_queue<int> queue(kSize);
+  push_elements(queue);
+  queue.close();
+  try {
+    queue.push(0);
+    FAIL();
+  } catch (gcl::closed_error expected) {
+  }
+}
+
+// Verify that we cannot read from a closed queue once it has been
+// emptied.
+TEST_F(BlockingQueueTest, TryPopClosed) {
+  blocking_queue<int> queue(kSize);
+  push_elements(queue);
+  queue.close();
+  pop_elements(queue);
+  ASSERT_TRUE(queue.is_closed());
+  try {
+    queue.pop();
+    FAIL();
+  } catch (gcl::closed_error expected) {
+  }
+}
+
+
 // The following tests push elements onto the queue from one thread, and read
 // from another. They will test the wait/notify mechanism (and they show no
 // errors when run with the ThreadSanitizer) but they are not deterministic.
@@ -188,8 +221,6 @@ TEST_F(BlockingQueueTest, PushPopTwoThreads) {
   blocking_queue<int> queue(kLargeSize);
   thread thr1(tr1::bind(DoPop, &queue));
   thread thr2(tr1::bind(DoPush, &queue));
-  THREAD_DBG << "Created thr1 " << thr1.get_id() << ENDL;
-  THREAD_DBG << "Created thr2 " << thr2.get_id() << ENDL;
   thr1.join();
   thr2.join();
  }
@@ -205,16 +236,13 @@ TEST_F(BlockingQueueTest, PushPopThreeThreads) {
   thr3.join();
  }
 
-// TODO(alasdair): Use atomics when available
-static mutex limit_mutex;
-static bool at_limit(const int limit, int *value) {
-  unique_lock<mutex> l(limit_mutex);
-  return limit <= (*value)++;
+static bool at_limit(const int limit, atomic_int *value) {
+  return limit <= value->fetch_add(1, memory_order_relaxed);
 }
 
 static void DoPopPositiveOrNegativeUntilLimit(blocking_queue<int> *queue,
                                               const int limit,
-                                              int *value) {
+                                              atomic_int *value) {
   int last_positive = -1;
   int last_negative = 0;
   // One thread is pushing increasing positive numbers, starting from 0, while
@@ -222,13 +250,20 @@ static void DoPopPositiveOrNegativeUntilLimit(blocking_queue<int> *queue,
   // that the popped number is increasing or decreasing as appropriate. (The
   // numbers will be interleaved.)
   while (!at_limit(limit, value)) {
-    int popped = queue->pop();
-    if (popped < 0) {
-      ASSERT_TRUE(popped < last_negative);
-      last_negative = popped;
-    } else {
-      ASSERT_TRUE(popped > last_positive);
-      last_positive = popped;
+    try {
+      int popped = queue->pop();
+      if (popped < 0) {
+        ASSERT_TRUE(popped < last_negative);
+        last_negative = popped;
+      } else {
+        ASSERT_TRUE(popped > last_positive);
+        last_positive = popped;
+      }
+    } catch (gcl::closed_error expected) {
+      // There are two threads reading from the queue. It's possible
+      // that one thread may have grabbed multiple values, in which
+      // case the queue will be closed for this thread. So ignore a
+      // closed error.
     }
   }
 }
@@ -237,15 +272,18 @@ static void DoPopPositiveOrNegativeUntilLimit(blocking_queue<int> *queue,
 TEST_F(BlockingQueueTest, PushPopFourThreads) {
   blocking_queue<int> queue(kLargeSize);
   const int limit = static_cast<int>(kLargeSize) * 4;
-  int  num_popped = 0;
+  atomic_int  num_popped;
+  num_popped = 0;
   thread thr1(tr1::bind(DoPopPositiveOrNegativeUntilLimit,
                         &queue, limit, &num_popped));
   thread thr2(tr1::bind(DoPopPositiveOrNegativeUntilLimit,
                         &queue, limit, &num_popped));
   thread thr3(tr1::bind(DoPushNegative, &queue));
   thread thr4(tr1::bind(DoPush, &queue));
-  thr1.join();
-  thr2.join();
   thr3.join();
   thr4.join();
- }
+  queue.close();
+  thr1.join();
+  thr2.join();
+  EXPECT_EQ(limit + 2, num_popped.load(memory_order_relaxed));
+}
