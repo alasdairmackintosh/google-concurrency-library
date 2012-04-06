@@ -51,6 +51,11 @@ class buffer_queue
     bool closed_;
     const char* name_;
 
+    void init(size_t max_elems);
+
+    template <typename Iter>
+    void iter_init(size_t max_elems, Iter first, Iter last);
+
     size_t next(size_t idx) { return (idx + 1) % num_slots_; }
 
     void pop_from(Element& elem, size_t pdx, size_t hdx)
@@ -76,6 +81,13 @@ class buffer_queue
 };
 
 template <typename Element>
+void buffer_queue<Element>::init(size_t max_elems)
+{
+    if ( max_elems < 1 )
+        throw std::invalid_argument("number of elements must be at least one");
+}
+
+template <typename Element>
 buffer_queue<Element>::buffer_queue(size_t max_elems, const char* name)
 :
     waiting_full_( 0 ),
@@ -87,8 +99,7 @@ buffer_queue<Element>::buffer_queue(size_t max_elems, const char* name)
     closed_( false ),
     name_( name )
 {
-    if ( max_elems < 1 )
-        throw std::invalid_argument("number of elements must be at least one");
+    init(max_elems);
 }
 
 template <typename Element>
@@ -104,59 +115,57 @@ buffer_queue<Element>::buffer_queue(size_t max_elems)
     closed_( false ),
     name_( "" )
 {
-    if ( max_elems < 1 )
-        throw std::invalid_argument("number of elements must be at least one");
+    init(max_elems);
 }
 
 template <typename Element>
 template <typename Iter>
-buffer_queue<Element>::buffer_queue(size_t num_elems, Iter first, Iter last,
+void buffer_queue<Element>::iter_init(size_t max_elems, Iter first, Iter last)
+{
+    size_t hdx = 0;
+    for ( Iter cur = first; cur != last; ++cur ) {
+        if ( hdx >= max_elems )
+            throw std::invalid_argument("too few slots for iterator");
+        size_t nxt = hdx + 1; // more efficient than next(hdx)
+        size_t pdx = pop_index_;
+        push_at( *cur, hdx, nxt, pdx );
+        hdx = nxt;
+    }
+}
+
+template <typename Element>
+template <typename Iter>
+buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last,
                                     const char* name)
 :
     // would rather do buffer_queue(max_elems, name)
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[num_elems+1] ),
+    buffer_( new Element[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
-    num_slots_( num_elems+1 ),
+    num_slots_( max_elems+1 ),
     closed_( false ),
     name_( name )
 {
-    size_t hdx = 0;
-    for ( Iter cur = first; cur != last; ++cur ) {
-        if ( hdx >= num_elems )
-            throw std::invalid_argument("two few slots for iterator");
-        size_t nxt = hdx + 1; // more efficient than next(hdx)
-        size_t pdx = pop_index_;
-        push_at( *cur, hdx, nxt, pdx );
-        hdx = nxt;
-    }
+    iter_init(max_elems, first, last);
 }
 
 template <typename Element>
 template <typename Iter>
-buffer_queue<Element>::buffer_queue(size_t num_elems, Iter first, Iter last)
+buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last)
 :
     // would rather do buffer_queue(max_elems, first, last, "")
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[num_elems+1] ),
+    buffer_( new Element[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
-    num_slots_( num_elems+1 ),
+    num_slots_( max_elems+1 ),
     closed_( false ),
     name_( "" )
 {
-    size_t hdx = 0;
-    for ( Iter cur = first; cur != last; ++cur ) {
-        if ( hdx >= num_elems )
-            throw std::invalid_argument("two few slots for iterator");
-        size_t nxt = hdx + 1; // more efficient than next(hdx)
-        size_t pdx = pop_index_;
-        push_at( *cur, hdx, nxt, pdx );
-        hdx = nxt;
-    }
+    iter_init(max_elems, first, last);
 }
 
 template <typename Element>
