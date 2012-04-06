@@ -31,7 +31,7 @@ using namespace gcl;
 // Dummy User class
 class User {
  public:
-  User(int uid) : uid_(uid) {
+  User(int uid = 0) : uid_(uid) {
   }
   string get_name() {
     std::stringstream o;
@@ -60,12 +60,6 @@ void consume_user(User input) {
 }
 
 
-// Function invoked when a pipeline ends.
-void OnEnd(countdown_latch* latch) {
-  printf("Ending pipeline\n");
-  latch->count_down();
-}
-
 void print_string(string s) {
   printf("%s", s.c_str());
 }
@@ -73,88 +67,65 @@ void print_string(string s) {
 class PipelineTest : public testing::Test {
 };
 
-PipelineTerm Nothing(PipelineTerm) {
-  printf("Nothing\n");
-  return PipelineTerm();
-};
-
-// TODO(alasdair): Not really a test - just shows a (very basic)
-// pipeline in action. Add proper tests once the interface is sorted
-// out.
 TEST_F(PipelineTest, Example) {
   simple_thread_pool pool;
-  countdown_latch latch(1);
-  function <void ()> end_fn = bind(&OnEnd, &latch);
 
   function <int (string input)> f1 = find_uid;
   function <User (int uid)> f2 = get_user;
   function <void (User user)> c = consume_user;
 
   // Simple one-stage pipeline
-  SimplePipeline<string, int> p1(f1);
+  SimplePipelinePlan<string, int> p1(f1);
   int uid = p1.Apply("hello");
   printf("Got uid %d\n", uid);
 
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
-  SimplePipeline<string, User> p2 = Filter(f1)|Filter(f2);
+  printf("Creating p2\n");
+  SimplePipelinePlan<string, User> p2 = Filter(f1) | Filter(f2);
   User a2 = p2.Apply("hello world");
   printf("Got %s from pipeline\n", a2.get_name().c_str());
 
-  // RunnablePipeline that reads from a queue and writers to a sink
+  // A Runnable Pipeline that reads from a queue and write to a sink
   buffer_queue<string> queue(10);
   queue.push("Queued Hello");
-  queue.push("queued world");
 
   printf("Creating p3\n");
-  FullPipeline<PipelineTerm, User> p3 =
-    Source(&queue)|
-    Filter(f1)|Filter(f2);
+  FullPipelinePlan<PipelineTerm, User> p3 =
+      Source(&queue) | Filter(f1) | Filter(f2);
 
   printf("Creating p4\n");
-  Pipeline p4 = p3|Consume(c);
+  buffer_queue<User> out(10);
+  PipelinePlan p4 = p3|SinkAndClose(&out);
 
+  printf("Starting p4\n");
+  PipelineExecution pex(p4, &pool);
   printf("Running p4\n");
-  //Pipeline p5 = p4.OnEnd(end_fn);
-  //TODO(aberkan): run should return something we can wait on
-  p4.run(pool);
   queue.push("More stuff");
   queue.push("Yet More stuff");
+  EXPECT_FALSE(pex.is_done());
   queue.push("Are we done yet???");
+  PipelineExecution pex2(Source(&out)|Consume(c), &pool);
+  EXPECT_FALSE(pex2.is_done());
   queue.close();
 
-  printf("Test Done\n");
-
-  //TODO(aberkan): We need to wait for the pipeline to complete.
   sleep(1);
-  //latch.wait();
-  //
+  // RACY!!!!
+  EXPECT_TRUE(pex.is_done());
+  printf("Ending p4\n");
+  pex.wait();
+  printf("Test Done\n");
+  EXPECT_TRUE(out.is_closed());
+  EXPECT_TRUE(pex2.is_done());
 }
 
-#if 0
 TEST_F(PipelineTest, ParallelExample) {
-  countdown_latch latch(1);
-  function <void ()> end_fn = bind(&OnEnd, &latch);
-
-  function <int (string input)> f1 = find_uid;
-  function <User (int uid)> f2 = get_user;
-  function <void (User user)> c = consume_user;
-
-  // Simple one-stage pipeline
-  Pipeline<string, int> p1(f1);
-  int uid = p1.apply("hello");
-  printf("Got uid %d\n", uid);
 
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
-  Pipeline<string, User> p2 = Pipeline<string, int>(f1).Filter<User>(f2);
-  User a2 = p2.apply("hello world");
-  printf("Got %s from pipeline\n", a2.get_name().c_str());
+  SimplePipelinePlan<string, User> p2 = Filter(find_uid)|Filter(get_user);
 
-
-  // RunnablePipeline that reads from a queue and writers to a sink
-  typedef source<string, blocking_queue<string> > string_source;
-  blocking_queue<string> queue;
+  buffer_queue<string> queue(10);
   queue.push("Queued Hello");
   queue.push("queued world");
   queue.push("queued 1");
@@ -163,19 +134,17 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("queued 4444");
   queue.push("queued 55555");
   queue.push("queued 666666");
-  string_source in_source(&queue);
-  StartablePipeline<string, User, string_source> p3 =
-    Pipeline<string, int>(f1).Filter<User>(f2)
-      .Source<string_source>(in_source);
+
+  FullPipelinePlan<string, User> p3 = Parallel(p2);
+  CXX0X_AUTO_VAR(s, Source(&queue));
+
+  PipelinePlan p4 = s|p3|Consume(consume_user);
 
   simple_thread_pool pool;
-  RunnablePipeline<string, User, string_source> p4 = p3.Consume(c).Parallel(3);
-  p4.run(pool);
+  PipelineExecution pex(p4, &pool);
   queue.push("More stuff");
   queue.push("Yet More stuff");
   queue.push("Are we done yet???");
   queue.close();
-  p4.wait();
+  pex.wait();
 }
-
-#endif

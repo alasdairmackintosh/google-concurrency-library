@@ -81,6 +81,9 @@ TEST(SerialExecutorTest, ShutdownTest) {
 
   serial_executor* exec = new serial_executor();
   exec->execute(tr1::bind(&LockedTask::run, &locked_task));
+  // Let the executor thread make some progress.
+  this_thread::sleep_for(chrono::milliseconds(100));
+
   // NOTE: this should deadlock! Need to start a new thread to handle shutdown
   // since the executor will block waiting for the running task to join!
   thread exec_deleter(tr1::bind(&delete_executor, exec));

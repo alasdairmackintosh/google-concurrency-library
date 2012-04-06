@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "thread.h"
+#include "posix_errors.h"
 
 #include <assert.h>
+#include <exception>
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
@@ -38,24 +40,45 @@ static void* thread_bootstrap(void* void_arg) {
 
 }
 
+thread::~thread() {
+  if (joinable_) {
+    std::terminate();
+  }
+}
+
 void thread::start(std::tr1::function<void()> f) {
   pthread_attr_t attr;
   pthread_attr_init(&attr);
-  thread_bootstrap_arg* arg = new thread_bootstrap_arg;
+  thread_bootstrap_arg* arg = new (std::nothrow) thread_bootstrap_arg;
+  if (arg == NULL) {
+    pthread_attr_destroy(&attr);
+    throw std::bad_alloc();
+  }
   arg->start_func = f;
   joinable_ = true;
-  pthread_create(&native_handle_, &attr, thread_bootstrap, arg);
+  int result = pthread_create(&native_handle_, &attr, thread_bootstrap, arg);
+  if (result != 0) {
+    delete arg;
+    pthread_attr_destroy(&attr);
+    handle_err_return(result);
+  }
   pthread_attr_destroy(&attr);
 }
 
 void thread::join() {
-  assert(pthread_join(native_handle_, NULL) == 0);
+  if (joinable_ == false) {
+    throw std::system_error(std::make_error_code(std::errc::invalid_argument));
+  }
   joinable_ = false;
+  handle_err_return(pthread_join(native_handle_, NULL));
 }
 
 void thread::detach() {
-  assert(pthread_detach(native_handle_) == 0);
+  if (joinable_ == false) {
+    throw std::system_error(std::make_error_code(std::errc::invalid_argument));
+  }
   joinable_ = false;
+  handle_err_return(pthread_detach(native_handle_));
 }
 
 void this_thread::sleep_for(const chrono::milliseconds& delay) {

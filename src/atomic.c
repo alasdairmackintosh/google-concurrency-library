@@ -23,15 +23,16 @@
 #endif
 
 void atomic_thread_fence( memory_order __x__ )
-{ 
+{
 #ifdef USE_SYNC
     __sync_synchronize();
 #endif
-} 
+}
 
 void atomic_signal_fence( memory_order __x__ )
-{ 
-} 
+{
+    __asm__ __volatile__ ("" ::: "memory");
+}
 
 bool __atomic_flag_test_and_set_explicit
 ( volatile atomic_flag* __a__, memory_order __x__ )

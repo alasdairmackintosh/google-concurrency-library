@@ -26,6 +26,7 @@
 class thread {
  public:
   template<class F> explicit thread(F f);
+  ~thread();
 
   void join();
   void detach();

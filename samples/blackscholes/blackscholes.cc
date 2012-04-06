@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <blocking_queue.h>
+#include <buffer_queue.h>
 #include <thread.h>
 #include <iterator_queue.h>
 #include <source.h>
@@ -337,11 +338,11 @@ int main (int argc, char **argv)
     printf("Size of data: %d\n", (int)(numOptions * (sizeof(OptionData) + sizeof(int))));
 
 #ifdef PIPELINE
-    gcl::blocking_queue<int> input_queue;
+    gcl::buffer_queue<int> input_queue(1000);
     for(int i=0; i<nThreads; i++) {
       input_queue.push(i);
     }
-    gcl::QueueBack<int> input_source(&input_queue);
+    gcl::queue_back<int> *input_source = &input_queue;
     // TODO(aberkan) Parallelify
     Pipeline p = gcl::Source(input_source)|
                  gcl::Filter(bs_thread)|
