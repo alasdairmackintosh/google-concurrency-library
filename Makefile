@@ -103,7 +103,8 @@ STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o \
     testing/blocking_queue_test.o testing/serial_executor_test.o \
     testing/simple_thread_pool_test.o testing/source_test.o \
     testing/barrier_test.o testing/mutable_thread_test.o \
-    testing/pipeline_test.o testing/collection_queue_test.o
+    testing/pipeline_test.o testing/collection_queue_test.o \
+    testing/iterator_queue_test.o
  
 NativeTests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
 NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a std_atomic.a \

@@ -26,14 +26,14 @@
 #include <vector>
 
 #include <thread.h>
-#include <collection_queue.h>
+#include <iterator_queue.h>
 #include <source.h>
 #include <pipeline.h>
 
 using std::tr1::bind;
 using std::vector;
 
-using gcl::collection_queue;
+using gcl::iterator_queue;
 using gcl::simple_thread_pool;
 using gcl::source;
 using gcl::Pipeline;
@@ -345,8 +345,9 @@ int main (int argc, char **argv)
       input.push_back(i);
     }
 
-    typedef source<int, collection_queue<vector<int> > > int_source;
-    collection_queue<vector<int> >input_queue(input);
+    typedef iterator_queue<vector<int>::const_iterator> int_queue;
+    typedef source<int, int_queue> int_source;
+    int_queue input_queue(input.begin(), input.end());
     int_source input_source(&input_queue);
     RunnablePipeline<int, int, int_source> p =
         Pipeline<int, int>(bs_thread)
