@@ -117,19 +117,19 @@ do
 
 cat <<EOF
 
-extern bool atomic_flag_test_and_set
+inline bool atomic_flag_test_and_set
 ( ${VOLATILE} atomic_flag* __a__ )
 { return __atomic_flag_test_and_set_explicit( __a__, memory_order_seq_cst ); }
 
-extern bool atomic_flag_test_and_set_explicit
+inline bool atomic_flag_test_and_set_explicit
 ( ${VOLATILE} atomic_flag* __a__, memory_order __x__ )
 { return __atomic_flag_test_and_set_explicit( __a__, __x__ ); }
 
-extern void atomic_flag_clear
+inline void atomic_flag_clear
 ( ${VOLATILE} atomic_flag* __a__ )
 { return __atomic_flag_clear_explicit( __a__, memory_order_seq_cst ); }
 
-extern void atomic_flag_clear_explicit
+inline void atomic_flag_clear_explicit
 ( ${VOLATILE} atomic_flag* __a__, memory_order __x__ )
 { return __atomic_flag_clear_explicit( __a__, __x__ ); }
 
@@ -394,7 +394,7 @@ cat <<EOF
     { _ATOMIC_STORE_( this, __m__, __x__ ); }
 
     ${NAME} load
-    ( memory_order __x__ = memory_order_seq_cst ) ${VOLATILE}
+    ( memory_order __x__ = memory_order_seq_cst ) const ${VOLATILE}
     { return (${NAME})_ATOMIC_LOAD_( this, __x__ ); }
 
     ${NAME} exchange
@@ -445,7 +445,7 @@ cat <<EOF
     ${NAME} operator =( ${NAME} __v__ ) ${VOLATILE}
     { store( __v__ ); return __v__; }
 
-    operator ${NAME}() ${VOLATILE}
+    operator ${NAME}() const ${VOLATILE}
     { return load(); }
 
 EOF
@@ -669,11 +669,11 @@ do
 
 cat <<EOF
 
-${RTN} atomic_fetch${OPERKEY}_explicit
+inline ${RTN} atomic_fetch${OPERKEY}_explicit
 ( ${VOLATILE} atomic${KEY}* __a__, ${ARG} __m__, memory_order __x__ )
 { return __a__->fetch${OPERKEY}( __m__, __x__ ); }
 
-${RTN} atomic_fetch${OPERKEY}
+inline ${RTN} atomic_fetch${OPERKEY}
 ( ${VOLATILE} atomic${KEY}* __a__, ${ARG} __m__ )
 { return __a__->fetch${OPERKEY}( __m__, memory_order_seq_cst ); }
 

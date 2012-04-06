@@ -116,6 +116,11 @@ int integer_example( void )
     taul -= taul++;
     taul |= --taul;
     taul &= 7;
+
+    // Verify const operations
+    const atomic_ulong b = { 4 };
+    x = b.load();
+    y = b;
 #endif
     return y + z;
 }
@@ -221,4 +226,3 @@ int main()
 {
     return 0;
 }
-
