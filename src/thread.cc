@@ -106,7 +106,7 @@ bool operator<(thread::id x, thread::id y) {
 }
 
 bool operator<=(thread::id x, thread::id y) {
-  return x < y || x == y;
+  return ! (y < x);
 }
 
 bool operator>(thread::id x, thread::id y) {

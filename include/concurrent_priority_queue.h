@@ -166,7 +166,7 @@ class concurrent_priority_queue {
     value_type result;
     // TODO(alasdair): Add a proper implementation of this.
     while (!try_pop(result)) {
-      this_thread::sleep_for(10);
+      this_thread::sleep_for(chrono::milliseconds(10));
     }
     return result;
   }

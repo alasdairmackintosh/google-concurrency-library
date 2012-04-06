@@ -74,7 +74,6 @@ TEST(ThreadTest, GetId) {
   EXPECT_GE(lesser, lesser);
   EXPECT_LE(lesser, lesser);
 
-
   // The null/empty thread id should not equal the id of any real
   // thread.
   thread::id null_id;
@@ -89,4 +88,5 @@ TEST(ThreadTest, GetId) {
   EXPECT_NE(null_id, id_set_by_thread);
   EXPECT_LT(null_id, this_thread_id);
   EXPECT_GT(this_thread_id, null_id);
+  EXPECT_FALSE(null_id < null_id);
 }

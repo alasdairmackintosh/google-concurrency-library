@@ -49,14 +49,14 @@ gmock_main.a: third_party/googlemock/src/gmock_main.o
 GMOCK_A := gtest.a gmock.a
 GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
-STD_THREAD_OBJS := src/thread.o src/mutex.o src/condition_variable.o
+STD_THREAD_OBJS := src/thread.o src/mutex.o src/condition_variable.o src/countdown_latch.o
 std_thread.a: CppFlags += -Iinclude
 std_thread.a: $(STD_THREAD_OBJS)
 
 TEST_OBJS := testing/thread_test.o testing/lock_test.o testing/race_test.o \
 		testing/concurrent_priority_queue_test.o
 AllTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
-AllTests: std_thread.a $(GMOCK_MAIN_A) $(TEST_OBJS)
+AllTests: $(TEST_OBJS) std_thread.a $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
 
 CompileTests: CppFlags += -Iinclude
