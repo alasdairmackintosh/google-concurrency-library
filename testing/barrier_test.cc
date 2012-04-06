@@ -43,16 +43,6 @@ using gcl::thread_barrier;
 
 static size_t kNumThreads = 3;
 
-
-// Invoked by a barrier after all threads have called count_down_and_wait(), but
-// before any are released. The value of each counter should be 1.
-// (See the handling of progress_count in WaitForBarrierCountExceptions)
-static void WaitFn(atomic_int* counters) {
-  for (size_t i = 0; i < kNumThreads; i++) {
-    EXPECT_EQ(1, counters[i].load());
-  }
-}
-
 // Templated helper class that tests both barrier and thread_barriers.
 template <class BT>
 class TestHelper {
@@ -108,7 +98,6 @@ class TestHelper {
     for (size_t i = 0; i < kNumThreads; i++) {
       counters[i] = 0;
     }
-    function<void()> wait_fn = bind(WaitFn, counters);
 
     thread* threads[kNumThreads];
     for (size_t i = 0; i < kNumThreads; i++) {

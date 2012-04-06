@@ -22,8 +22,6 @@
 #include <condition_variable.h>
 #include <mutex.h>
 
-#include "latch_base.h"
-
 #if defined(__GXX_EXPERIMENTAL_CXX0X__)
 #include <functional>
 #else
@@ -59,12 +57,10 @@ class barrier {
       : thread_count_(num_threads),
         num_waiting_(0),
         num_to_leave_(0),
-        latch_(num_threads),
         completion_fn_(completion) {
     if (num_threads == 0) {
       throw std::invalid_argument("num_threads is 0");
     }
-    latch_.reset(bind(&barrier::on_countdown, this));
   }
 
   ~barrier();
@@ -74,20 +70,21 @@ class barrier {
   // If no completion function is registered, resets itself with the original
   // num_threads count.
   //
-  // Memory ordering: For threads X and Y that call await(), the call
-  // to await() in X happens before the return from await() in Y.
+  // Memory ordering: For threads X and Y that call count_down_and_wait(), the
+  // call to count_down_and_wait() in X happens before the return from
+  // count_down_and_wait() in Y.
   void count_down_and_wait() throw (std::logic_error);
 
   // Resets the barrier with the specified number of threads. This method should
-  // only be invoked when there are no other threads currently inside the wait()
-  // method. It is also safe to invoke this method from within the registered
-  // completion_fn.
+  // only be invoked when there are no other threads currently inside the
+  // count_down_and_wait() method. It is also safe to invoke this method from
+  // within the registered completion.
   void reset(size_t num_threads);
 
-  // Resets the barrier with the specified completion.  This method should
-  // only be invoked when there are no other threads currently inside the wait()
-  // method. It is also safe to invoke this method from within the registered
-  // completion.
+  // Resets the barrier with the specified completion.  This method should only
+  // be invoked when there are no other threads currently inside the
+  // count_down_and_wait() method. It is also safe to invoke this method from
+  // within the registered completion.
   //
   // If completion is NULL, then the barrier behaves as if no completion
   // were registered in the constructor.
@@ -110,7 +107,6 @@ class barrier {
   size_t num_waiting_;
   size_t num_to_leave_;
 
-  latch_base latch_;
   function<void()> completion_fn_;
 };
 }

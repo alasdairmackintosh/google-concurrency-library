@@ -30,12 +30,10 @@ barrier::barrier(size_t num_threads) throw (std::invalid_argument)
     : thread_count_(num_threads),
       new_thread_count_(num_threads),
       num_waiting_(0),
-      num_to_leave_(0),
-      latch_(num_threads) {
+      num_to_leave_(0) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
-  latch_.reset(bind(&barrier::on_countdown, this));
 }
 
 barrier::~barrier() {
