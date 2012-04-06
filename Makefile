@@ -71,7 +71,7 @@ test_mutex.a: $(TEST_MUTEX_OBJS)
 # Native tests that use the standard mutex clases rather than the test
 # mutex classes. These are for testing the normal
 # mutex/condition_variable classes.
-STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o 
+STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o testing/blocking_queue_test.o
 NativeTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
 NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)

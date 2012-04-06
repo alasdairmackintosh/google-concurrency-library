@@ -29,7 +29,7 @@
 // multiple threads.
 
 template <typename T,
-          class Cont = std::vector<T>,
+          class Container = std::vector<T>,
           class Less = std::less<T> >
 class concurrent_priority_queue {
  public:
@@ -41,30 +41,32 @@ class concurrent_priority_queue {
   concurrent_priority_queue() {
   }
 
-  // requires CopyConstructible<Cont>
-  explicit concurrent_priority_queue(const Cont& cont) : cont_(cont) {
+  // requires CopyConstructible<Container>
+  explicit concurrent_priority_queue(const Container& cont) : cont_(cont) {
     make_heap();
   }
 
-  // requires CopyConstructible<Cont> & CopyConstructible<Less>
-  concurrent_priority_queue(const Less& c, const Cont& cont)
+  // requires CopyConstructible<Container> & CopyConstructible<Less>
+  concurrent_priority_queue(const Less& c, const Container& cont)
       : less_(c), cont_(cont) {
     make_heap();
   }
 
-  // requires CopyConstructible<Cont> & RangeInsertionContainer<Cont, Iter> &
+  // requires CopyConstructible<Container> &
+  // RangeInsertionContainer<Container, Iter> &
   // CopyConstructible<Less>
   template <typename Iter>
   concurrent_priority_queue(Iter first,
                             Iter last,
                             const Less& less,
-                            const Cont& cont)
+                            const Container& cont)
     : less_(less), cont_(cont) {
     cont_.insert(cont_.end(), first, last);
     make_heap();
   }
 
-  // requires MoveConstructible<Cont> & RangeInsertionContainer<Cont, Iter>
+  // requires MoveConstructible<Container> &
+  // RangeInsertionContainer<Container, Iter>
   template <typename Iter>
   concurrent_priority_queue(Iter first, Iter last) : cont_(first, last) {
     make_heap();
@@ -74,7 +76,7 @@ class concurrent_priority_queue {
   // This method is not thread safe. It is the caller's responsibility
   // to ensure that the other queue will not be modified during this
   // operation.
-  // requires MoveConstructible<Cont>
+  // requires MoveConstructible<Container>
   concurrent_priority_queue(const concurrent_priority_queue& other)
      : less_(other.less_), cont_(other.cont_) {
   }
@@ -84,7 +86,7 @@ class concurrent_priority_queue {
   // to ensure that the other queue will not be modified during this
   // operation, and that this queue will not not be accessed until the
   // copy is complete.
-  // requires MoveAssignable<Cont>
+  // requires MoveAssignable<Container>
   concurrent_priority_queue& operator=(const concurrent_priority_queue& other) {
     this->cont_ = other.cont_;
     this->less_ = other.less_;
@@ -96,7 +98,7 @@ class concurrent_priority_queue {
   // This method is not thread safe. It is the caller's responsibility
   // to ensure that the neither queue will be acessed by another
   // thread until this operation is complete.
-  // requires Swappable<Cont>
+  // requires Swappable<Container>
   void swap(concurrent_priority_queue& other) {
     using std::swap;
     swap(cont_, other.cont_);
@@ -135,7 +137,7 @@ class concurrent_priority_queue {
 
 #if 0
   // TODO(alasdair): Add this when we have support for the '...' construct
-  // requires BackEmplacementContainer<Cont, Args&...>
+  // requires BackEmplacementContainer<Container, Args&...>
   template <class... Args>
   void emplace(Args&... args);
 #endif
@@ -177,7 +179,7 @@ class concurrent_priority_queue {
   }
 
   Less less_;
-  Cont cont_;
+  Container cont_;
 };
 
 #endif  // STD_CONCURRENT_PRIORITY_QUEUE_
