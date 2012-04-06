@@ -44,7 +44,6 @@ void thread::detach() {
   joinable_ = false;
 }
 
-
 void this_thread::sleep_for(const chrono::milliseconds& delay) {
   timespec tm;
   tm.tv_sec = delay.num / 1000;
@@ -53,4 +52,67 @@ void this_thread::sleep_for(const chrono::milliseconds& delay) {
   do {
     nanosleep(&tm, &tm);
   } while (errno == EINTR);
+}
+
+thread::id thread::get_id() const {
+  if (joinable_) {
+    return thread::id(native_handle_);
+  } else {
+    return thread::id();
+  }
+}
+
+thread::id::id() : is_null_(true) {
+}
+
+thread::id::id(pthread_t id) : id_(id), is_null_(false) {
+}
+
+thread::id this_thread::get_id() {
+  return thread::id(pthread_self());
+}
+
+bool operator==(thread::id x, thread::id y) {
+  return (x.is_null_ && y.is_null_) ||
+      (!x.is_null_ && !y.is_null_ && pthread_equal(x.id_, y.id_));
+}
+
+bool operator!=(thread::id x, thread::id y) {
+  return !(x == y);
+}
+
+// TODO(alasdair): Used for comparison operator. Need better
+// implementation of this, or alternative way to implement these
+// methods.
+unsigned long thread::id::long_value() const {
+  assert(!is_null_ && sizeof(id_) == sizeof(unsigned long));
+  unsigned long tid;
+  memcpy(&tid, &id_, sizeof(unsigned long));
+  return tid;
+}
+
+// Comparison. To satisfy an equivalence relationship induced by a
+// strict weak ordering, we define a and b to be equivalent if
+// !(a < b) && !(b < a). See 25.5.7. To ensure that two null ids
+// are equivalent, we ensure that nothing is ever less than null.
+bool operator<(thread::id x, thread::id y) {
+  if (y.is_null_) {
+    return false;
+  } else if (x.is_null_) {
+    return true;
+  } else {
+    return x.long_value() <  y.long_value();
+  }
+}
+
+bool operator<=(thread::id x, thread::id y) {
+  return x < y || x == y;
+}
+
+bool operator>(thread::id x, thread::id y) {
+  return ! (x <= y);
+}
+
+bool operator>=(thread::id x, thread::id y) {
+  return ! (x < y);
 }

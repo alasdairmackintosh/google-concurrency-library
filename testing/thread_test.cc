@@ -19,6 +19,11 @@ void WaitForThenSet(mutex& mu, bool* ready, bool* signal) {
   *signal = true;
 }
 
+// Sets 'id' to the id of this thread.
+void SetThreadId(thread::id* id) {
+  *id = this_thread::get_id();
+}
+
 TEST(ThreadTest, StartsNewThread) {
   bool ready = false;
   bool signal = false;
@@ -42,4 +47,46 @@ TEST(ThreadTest, JoinSynchronizes) {
   thread thr(tr1::bind(WaitForThenSet, tr1::ref(mu), &ready, &signal));
   thr.join();
   EXPECT_TRUE(signal);
+}
+
+TEST(ThreadTest, GetId) {
+  thread::id id_set_by_thread;
+  thread::id this_thread_id = this_thread::get_id();
+  thread thr(tr1::bind(SetThreadId, &id_set_by_thread));
+  thread::id id_of_thread = thr.get_id();
+  thr.join();
+  // The id that was set in SetThreadId() should equal the id of the
+  // thread we created, and should not equal the current thread id.
+  EXPECT_EQ(id_set_by_thread, id_of_thread);
+  EXPECT_NE(id_set_by_thread, this_thread_id);
+
+  thread::id greater, lesser;
+  if (this_thread_id < id_of_thread) {
+    lesser = this_thread_id;
+    greater = id_of_thread;
+  } else {
+    lesser = id_of_thread;
+    greater = this_thread_id;
+  }
+  EXPECT_GT(greater, lesser);
+  EXPECT_GE(greater, lesser);
+  EXPECT_LE(lesser, greater);
+  EXPECT_GE(lesser, lesser);
+  EXPECT_LE(lesser, lesser);
+
+
+  // The null/empty thread id should not equal the id of any real
+  // thread.
+  thread::id null_id;
+  EXPECT_NE(id_set_by_thread, null_id);
+  EXPECT_NE(this_thread_id, null_id);
+
+  // After a join, a thread should no longer have an id.
+  EXPECT_EQ(null_id, thr.get_id());
+
+  // Verify behaviour of null id in comparisons
+  EXPECT_EQ(null_id, null_id);
+  EXPECT_NE(null_id, id_set_by_thread);
+  EXPECT_LT(null_id, this_thread_id);
+  EXPECT_GT(this_thread_id, null_id);
 }

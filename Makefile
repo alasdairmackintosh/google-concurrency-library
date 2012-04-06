@@ -56,7 +56,7 @@ std_thread.a: $(STD_THREAD_OBJS)
 TEST_OBJS := testing/thread_test.o testing/lock_test.o testing/race_test.o \
 		testing/concurrent_priority_queue_test.o
 AllTests: CppFlags += -Iinclude $(GTEST_I) $(GMOCK_I)
-AllTests: std_thread.a $(GMOCK_MAIN_A) $(TEST_OBJS)
+AllTests: $(TEST_OBJS) std_thread.a $(GMOCK_MAIN_A)
 	$(CXX) -o $@ $(LdFlags) $^ $(LOADLIBES) $(LdLibs)
 
 
