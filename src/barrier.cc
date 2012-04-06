@@ -1,7 +1,6 @@
 // Copyright 2010 Google Inc. All Rights Reserved.
 
 #include <barrier.h>
-#include <stdio.h>
 namespace tr1 = std::tr1;
 
 namespace gcl {
@@ -40,9 +39,8 @@ bool barrier::await()  throw (std::logic_error) {
     }
     cv_.notify_all();
   }
-  printf("barrier block - num_to_exit_ = %d\n", (int)num_to_exit_);
   num_to_exit_--;
   return (num_to_exit_ == 0);
 }
 
-}
+}  // End namespace gcl
