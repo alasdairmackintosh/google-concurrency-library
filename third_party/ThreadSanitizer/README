@@ -1,0 +1,23 @@
+This directory contains the binaries of ThreadSanitizer (aka tsan),
+a Valgrind-based data race detector.
+
+For fresh binaries and more details see
+  http://code.google.com/p/data-race-test/wiki/ThreadSanitizer
+
+Supported platforms: 
+  * Linux/x86_64, tested only on Ubuntu 8.04, 
+    supports both 32- and 64-bit binaries.
+  * MacOS X 10.5 (32-bit only)
+
+Usage example:
+  srcdir=<the directory with GCL sources>
+  objdir=<the directory where GCL is built>
+  # Linux: 
+  TSAN="$srcdir/third_party/ThreadSanitizer/Linux-x86_64/tsan-self-contained.sh"
+  # Mac:   
+  TSAN="$srcdir/third_party/ThreadSanitizer/Darwin-i386/tsan-self-contained.sh --dsymutil=yes"
+  cd $objdir
+  # Run in the pure-happens-before (less aggressive) mode.
+  $TSAN --pure-happens-before ./race_test  
+  # Run in the hybrid (more aggressive) mode.
+  $TSAN ./race_test
