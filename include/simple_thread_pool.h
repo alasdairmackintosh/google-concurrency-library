@@ -36,7 +36,7 @@ namespace gcl {
 // actually handle task queueing and execution).
 class simple_thread_pool {
  public:
-  // Ubounded form of the simple_thread_pool
+  // Unbounded form of the simple_thread_pool
   simple_thread_pool();
 
   // Bounded thread-pool (cap on the number of threads).

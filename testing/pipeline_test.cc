@@ -3,6 +3,7 @@
 
 #include "pipeline.h"
 #include "blocking_queue.h"
+#include "countdown_latch.h"
 #include "source.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,7 @@ using std::tr1::bind;
 using std::tr1::placeholders::_1;
 
 using gcl::blocking_queue;
+using gcl::countdown_latch;
 using gcl::simple_thread_pool;
 using gcl::source;
 using gcl::Pipeline;
@@ -59,6 +61,13 @@ void consume_user(User input) {
   printf("Consuming %s\n", input.get_name().c_str());
 }
 
+
+// Function invoked when a pipeline ends.
+void OnEnd(countdown_latch* latch) {
+  printf("Ending pipeline\n");
+  latch->count_down();
+}
+
 class PipelineTest : public testing::Test {
 };
 
@@ -66,6 +75,8 @@ class PipelineTest : public testing::Test {
 // pipeline in action. Add proper tests once the interface is sorted
 // out.
 TEST_F(PipelineTest, Example) {
+  countdown_latch latch(1);
+  function <void ()> end_fn = bind(&OnEnd, &latch);
 
   function <int (string input)> f1 = find_uid;
   function <User (int uid)> f2 = get_user;
@@ -95,11 +106,57 @@ TEST_F(PipelineTest, Example) {
 
   simple_thread_pool pool;
   RunnablePipeline<string, User, string_source> p4 = p3.Consume(c);
-  p4.run(pool);
-
+  RunnablePipeline<string, User, string_source> p5 = p4.OnEnd(end_fn);
+  p5.run(pool);
+  queue.push("More stuff");
+  queue.push("Yet More stuff");
+  queue.push("Are we done yet???");
   queue.close();
-  // Short sleep just to give the threads some time to execute.
+  latch.wait();
+}
 
-  // TODO(alasdair): How do we wait for pipelines to terminate?
-  this_thread::sleep_for(chrono::milliseconds(1));
+TEST_F(PipelineTest, ParallelExample) {
+  countdown_latch latch(1);
+  function <void ()> end_fn = bind(&OnEnd, &latch);
+
+  function <int (string input)> f1 = find_uid;
+  function <User (int uid)> f2 = get_user;
+  function <void (User user)> c = consume_user;
+
+  // Simple one-stage pipeline
+  Pipeline<string, int> p1(f1);
+  int uid = p1.apply("hello");
+  printf("Got uid %d\n", uid);
+
+  // Two-stage pipeline. Combines string->int and int->User to make
+  // string->User
+  Pipeline<string, User> p2 = Pipeline<string, int>(f1).Filter<User>(f2);
+  User a2 = p2.apply("hello world");
+  printf("Got %s from pipeline\n", a2.get_name().c_str());
+
+
+  // RunnablePipeline that reads from a queue and writers to a sink
+  typedef source<string, blocking_queue<string> > string_source;
+  blocking_queue<string> queue;
+  queue.push("Queued Hello");
+  queue.push("queued world");
+  queue.push("queued 1");
+  queue.push("queued 22");
+  queue.push("queued 333");
+  queue.push("queued 4444");
+  queue.push("queued 55555");
+  queue.push("queued 666666");
+  string_source in_source(queue);
+  StartablePipeline<string, User, string_source> p3 =
+    Pipeline<string, int>(f1).Filter<User>(f2)
+      .Source<string_source>(&in_source);
+
+  simple_thread_pool pool;
+  RunnablePipeline<string, User, string_source> p4 = p3.Consume(c).Parallel(3);
+  p4.run(pool);
+  queue.push("More stuff");
+  queue.push("Yet More stuff");
+  queue.push("Are we done yet???");
+  queue.close();
+  p4.wait();
 }

@@ -43,6 +43,14 @@ class source {
   // Postcondition: has_value() will be false.
   source(S& queue) : queue_(queue), state_(empty) { }
 
+  source(const source& other) : queue_(other.queue), state_(empty) { }
+
+  source& operator=(const source& other) {
+    queue_ = other.queue;
+    state_ = empty;
+    return *this;
+  }
+
   // Returns true if this source is closed. Attemting to read from a
   // closed source will throw a closed_error.
   bool is_closed() {

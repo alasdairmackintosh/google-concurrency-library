@@ -4,7 +4,6 @@
 
 #include <limits>
 #include <set>
-#include <stdio.h>
 #include <tr1/functional>
 
 #include <atomic.h>

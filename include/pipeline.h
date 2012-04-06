@@ -3,9 +3,14 @@
 #ifndef GCL_PIPELINE_
 #define GCL_PIPELINE_
 
+#include <iostream>
+
 #include <exception>
+#include <stdexcept>
 #include <tr1/functional>
 
+#include <atomic.h>
+#include <countdown_latch.h>
 #include <simple_thread_pool.h>
 
 using std::tr1::function;
@@ -140,19 +145,118 @@ template <typename IN,
 class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
  public:
   RunnablePipeline(StartablePipeline<IN, OUT, SOURCE>& start, function<void (IN input)> consumer)
-  : StartablePipeline<IN, OUT, SOURCE>(start), consumer_(consumer) {
+      : StartablePipeline<IN, OUT, SOURCE>(start),
+        n_threads_(0),
+        consumer_(consumer),
+        end_latch_(1) {
+    set_default_end_fn();
   }
 
   RunnablePipeline(SOURCE* source)
-    : StartablePipeline<IN, OUT, SOURCE>(source), consumer_(NULL) {
+      : StartablePipeline<IN, OUT, SOURCE>(source),
+        n_threads_(0),
+        consumer_(NULL),
+        end_latch_(1) {
+    set_default_end_fn();
   }
 
   RunnablePipeline(SOURCE* source, function<void (OUT output)> consumer)
-    : StartablePipeline<IN, OUT, SOURCE>(source), consumer_(consumer) {
+    : StartablePipeline<IN, OUT, SOURCE>(source),
+      n_threads_(0),
+      consumer_(consumer),
+      end_latch_(1) {
+    set_default_end_fn();
   }
 
-  using StartablePipeline<IN, OUT, SOURCE>::get_source;
+  RunnablePipeline(const RunnablePipeline& other)
+      : StartablePipeline<IN, OUT, SOURCE>(other),
+        n_threads_(other.n_threads_),
+        consumer_(other.consumer_),
+        end_latch_(1) {
+    set_end_fn(other);
+  }
+
+ protected:
+  RunnablePipeline(const RunnablePipeline& other, function<void ()> end_fn)
+      : StartablePipeline<IN, OUT, SOURCE>(other),
+        n_threads_(other.n_threads_),
+        consumer_(other.consumer_),
+        end_fn_(end_fn),
+        default_end_(false),
+        end_latch_(0) {
+  }
+
+  RunnablePipeline(const RunnablePipeline& other, int n_threads)
+      : StartablePipeline<IN, OUT, SOURCE>(other),
+        n_threads_(n_threads),
+        consumer_(other.consumer_),
+        end_latch_(1) {
+    set_end_fn(other);
+  }
+
+  void set_end_fn(const RunnablePipeline& other) {
+    if (other.default_end_) {
+      set_default_end_fn();
+    } else {
+      end_fn_ = other.end_fn_;
+      default_end_ = false;
+    }
+  }
+
+ public:
+  // Sets an explicit function to be called when the Pipeline ends.
+  // Cannot be combined with wait()
+  RunnablePipeline<IN, OUT, SOURCE> OnEnd(function<void ()> end_fn) {
+    return RunnablePipeline<IN, OUT, SOURCE>(*this, end_fn);
+  }
+
+  RunnablePipeline<IN, OUT, SOURCE> Parallel(int n_threads) {
+    return RunnablePipeline<IN, OUT, SOURCE>(*this, n_threads);
+  }
+
   void run() {
+    if (n_threads_ > 0) {
+      std::cerr << "Warning - running in serial mode\n";
+    }
+    run_internal();
+  }
+
+  // Runs this pipeline in a threadpool.
+  // TODO(alasdair): What kind of threadpool do we support?
+  // TODO(alasdair): How do we handle errors?
+  void run(simple_thread_pool& pool) {
+    if (n_threads_ > 0) {
+      atomic_init(&count_, n_threads_);
+    }
+    int thread_count = n_threads_ < 1 ? 1 : n_threads_;
+    for (int i = 0; i < thread_count; i++) {
+      mutable_thread* thread = pool.try_get_unused_thread();
+      if (thread != NULL) {
+        function <void ()> f = bind(static_cast<void (RunnablePipeline::*)()>(
+            &RunnablePipeline<IN, OUT, SOURCE>::run_internal), this);
+        if (!thread->execute(f)) {
+          // TODO(alasdair): What do we do here?
+          throw std::exception();
+        }
+      } else {
+        // TODO(alasdair): What do we do here?
+        throw std::exception();
+      }
+    }
+  }
+
+  // Blocks until the pipeline has finished. Throws an exception if a
+  // custom function was defined using OnEnd
+  void wait()  throw (std::logic_error) {
+    if (!default_end_) {
+      throw std::logic_error("Cannot wait if EndFn defined.");
+    }
+    end_latch_.wait();
+  }
+ private:
+
+  using StartablePipeline<IN, OUT, SOURCE>::get_source;
+  void run_internal() {
     bool closed = false;
     while(!closed) {
       get_source()->wait();
@@ -161,25 +265,39 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
         consumer_(get_source()->get());
       }
     }
-  }
-
-  // Runs this pipeline in a threadpool.
-  // TODO(alasdair): What kind of threadpool do we support?
-  // TODO(alasdair): How do we handle errors?
-  void run(simple_thread_pool& pool) {
-    mutable_thread* thread = pool.try_get_unused_thread();
-    if (thread != NULL) {
-      function <void ()> f = bind(static_cast<void (RunnablePipeline::*)()>(
-          &RunnablePipeline<IN, OUT, SOURCE>::run), this);
-      if (!thread->execute(f)) {
-        throw std::exception();
-      }
+    if (n_threads_ > 0) {
+      end_thread();
     } else {
-      throw std::exception();
+      end_fn_();
     }
   }
- private:
+
+  // Invoked when then pipeline has finished, unless a custom end_fn
+  // has been set. Counts down the end_latch, so that a thread blocked
+  // in wait() can return.
+  void default_end() {
+    end_latch_.count_down();
+  }
+
+  void set_default_end_fn() {
+    end_fn_ = bind(&RunnablePipeline::default_end, this);
+    default_end_ = true;
+  }
+
+  void end_thread() {
+    int left = --count_;
+    if (left == 0) {
+      end_fn_();
+    }
+  }
+
+  const int n_threads_;
   function <void(IN input)> consumer_;
+
+  function <void()> end_fn_;
+  bool default_end_;
+  countdown_latch end_latch_;
+  atomic_int count_;
 };
 
 template <typename IN,

@@ -55,7 +55,7 @@ GMOCK_MAIN_A := gmock_main.a $(GMOCK_A)
 
 # The std_atomic library.
 include/atomic.h : util/atomic.sh
-	sh util/atomic.sh > include/atomic.h
+	/bin/bash util/atomic.sh > include/atomic.h
 
 src/atomic.o : include/atomic.h
 STD_ATOMIC_OBJS := src/atomic.o
@@ -102,7 +102,9 @@ test_mutex.a: $(TEST_MUTEX_OBJS)
 STD_MUTEX_TEST_OBJS := testing/thread_test.o testing/lock_test.o \
     testing/blocking_queue_test.o testing/serial_executor_test.o \
     testing/simple_thread_pool_test.o testing/source_test.o \
-    testing/barrier_test.o testing/mutable_thread_test.o
+    testing/barrier_test.o testing/mutable_thread_test.o \
+    testing/pipeline_test.o
+ 
 NativeTests: CppFlags += -Iinclude -Itesting $(GTEST_I) $(GMOCK_I)
 NativeTests: $(STD_MUTEX_TEST_OBJS) std_thread.a std_mutex.a std_atomic.a \
              $(GMOCK_MAIN_A)

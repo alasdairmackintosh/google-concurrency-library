@@ -2,7 +2,6 @@
 
 #include <mutable_thread.h>
 
-#include <stdio.h>
 #include <tr1/functional>
 
 #include <atomic.h>
