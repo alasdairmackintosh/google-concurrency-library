@@ -3,6 +3,8 @@
 #ifndef GCL_SOURCE_
 #define GCL_SOURCE_
 
+#include <gcl_string.h>
+#include <thread.h>
 #include <closed_error.h>
 
 namespace gcl {
@@ -36,24 +38,31 @@ template <typename T, class S>
 class source {
  private:
   // TODO(alasdair): Make this a scoped enum when we have support for this.
-  enum state {empty, value, closed};
+  enum state {unknown, empty, value, closed};
 
  public:
   // Creates a new source.
   // Postcondition: has_value() will be false.
-  source(S& queue) : queue_(queue), state_(empty) { }
+  source(S* queue) : queue_(queue), state_(unknown) {
+  }
 
-  source(const source& other) : queue_(other.queue), state_(empty) { }
+  source(const source& other) : queue_(other.queue_), state_(unknown) {
+  }
 
   source& operator=(const source& other) {
-    queue_ = other.queue;
-    state_ = empty;
-    return *this;
+    queue_ = other.queue_;
+    state_ = unknown;
+    std::stringstream ss;
   }
 
   // Returns true if this source is closed. Attemting to read from a
   // closed source will throw a closed_error.
   bool is_closed() {
+    if (state_ == unknown) {
+      if (queue_->is_closed()) {
+        state_ = closed;
+      }
+    }
     return state_ == closed;
   }
 
@@ -67,14 +76,16 @@ class source {
   T get() {
     switch (state_) {
       case empty:
-        return queue_.pop();
+      case unknown:
+        return queue_->pop();
       case value:
         state_ = empty;
         return value_;
       case closed:
         throw closed_error("Closed");
     }
-    throw std::runtime_error("Invalid state");
+    throw std::runtime_error("Invalid state" + to_string(state_) +
+                             " in thread " + to_string(this_thread::get_id()));
   }
 
   // Waits until a value is available, or the source becomes
@@ -85,15 +96,17 @@ class source {
   // Postcondition: one of is_closed() or has_value() will be
   // true.
   void wait() {
-    if (state_ != empty) {
+    if (state_ != empty && state_ != unknown) {
       if (state_ == closed) {
         return;
       } else {
-        throw std::logic_error(std::string("Invalid state "));
+        throw std::logic_error(
+            std::string("Invalid state " + to_string(state_) +
+                        " in thread " + to_string(this_thread::get_id())));
       }
     }
     try {
-      value_ = queue_.pop();
+      value_ = queue_->pop();
       state_ = value;
     } catch (closed_error& e) {
       state_ = closed;
@@ -114,7 +127,7 @@ class source {
 #endif
 
  private:
-  S& queue_;
+  S* queue_;
   state state_;
   // TODO(alasdair): What happens if this isn't default constructible?
   // Need move-assignment semantics...

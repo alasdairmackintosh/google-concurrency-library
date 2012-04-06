@@ -84,7 +84,7 @@ std::basic_ostream<charT, traits>& operator<<(
     if (sizeof(id.id_) == sizeof(unsigned long)) {
       unsigned long tid;
       memcpy(&tid, &id.id_, sizeof(unsigned long));
-      stream << tid;
+      stream << std::hex << tid << std::dec;
     } else {
       stream << "???";
     }

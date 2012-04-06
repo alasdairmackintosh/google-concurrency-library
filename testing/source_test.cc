@@ -25,7 +25,7 @@ TEST_F(SourceTest, Basic) {
   blocking_queue<int> queue;
   queue.push(42);
 
-  source<int, blocking_queue<int> > test_source(queue);
+  source<int, blocking_queue<int> > test_source(&queue);
   ASSERT_FALSE(test_source.has_value());
   test_source.wait();
   ASSERT_TRUE(test_source.has_value());

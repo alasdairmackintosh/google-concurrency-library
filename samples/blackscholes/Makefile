@@ -12,7 +12,6 @@ all: blackscholes
 
 clean:
 	find * -name '*.a' -o -name '*.o' -o -name '*.d' | xargs $(RM)
-	$(RM) Tests NativeTests
 
 blackscholes: blackscholes.o
 

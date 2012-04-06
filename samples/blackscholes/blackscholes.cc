@@ -23,14 +23,17 @@
 #include <string.h>
 
 #include <tr1/functional>
+#include <vector>
+
 #include <thread.h>
-#include <blocking_queue.h>
+#include <collection_queue.h>
 #include <source.h>
 #include <pipeline.h>
 
 using std::tr1::bind;
+using std::vector;
 
-using gcl::blocking_queue;
+using gcl::collection_queue;
 using gcl::simple_thread_pool;
 using gcl::source;
 using gcl::Pipeline;
@@ -334,21 +337,28 @@ int main (int argc, char **argv)
     printf("Size of data: %d\n", (int)(numOptions * (sizeof(OptionData) + sizeof(int))));
 
 #ifdef PIPELINE
-    // Run the analysis in a pipeline
-    typedef source<int, blocking_queue<int> > int_source;
-    blocking_queue<int> queue;
-    int_source input_source(queue);
+    // Run the analysis in a pipeline. Use a queue based on a
+    // std::vector, as we know all of the elemetns thast we are
+    // processing in advance.
+    vector<int> input;
     for(int i=0; i<nThreads; i++) {
-      queue.push(i);
+      input.push_back(i);
     }
-    queue.close();
+
+    typedef source<int, collection_queue<vector<int> > > int_source;
+    collection_queue<vector<int> >input_queue(input);
+    int_source input_source(&input_queue);
     RunnablePipeline<int, int, int_source> p =
-        Pipeline<int, int>(bs_thread).Source<int_source>(&input_source).Consume(process_result).Parallel(nThreads);
+        Pipeline<int, int>(bs_thread)
+        .Source<int_source>(input_source)
+        .Consume(process_result)
+        .Parallel(nThreads);
     simple_thread_pool pool(nThreads, nThreads);
+
     p.run(pool);
     p.wait();
 #else
-    // Run the analysis in a pipeline
+    // Run the analysis using threads
     thread* threads[nThreads];
     for(i=0; i<nThreads; i++) {
       threads[i] = new thread(bind(&bs_thread, i));

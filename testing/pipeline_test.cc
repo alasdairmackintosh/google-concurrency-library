@@ -1,6 +1,9 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
 //
 
+#include <vector>
+using std::vector;
+
 #include "pipeline.h"
 #include "blocking_queue.h"
 #include "countdown_latch.h"
@@ -99,10 +102,10 @@ TEST_F(PipelineTest, Example) {
   blocking_queue<string> queue;
   queue.push("Queued Hello");
   queue.push("queued world");
-  string_source in_source(queue);
+  string_source in_source(&queue);
   StartablePipeline<string, User, string_source> p3 =
     Pipeline<string, int>(f1).Filter<User>(f2)
-      .Source<string_source>(&in_source);
+      .Source<string_source>(in_source);
 
   simple_thread_pool pool;
   RunnablePipeline<string, User, string_source> p4 = p3.Consume(c);
@@ -146,10 +149,10 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("queued 4444");
   queue.push("queued 55555");
   queue.push("queued 666666");
-  string_source in_source(queue);
+  string_source in_source(&queue);
   StartablePipeline<string, User, string_source> p3 =
     Pipeline<string, int>(f1).Filter<User>(f2)
-      .Source<string_source>(&in_source);
+      .Source<string_source>(in_source);
 
   simple_thread_pool pool;
   RunnablePipeline<string, User, string_source> p4 = p3.Consume(c).Parallel(3);

@@ -4,6 +4,7 @@
 #define GCL_PIPELINE_
 
 #include <iostream>
+#include <vector>
 
 #include <exception>
 #include <stdexcept>
@@ -77,7 +78,7 @@ class Pipeline {
   }
 
   template <typename SOURCE>
-  StartablePipeline<IN, OUT, SOURCE> Source(SOURCE* source);
+  StartablePipeline<IN, OUT, SOURCE> Source(SOURCE source);
 
   OUT apply(IN in) {
     return fn_(in);
@@ -101,11 +102,11 @@ template <typename IN,
           typename SOURCE>
 class StartablePipeline : public Pipeline<IN, OUT> {
  public:
-  StartablePipeline(const Pipeline<IN, OUT>& pipeline, SOURCE* source)
+  StartablePipeline(const Pipeline<IN, OUT>& pipeline, SOURCE source)
       : Pipeline<IN, OUT>(pipeline), source_(source) {
   }
 
-  StartablePipeline(SOURCE* source)
+  StartablePipeline(SOURCE source)
       : source_(source) {
   }
 
@@ -114,7 +115,7 @@ class StartablePipeline : public Pipeline<IN, OUT> {
         source_(other.source_) {
   }
 
-  void operator=(const StartablePipeline<IN, OUT, SOURCE>& other) {
+  StartablePipeline& operator=(const StartablePipeline<IN, OUT, SOURCE>& other) {
     Pipeline<IN, OUT>::operator=(other);
     source_ = other.source_;
     return *this;
@@ -130,11 +131,11 @@ class StartablePipeline : public Pipeline<IN, OUT> {
   RunnablePipeline<IN, OUT, SOURCE> Consume(function<void (OUT result)> sink);
 
  protected:
-  SOURCE* get_source() {
+  SOURCE& get_source() {
     return source_;
   }
  private:
-  SOURCE* source_;
+  SOURCE source_;
 
 };
 
@@ -152,7 +153,7 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     set_default_end_fn();
   }
 
-  RunnablePipeline(SOURCE* source)
+  RunnablePipeline(SOURCE source)
       : StartablePipeline<IN, OUT, SOURCE>(source),
         n_threads_(0),
         consumer_(NULL),
@@ -160,7 +161,7 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     set_default_end_fn();
   }
 
-  RunnablePipeline(SOURCE* source, function<void (OUT output)> consumer)
+  RunnablePipeline(SOURCE source, function<void (OUT output)> consumer)
     : StartablePipeline<IN, OUT, SOURCE>(source),
       n_threads_(0),
       consumer_(consumer),
@@ -174,6 +175,19 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
         consumer_(other.consumer_),
         end_latch_(1) {
     set_end_fn(other);
+  }
+
+  RunnablePipeline& operator=(const RunnablePipeline<IN, OUT, SOURCE>& other) {
+    StartablePipeline<IN, OUT, SOURCE>::operator=(other);
+    n_threads_ = other.n_threads_;
+    consumer_ = other.consumer_;
+    return *this;
+  }
+
+  ~RunnablePipeline() {
+    for (size_t i = 0; i < children_.size(); i++) {
+      delete children_[i];
+    }
   }
 
  protected:
@@ -218,6 +232,7 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     if (n_threads_ > 0) {
       std::cerr << "Warning - running in serial mode\n";
     }
+    n_threads_ = 0;
     run_internal();
   }
 
@@ -225,15 +240,16 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
   // TODO(alasdair): What kind of threadpool do we support?
   // TODO(alasdair): How do we handle errors?
   void run(simple_thread_pool& pool) {
-    if (n_threads_ > 0) {
-      atomic_init(&count_, n_threads_);
-    }
-    int thread_count = n_threads_ < 1 ? 1 : n_threads_;
-    for (int i = 0; i < thread_count; i++) {
+    // If we aren't running mutiple threads, then just run this
+    // pipeline in a threadpool's thread. Otherwise create mutiple
+    // children, and run each child in a separate thread. We could
+    // probably make this slightly more efficient by creating n-1
+    // children and re-sing the main object, but the whole child thing
+    // probably need rethinking anyway.
+    if (n_threads_ == 0) {
       mutable_thread* thread = pool.try_get_unused_thread();
       if (thread != NULL) {
-        function <void ()> f = bind(static_cast<void (RunnablePipeline::*)()>(
-            &RunnablePipeline<IN, OUT, SOURCE>::run_internal), this);
+        function <void ()> f = bind(&RunnablePipeline<IN, OUT, SOURCE>::run_internal, this);
         if (!thread->execute(f)) {
           // TODO(alasdair): What do we do here?
           throw std::exception();
@@ -241,6 +257,35 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
       } else {
         // TODO(alasdair): What do we do here?
         throw std::exception();
+      }
+    } else {
+      // TODO(alasdair): This is a bit messy. We need to have
+      // individual source objects for each thread that is running. (A
+      // source is not threadsafe, in that it is only designed to be
+      // called from a single thread, although multiple sources
+      // pointing to the same queue can be called from different
+      // threads.)
+      atomic_init(&count_, n_threads_);
+      children_.reserve(n_threads_);
+      for (int i = 0; i < n_threads_; i++) {
+        mutable_thread* thread = pool.try_get_unused_thread();
+        if (thread != NULL) {
+          RunnablePipeline *p = new RunnablePipeline(*this);
+          p->n_threads_ = 0;
+          // Set each child to invoke the main pipeline's end_thread
+          // function. When all threads finish we will invoke the main
+          // pipeline's end_fn_.
+          p->end_fn_ = bind(&RunnablePipeline::end_thread, this);
+          children_.push_back(p);
+          function <void ()> f = bind(&RunnablePipeline<IN, OUT, SOURCE>::run_internal, p);
+          if (!thread->execute(f)) {
+            // TODO(alasdair): What do we do here?
+            throw std::exception();
+          }
+        } else {
+          // TODO(alasdair): What do we do here?
+          throw std::exception();
+        }
       }
     }
   }
@@ -253,23 +298,21 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     }
     end_latch_.wait();
   }
- private:
 
+ private:
   using StartablePipeline<IN, OUT, SOURCE>::get_source;
   void run_internal() {
     bool closed = false;
     while(!closed) {
-      get_source()->wait();
-      closed = get_source()->is_closed();
+      if (!get_source().has_value()) {
+        get_source().wait();
+      }
+      closed = get_source().is_closed();
       if (!closed) {
-        consumer_(get_source()->get());
+        consumer_(get_source().get());
       }
     }
-    if (n_threads_ > 0) {
-      end_thread();
-    } else {
-      end_fn_();
-    }
+    end_fn_();
   }
 
   // Invoked when then pipeline has finished, unless a custom end_fn
@@ -291,7 +334,8 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
     }
   }
 
-  const int n_threads_;
+  int n_threads_;
+  std::vector<RunnablePipeline<IN, OUT, SOURCE>*> children_;
   function <void(IN input)> consumer_;
 
   function <void()> end_fn_;
@@ -303,7 +347,7 @@ class RunnablePipeline : public StartablePipeline<IN, OUT, SOURCE> {
 template <typename IN,
           typename OUT>
 template <typename SOURCE>
-StartablePipeline<IN, OUT, SOURCE> Pipeline<IN, OUT>::Source(SOURCE* source) {
+StartablePipeline<IN, OUT, SOURCE> Pipeline<IN, OUT>::Source(SOURCE source) {
   return StartablePipeline<IN, OUT, SOURCE>(*this, source);
 }
 
