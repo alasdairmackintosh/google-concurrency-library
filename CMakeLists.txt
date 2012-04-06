@@ -29,3 +29,7 @@ add_test(thread_test thread_test)
 add_executable(lock_test testing/lock_test.cc)
 target_link_libraries(lock_test gmock_main std_thread)
 add_test(lock_test lock_test)
+
+add_executable(race_test testing/race_test.cc)
+target_link_libraries(race_test gmock_main std_thread)
+add_test(race_test race_test)
