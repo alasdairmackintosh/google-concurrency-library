@@ -1,7 +1,7 @@
 // Copyright 2010 Google Inc. All Rights Reserved.
 
-#ifndef STD_SERIAL_EXECUTOR_
-#define STD_SERIAL_EXECUTOR_
+#ifndef GCL_SERIAL_EXECUTOR_
+#define GCL_SERIAL_EXECUTOR_
 
 #include <queue>
 #include <tr1/functional>
@@ -9,6 +9,8 @@
 #include "condition_variable.h"
 #include "mutex.h"
 #include "thread.h"
+
+namespace gcl {
 
 // Simple executor which creates a new thread for controlling and executing
 // parameter-free function objects.
@@ -50,4 +52,6 @@ class serial_executor {
   bool queue_ready();
 };
 
-#endif
+}  // End namespace gcl
+
+#endif  // GCL_SERIAL_EXECUTOR_

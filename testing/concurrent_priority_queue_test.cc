@@ -16,6 +16,8 @@ using testing::_;
 using testing::Invoke;
 using testing::InSequence;
 
+using gcl::concurrent_priority_queue;
+
 // Iterator used with MyContainer
 // TODO(alasdair): Verify if we need this. Keeping it for now until
 // all functionality and multithreaded tests are complete.

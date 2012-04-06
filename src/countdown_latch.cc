@@ -5,6 +5,8 @@
 #include "mutex.h"
 #include "condition_variable.h"
 
+namespace gcl {
+
 countdown_latch::countdown_latch(unsigned int count)
  : count_(count) {
 }
@@ -25,3 +27,5 @@ void countdown_latch::count_down() {
     condition_.notify_all();
   }
 }
+
+}  // End namespace gcl

@@ -1,10 +1,12 @@
 // Copyright 2009 Google Inc. All Rights Reserved.
 
-#ifndef STD_COUNTDOWN_LATCH_
-#define STD_COUNTDOWN_LATCH_
+#ifndef GCL_COUNTDOWN_LATCH_
+#define GCL_COUNTDOWN_LATCH_
 
 #include <condition_variable.h>
 #include <mutex.h>
+
+namespace gcl {
 
 // A countdown_latch allows one or more threads to block until an
 // operation is completed. A countdown_latch is initialized with a
@@ -46,4 +48,6 @@ private:
   countdown_latch& operator=(const countdown_latch&);
 };
 
-#endif  // STD_COUNTDOWN_LATCH_
+}  // End namespace gcl
+
+#endif  // GCL_COUNTDOWN_LATCH_

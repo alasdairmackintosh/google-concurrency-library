@@ -11,6 +11,8 @@
 
 namespace tr1 = std::tr1;
 
+namespace gcl {
+
 serial_executor::serial_executor()
   : shutting_down(false),
     run_thread(tr1::bind(&serial_executor::run, this)) {}
@@ -58,3 +60,5 @@ void serial_executor::run() {
 bool serial_executor::queue_ready() {
   return !function_queue.empty() || shutting_down;
 }
+
+}  // End namespace gcl

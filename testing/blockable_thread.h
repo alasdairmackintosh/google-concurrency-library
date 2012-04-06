@@ -9,6 +9,8 @@
 #include "test_mutex.h"
 #include <iostream>
 
+using gcl::countdown_latch;
+
 // A ThreadBlocker will block when it is invoked from a given thread,
 // but will not block when invoked from other threads. It enables the
 // creation of test cases where two similar actions are performed in
