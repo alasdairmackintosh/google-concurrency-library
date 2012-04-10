@@ -15,13 +15,15 @@
 #ifndef STD_TESTING_THREADBLOCKER_
 #define STD_TESTING_THREADBLOCKER_
 
-#include "mutex.h"
-#include "thread.h"
-#include "latch.h"
-#include "test_mutex.h"
 #include <iostream>
 
-using gcl::latch;
+#include "mutex.h"
+#include "thread.h"
+
+#include "countdown_latch.h"
+#include "test_mutex.h"
+
+using gcl::countdown_latch;
 
 // A ThreadBlocker will block when it is invoked from a given thread,
 // but will not block when invoked from other threads. It enables the
@@ -47,7 +49,7 @@ using gcl::latch;
 //
 //  void Test() {
 //    ThreadBlocker blocker();
-//    BlockableThread thr(std::tr1::bind(Action, blocker), &blocker);
+//    BlockableThread thr(std::bind(Action, blocker), &blocker);
 //    blocker.Start();
 //
 //    // Wait until 'thr' is blocked.
@@ -89,8 +91,8 @@ private:
   thread::id id_;
   mutex count_mutex_;
   int count_;
-  latch block_latch_;
-  latch start_latch_;
+  countdown_latch block_latch_;
+  countdown_latch start_latch_;
 };
 
 // A thread used in conjunction with a ThreadBlocker
@@ -105,7 +107,7 @@ private:
     blocker->WaitToStart();
     f_();
   }
-  std::tr1::function<void()> f_;
+  std::function<void()> f_;
   
   // Disallow copy and assign
   BlockableThread(const BlockableThread&);
@@ -114,7 +116,7 @@ private:
 
 template<class F>
 BlockableThread::BlockableThread(F f, ThreadBlocker* blocker)
-: thread(std::tr1::bind(&BlockableThread::init, this, blocker)),
+: thread(std::bind(&BlockableThread::init, this, blocker)),
   f_(f) {
 }
 

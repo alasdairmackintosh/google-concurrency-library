@@ -12,71 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thread.h>
-
 #include "barrier.h"
-#include "debug.h"
 
 namespace gcl {
-using std::atomic;
-using std::memory_order;
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-using std::bind;
-#else
-using std::tr1::bind;
-#endif
 
 barrier::barrier(size_t num_threads) throw (std::invalid_argument)
-    : thread_count_(num_threads),
-      new_thread_count_(num_threads),
-      num_waiting_(0),
-      num_to_leave_(0) {
+    : num_to_block_left_(num_threads),
+      num_to_exit_(num_threads),
+      function_(NULL) {
   if (num_threads == 0) {
-    throw std::invalid_argument("num_threads is 0");
+    throw std::invalid_argument("num_threads must be > 0");
   }
 }
 
-barrier::~barrier() {
+barrier::barrier(size_t num_threads, std::function<void()> function)
+    throw (std::invalid_argument)
+    : num_to_block_left_(num_threads),
+      num_to_exit_(num_threads),
+      function_(function) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads must be > 0");
+  }
 }
 
-// These methods could be implemented as C++11 lambdas, but are written as
-// member functions for C++98 compatibility.
-bool barrier::all_threads_exited() {
-  return num_to_leave_ == 0;
-}
-
-bool barrier::all_threads_waiting() {
-  return num_waiting_ == thread_count_;
-}
-
-void barrier::count_down_and_wait()  throw (std::logic_error) {
-  unique_lock<mutex> lock(mutex_);
-  idle_.wait(lock, bind(&barrier::all_threads_exited, this));
-  ++num_waiting_;
-  if (num_waiting_ == thread_count_) {
-    num_to_leave_ = thread_count_;
-    on_countdown();
-    ready_.notify_all();
+bool barrier::await()  throw (std::logic_error) {
+  unique_lock<mutex> ul(lock_);
+  if (num_to_block_left_ == 0) {
+    throw std::logic_error("called too many times.");
+  }
+  if (--num_to_block_left_ > 0) {
+    while (num_to_block_left_ != 0) {
+      cv_.wait(ul);
+    }
   } else {
-    ready_.wait(lock, bind(&barrier::all_threads_waiting, this));
+    if (function_ != NULL) {
+      function_();
+    }
+    cv_.notify_all();
   }
-  if (--num_to_leave_ == 0) {
-    thread_count_ = new_thread_count_;
-    num_waiting_ = 0;
-    idle_.notify_all();
-  }
-}
-
-void barrier::on_countdown() {
-  if (completion_fn_) {
-    completion_fn_();
-  }
-}
-
-void barrier::reset(size_t num_threads) {
-  // TODO(alasdair): Consider adding a check that we are either in the
-  // completion function, or have not yet called wait()
-  new_thread_count_ = num_threads;
+  num_to_exit_--;
+  return (num_to_exit_ == 0);
 }
 
 }  // End namespace gcl

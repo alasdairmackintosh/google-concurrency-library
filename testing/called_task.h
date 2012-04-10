@@ -14,9 +14,10 @@
 
 #include "atomic.h"
 #include "condition_variable.h"
+
 #include "mutable_thread.h"
 
-using std::atomic_int;
+using std::atomic;
 using std::memory_order_relaxed;
 
 namespace gcl {
@@ -39,7 +40,7 @@ struct Called {
   // Blocking wait function which returns when count reaches ready_count
   void wait() {
     unique_lock<mutex> wait_lock(ready_lock);
-    ready_condvar.wait(wait_lock, tr1::bind(&Called::is_done, this));
+    ready_condvar.wait(wait_lock, std::bind(&Called::is_done, this));
   }
 
   void update_count(int new_ready_count) {
@@ -49,9 +50,9 @@ struct Called {
                                               new_ready_count)) {}
   }
 
-  atomic_int count;
+  atomic<int> count;
 
-  atomic_int ready_count;
+  atomic<int> ready_count;
   mutex ready_lock;
   condition_variable ready_condvar;
 
