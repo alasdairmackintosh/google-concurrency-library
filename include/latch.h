@@ -15,10 +15,9 @@
 #ifndef GCL_LATCH_
 #define GCL_LATCH_
 
-#include <cxx0x.h>
-#include <condition_variable.h>
-#include <latch_base.h>
-#include <mutex.h>
+#include "cxx0x.h"
+#include "condition_variable.h"
+#include "mutex.h"
 
 namespace gcl {
 
@@ -55,7 +54,12 @@ public:
   void count_down_and_wait();
 
 private:
-  latch_base base_;
+  // The counter for this latch.
+  size_t count_;
+
+  // The condition that blocks until the count reaches 0
+  condition_variable condition_;
+  mutex condition_mutex_;
 
  // Disallow copy and assign
   latch(const latch&) CXX0X_DELETED

@@ -18,21 +18,39 @@
 #include "condition_variable.h"
 
 namespace gcl {
-
 latch::latch(size_t count)
- : base_(count) {
+    : count_(count) {
 }
 
 void latch::wait() {
-  base_.wait();
+  unique_lock<mutex> lock(condition_mutex_);
+  while(count_ > 0) {
+    condition_.wait(lock);
+  }
 }
 
 void latch::count_down() {
-  base_.count_down();
+  lock_guard<mutex> lock(condition_mutex_);
+  if (count_ == 0) {
+    throw std::logic_error("internal count == 0");
+  }
+  if (--count_ == 0) {
+    condition_.notify_all();
+  }
 }
 
 void latch::count_down_and_wait() {
-  base_.count_down_and_wait();
+  unique_lock<mutex> lock(condition_mutex_);
+  if (count_ == 0) {
+    throw std::logic_error("internal count == 0");
+  }
+  if (--count_ == 0) {
+    condition_.notify_all();
+  } else {
+    while(count_ > 0) {
+      condition_.wait(lock);
+    }
+  }
 }
 
 }  // End namespace gcl
