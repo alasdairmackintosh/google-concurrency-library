@@ -480,7 +480,7 @@ void RunFilter(PipelineExecution* pex,
   }
   f->Close();
 
-  pex->thread_end_->await();
+  pex->thread_end_->count_down_and_wait();
 }
 
 PipelineExecution::PipelineExecution(const PipelinePlan& pp,

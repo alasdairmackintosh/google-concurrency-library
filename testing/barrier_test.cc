@@ -33,6 +33,12 @@ using testing::InSequence;
 using std::atomic;
 using gcl::barrier;
 
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+using std::function;
+#else
+using std::tr1::function;
+#endif
+
 static size_t kNumThreads = 3;
 static size_t kZero = 0;
 
@@ -48,7 +54,8 @@ TEST_F(BarrierTest, InvalidConstructorArg) {
   } catch (std::invalid_argument expected) {
   }
   try {
-    barrier b(kZero, NULL);
+    function<void()> completion_fn = NULL;
+    barrier b(kZero, completion_fn);
     FAIL();
   } catch (std::invalid_argument expected) {
   }
@@ -65,12 +72,9 @@ static void WaitForBarrierCountExceptions(barrier* b,
     if (progress_count != NULL) {
       (*progress_count)++;
     }
-    bool result = b->await();
+    b->count_down_and_wait();
     if (progress_count != NULL) {
       (*progress_count)++;
-      if (result) {
-        (*progress_count)++;
-      }
     }
   } catch (std::logic_error e) {
     (*exception_count)++;
