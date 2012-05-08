@@ -111,28 +111,6 @@ TEST_F(BarrierTest, CorrectNumberOfThreads) {
   }
 }
 
-// Verify that if we try to call await with too many threads, we get
-// an exception
-TEST_F(BarrierTest, TooManyThreads) {
-  barrier b(kNumThreads - 1);
-  atomic<int> num_exceptions;
-  num_exceptions = 0;
-
-  thread* threads[kNumThreads];
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(std::bind(WaitForBarrierCountExceptions,
-                                      &b, static_cast<atomic<int>*>(NULL),
-                                      &num_exceptions));
-  }
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads[i]->join();
-  }
-  EXPECT_EQ(1, num_exceptions.load());
-  for (size_t i = 0; i < kNumThreads; i++) {
-    delete threads[i];
-  }
-}
-
 // Verify that a registered function is correctly invoked after all
 // threads have waited.
 TEST_F(BarrierTest, FunctionInvocation) {
@@ -155,21 +133,10 @@ TEST_F(BarrierTest, FunctionInvocation) {
   }
   EXPECT_EQ(0, num_exceptions.load());
 
-  // We expect one of the threads to have incremented its progress
-  // count to 3, because await() returned true. All other threads will
-  // have incremented to 2.
-  size_t num_at_2 = 0;
-  int num_at_3 = 0;
   for (size_t i = 0; i < kNumThreads; i++) {
     int progress = counters[i].load();
-    if (progress == 2) {
-      num_at_2++;
-    } else if (progress == 3) {
-      num_at_3++;
-    }
+    EXPECT_EQ(2, progress);
   }
-  EXPECT_EQ(1, num_at_3);
-  EXPECT_EQ(kNumThreads - 1, num_at_2);
 
   for (size_t i = 0; i < kNumThreads; i++) {
     delete threads[i];
