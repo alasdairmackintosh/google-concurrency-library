@@ -43,13 +43,10 @@ description.
 
 If you're not a committer, all you have to do is keep uploading new versions until the reviewers are happy, and then they'll commit it for you.
 
-If you are a committer, once your change is reviewed, run `hg commit` to commit your local
-changes to your local repository. Then run `hg push` with your password from http://code.google.com/hosting/settings to push them out
-to the public one. See http://hgbook.red-bean.com/read/ for more
-details.
+If you are a committer, once your change is reviewed, run `svn commit` to commit your changes to the main repository. If prompted for a password, you will need your Google Code password from http://code.google.com/hosting/settings.
 === Editing wiki ===
 If you don't want to edit the wiki from the browser, do this:
-  * `hg clone https://wiki.google-concurrency-library.googlecode.com/hg/ wiki` (this will create a new directory with all wiki pages. Do it once)
+  * Checkout the wiki files from the repository. `svn checkout https://google-concurrency-library.googlecode.com/svn/wiki` (This will create a new directory with all wiki pages. Do it once)
   * Edit the wiki page using your favourite editor.
-  * `hg pull -u` in case some one edited the same page recently. If there are new changes, you may need `hg merge`
+  * Commit the changes as described above. 
   * `hg commit -m "Edited wiki" && hg push`
