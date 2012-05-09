@@ -50,6 +50,12 @@ PipelineTerm do_consume(std::function<void (T)> f, T t) {
   f(t);
   return PipelineTerm();
 }
+template<typename T>
+void call_and_close(std::function< void (queue_front<T>*)> f,
+                    queue_front<T>* qf) {
+  f(qf);
+  qf->close();
+}
 
 template <typename IN_TYPE,
           typename INTERMEDIATE,
@@ -222,6 +228,27 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
   queue_back<OUT> *qb_;
 };
 
+class filter_producer_point : public filter<PipelineTerm, PipelineTerm> {
+ public:
+  filter_producer_point(std::function<void ()> f) : f_(f) { };
+  virtual PipelineTerm Apply(PipelineTerm) {
+    throw;
+  }
+  virtual bool Run(std::function<PipelineTerm (PipelineTerm)> r) {
+    throw;
+  }
+  virtual bool Run() {
+    f_();
+    return false;
+  }
+
+  virtual void Close() { };
+  virtual filter<PipelineTerm, PipelineTerm>* clone() const {
+    return new filter_producer_point(f_);
+  }
+  std::function<void ()> f_;
+};
+
 template <typename OUT>
 class pipeline_segment {
  public:
@@ -313,6 +340,9 @@ class FullPipelinePlan {
   filter<IN, PipelineTerm> *leading_;
   pipeline_segment<PipelineTerm> *chain_;
   pipeline_segment<OUT> *trailing_;
+
+  typedef OUT out;
+  typedef IN in;
 };
 
 template<typename IN,
@@ -332,6 +362,9 @@ class SimplePipelinePlan {
   }
 
   filter<IN, OUT> *f_;
+
+  typedef OUT out;
+  typedef IN in;
 };
 
 // END CLASSES
@@ -345,6 +378,22 @@ FullPipelinePlan<PipelineTerm, OUT> Source(queue_back<OUT> *b) {
   return FullPipelinePlan<PipelineTerm, OUT>(NULL, NULL, p);
 }
 
+template<typename OUT>
+FullPipelinePlan<PipelineTerm, OUT> Produce(
+    std::function<void (queue_front<OUT>*)> f) {
+  // TODO: ref counting queue, no limit
+  buffer_queue<OUT> *q = new buffer_queue<OUT>(10);
+  filter_producer_point *fpp = new filter_producer_point(
+      bind(call_and_close<OUT>, f, q));
+  pipeline_segment<PipelineTerm>* p1 =
+          new pipeline_segment<PipelineTerm>(
+              fpp, NULL);
+  pipeline_segment<OUT>* p2 =
+      new pipeline_segment<OUT>(
+          new filter_thread_point<OUT>(q), NULL);
+  return FullPipelinePlan<PipelineTerm, OUT>(NULL, p1, p2);
+}
+
 template<typename IN,
          typename OUT>
 SimplePipelinePlan<IN, OUT> Filter(OUT f(IN)) {
@@ -355,6 +404,17 @@ template<typename IN,
          typename OUT>
 SimplePipelinePlan<IN, OUT> Filter(std::function<OUT (IN)> f) {
   return SimplePipelinePlan<IN, OUT>(f);
+}
+
+template<typename IN,
+         typename OUT>
+FullPipelinePlan<IN, OUT> Filter(
+    std::function<void (IN, queue_front<OUT>*)> f) {
+  // TODO: ref counting queue, no limit
+  buffer_queue<OUT> *q = new buffer_queue<OUT>(10);
+  std::function <void (IN)> ff = bind(f, std::placeholders::_1, q);
+  std::function<void ()> f2 = bind(&queue_common<IN>::close, q);
+  return Consume(ff, f2) | Source(q);
 }
 
 template<typename IN>
@@ -393,11 +453,11 @@ SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> *front) {
   return Consume(f1, f2);
 }
 
-template<typename IN,
-         typename OUT>
-FullPipelinePlan<IN, OUT> Parallel(SimplePipelinePlan<IN, OUT> p) {
+// This can take Full or Simple PipelinePlans
+template<typename T>
+FullPipelinePlan<typename T::in, typename T::out> Parallel(T p) {
   // TODO: ref counting queue, no limit
-  buffer_queue<IN> *q = new buffer_queue<IN>(10);
+  buffer_queue<typename T::in> *q = new buffer_queue<typename T::in>(10);
   return SinkAndClose(q) | Source(q) | p;
 }
 
@@ -430,11 +490,20 @@ template<typename IN,
          typename OUT>
 FullPipelinePlan<IN, OUT> operator|(const SimplePipelinePlan<IN, MID>& p1,
                                     const FullPipelinePlan<MID, OUT>& p2) {
+  assert(p2.leading_);
   filter<IN, PipelineTerm> *leading =
-      p2.leading_ ?
-      new filter_chain<IN, MID, PipelineTerm>(p1.f_, p2.leading_) :
-      p1.f_->clone();
+      new filter_chain<IN, MID, PipelineTerm>(p1.f_, p2.leading_);
   return FullPipelinePlan<IN, OUT>(leading,
+                                   p2.chain_clone(),
+                                   p2.trailing_clone());
+}
+
+template<typename IN,
+         typename OUT>
+FullPipelinePlan<IN, OUT> operator|(const SimplePipelinePlan<IN, PipelineTerm>& p1,
+                                    const FullPipelinePlan<PipelineTerm, OUT>& p2) {
+  assert(!p2.leading_);
+  return FullPipelinePlan<IN, OUT>(p1.f_->clone(),
                                    p2.chain_clone(),
                                    p2.trailing_clone());
 }

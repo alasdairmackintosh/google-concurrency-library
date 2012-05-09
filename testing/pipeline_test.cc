@@ -71,25 +71,38 @@ void print_string(string s) {
   printf("%s", s.c_str());
 }
 
+void repeat(int i, queue_front<int>* q) {
+  q->push(i);
+  q->push(i);
+}
+
+void produce_strings(queue_front<string>* queue) {
+  printf("Producing strings\n");
+  queue->push("Produced String1");
+  queue->push("Produced String22");
+  queue->push("Produced String333");
+  queue->push("Produced String4444");
+}
+
 class PipelineTest : public testing::Test {
 };
 
 TEST_F(PipelineTest, Example) {
   simple_thread_pool pool;
 
-  std::function <int (string input)> f1 = find_uid;
+  std::function <void (int, queue_front<int>*)> fr = repeat;
   std::function <User (int uid)> f2 = get_user;
   std::function <void (User user)> c = consume_user;
 
   // Simple one-stage pipeline
-  SimplePipelinePlan<string, int> p1(f1);
+  CXX0X_AUTO_VAR(p1, Filter(find_uid));
   int uid = p1.Apply("hello");
   printf("Got uid %d\n", uid);
 
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
   printf("Creating p2\n");
-  SimplePipelinePlan<string, User> p2 = Filter(f1) | Filter(f2);
+  CXX0X_AUTO_VAR(p2, Filter(find_uid) | Filter(f2));
   User a2 = p2.Apply("hello world");
   printf("Got %s from pipeline\n", a2.get_name().c_str());
 
@@ -98,8 +111,8 @@ TEST_F(PipelineTest, Example) {
   queue.push("Queued Hello");
 
   printf("Creating p3\n");
-  FullPipelinePlan<PipelineTerm, User> p3 =
-      Source(&queue) | Filter(f1) | Filter(f2);
+  CXX0X_AUTO_VAR(p3,
+                 Source(&queue) | Filter(find_uid) | Filter(fr) | Filter(f2));
 
   printf("Creating p4\n");
   buffer_queue<User> out(10);
@@ -130,7 +143,7 @@ TEST_F(PipelineTest, ParallelExample) {
 
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
-  SimplePipelinePlan<string, User> p2 = Filter(find_uid)|Filter(get_user);
+  CXX0X_AUTO_VAR(p2, Filter(find_uid)|Filter(get_user));
 
   buffer_queue<string> queue(10);
   queue.push("Queued Hello");
@@ -142,7 +155,7 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("queued 55555");
   queue.push("queued 666666");
 
-  FullPipelinePlan<string, User> p3 = Parallel(p2);
+  CXX0X_AUTO_VAR(p3, Parallel(p2));
   CXX0X_AUTO_VAR(s, Source(&queue));
 
   PipelinePlan p4 = s|p3|Consume(consume_user);
@@ -154,4 +167,15 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("Are we done yet???");
   queue.close();
   pex.wait();
+  printf("Done!!!");
+}
+
+TEST_F(PipelineTest, ProduceExample) {
+  simple_thread_pool pool;
+  PipelinePlan p5 = Produce<string>(produce_strings) | Filter(find_uid) |
+      Filter(get_user) | Consume(consume_user);
+  printf("Starting Execution\n");
+  PipelineExecution pex3(p5, &pool);
+  printf("Waiting for Completion\n");
+  pex3.wait();
 }
