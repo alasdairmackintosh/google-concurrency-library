@@ -45,10 +45,17 @@ The counter methods are:
     <constructor>():
     Equivalent to an initial value of zero.
 
-    void inc( integer ):
+    void operator +=( integer ):
     Add a value to the counter.  There is no default value.
-    void dec( integer ):
+    void operator -=( integer ):
     Subtract a value from the counter.  There is no default value.
+
+    void operator ++():
+    void operator ++(int):
+    Increment the counter.
+    void operator --():
+    void operator --(int):
+    Decrement the counter.
 
     integer load():
     Returns the value of the counter.
@@ -77,7 +84,7 @@ by placing a serial_counter_buffer in front of the atomic_counter.
         serial_counter_buffer cntbuf( suspicious_count );
         for ( arg::iterator i = arg.begin(); i != arg.end(); i++ )
             if ( is_suspicious( *i ) )
-                cntbuf.inc(1);
+                ++cntbuf;
     }
 
 The lifetime of the counter must be strictly larger than
@@ -112,7 +119,7 @@ the duplex_counter and its buffer provide a pull model of counters.
         duplex_counter_buffer cntbuf( suspicious_count );
         for ( arg::iterator i = arg.begin(); i != arg.end(); i++ )
             if ( is_suspicious( *i ) )
-                cntbuf.inc(1);
+                ++cntbuf;
     }
 
 Another thread may call suspicious_count.load() and get the current count.
@@ -120,15 +127,18 @@ That operation will poll each buffer for its count and return the sum.
 Naturally, any incs done to a buffer after it is polled will be missed,
 but no counts will be lost.
 
-The exchange operation works by atomically transfering
-buffer counts to the main counter.
-That is, every count will be extracted by one and only one exchange operation.
+The exchange operation works
+by atomically transfering buffer counts to the main counter,
+and then exchanging out of the main counter.
+Consequently,
+every count will be extracted by one and only one exchange operation.
 
 
 WEAK COUNTERS
 
 Duplex counters can are expensive because 
-the counter exchange operation and the buffer inc/dec operations
+the counter exchange operation
+and the buffer increment and decrement operations
 require write concurrency to the same object.
 To reduce that concurrency cost,
 the weak counter and its buffer
@@ -141,11 +151,11 @@ Use this counter when you do not intend to extract values.
 */
 
 /*
-    The plain counters come in serial and atomic flavors
+    The plain counters come in serial and atomic flavors.
 
-    The counter_bumper class provides the minimal inc/dec interface and
-    serves as the base class for atomic_counter, atomic_counter_buffer
-    and duplex_counter_buffer.
+    The counter_bumper class provides the minimal increment and decrement
+    interface and serves as the base class for atomic_counter,
+    atomic_counter_buffer and duplex_counter_buffer.
 */
 
 template< typename Integral > class serial_counter
@@ -155,8 +165,12 @@ public:
     CXX0X_CONSTEXPR_CTOR serial_counter( Integral in ) : value_( in ) {}
     serial_counter( const serial_counter& ) CXX0X_DELETED
     serial_counter& operator=( const serial_counter& ) CXX0X_DELETED
-    void inc( Integral by ) { value_ += by; }
-    void dec( Integral by ) { value_ -= by; }
+    void operator +=( Integral by ) { value_ += by; }
+    void operator -=( Integral by ) { value_ -= by; }
+    void operator ++() { *this += 1; }
+    void operator ++(int) { *this += 1; }
+    void operator --() { *this -= 1; }
+    void operator --(int) { *this -= 1; }
     Integral load() { return value_; }
     Integral exchange( Integral to )
         { Integral tmp = value_; value_ = to; return tmp; }
@@ -170,10 +184,14 @@ public:
     CXX0X_CONSTEXPR_CTOR counter_bumper( Integral in ) : value_( in ) {}
     counter_bumper( const counter_bumper& ) CXX0X_DELETED
     counter_bumper& operator=( const counter_bumper& ) CXX0X_DELETED
-    void inc( Integral by )
+    void operator +=( Integral by )
         { value_.fetch_add( by, std::memory_order_relaxed ); }
-    void dec( Integral by )
+    void operator -=( Integral by )
         { value_.fetch_sub( by, std::memory_order_relaxed ); }
+    void operator ++() { *this += 1; }
+    void operator ++(int) { *this += 1; }
+    void operator --() { *this -= 1; }
+    void operator --(int) { *this -= 1; }
 
 protected:
     std::atomic< Integral > value_;
@@ -213,9 +231,13 @@ public:
     serial_counter_buffer( const serial_counter_buffer& ) CXX0X_DELETED
     serial_counter_buffer& operator=( const serial_counter_buffer& )
         CXX0X_DELETED
-    void inc( Integral by ) { value_ += by; }
-    void dec( Integral by ) { value_ -= by; }
-    void push() { prime_.inc( value_ ); value_ = 0; }
+    void operator +=( Integral by ) { value_ += by; }
+    void operator -=( Integral by ) { value_ -= by; }
+    void operator ++() { *this += 1; }
+    void operator ++(int) { *this += 1; }
+    void operator --() { *this -= 1; }
+    void operator --(int) { *this -= 1; }
+    void push() { prime_ += value_; value_ = 0; }
     ~serial_counter_buffer() { push(); }
 private:
     Integral value_;
@@ -234,7 +256,7 @@ public:
         CXX0X_DELETED
 
     void push()
-        { prime_.inc( value_.exchange( 0, std::memory_order_relaxed ) ); }
+        { prime_ += value_.exchange( 0, std::memory_order_relaxed ); }
 
     ~atomic_counter_buffer() { push(); }
 private:
@@ -262,8 +284,12 @@ template< typename Integral > class weak_counter
 public:
     weak_counter() : value_( 0 ) {}
     weak_counter( Integral in ) : value_( in ) {}
-    void inc( Integral by );
-    void dec( Integral by );
+    void operator +=( Integral by );
+    void operator -=( Integral by );
+    void operator ++() { *this += 1; }
+    void operator ++(int) { *this += 1; }
+    void operator --() { *this -= 1; }
+    void operator --(int) { *this -= 1; }
     Integral load();
     ~weak_counter();
 private:
@@ -284,12 +310,16 @@ public:
     weak_counter_buffer() CXX0X_DELETED
     weak_counter_buffer( const weak_counter_buffer& ) CXX0X_DELETED
     weak_counter_buffer& operator=( const weak_counter_buffer& ) CXX0X_DELETED
-    void inc( Integral by ) {
+    void operator +=( Integral by ) {
         value_.store( value_.load( std::memory_order_relaxed ) + by,
                       std::memory_order_relaxed ); }
-    void dec( Integral by ) {
+    void operator -=( Integral by ) {
         value_.store( value_.load( std::memory_order_relaxed ) - by,
                       std::memory_order_relaxed ); }
+    void operator ++() { *this += 1; }
+    void operator ++(int) { *this += 1; }
+    void operator --() { *this -= 1; }
+    void operator --(int) { *this -= 1; }
     ~weak_counter_buffer();
 private:
     friend class weak_counter<Integral>;
@@ -364,7 +394,7 @@ weak_counter< Integral >::erase( weak_counter_buffer< Integral >* child,
 
 template< typename Integral >
 void
-weak_counter< Integral >::inc( Integral by )
+weak_counter< Integral >::operator +=( Integral by )
 {
     lock_guard< mutex > _( serializer_ );
     value_ += by;
@@ -372,7 +402,7 @@ weak_counter< Integral >::inc( Integral by )
 
 template< typename Integral >
 void
-weak_counter< Integral >::dec( Integral by )
+weak_counter< Integral >::operator -=( Integral by )
 {
     lock_guard< mutex > _( serializer_ );
     value_ -= by;
