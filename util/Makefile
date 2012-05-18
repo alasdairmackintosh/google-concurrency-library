@@ -31,10 +31,10 @@ LFlags = -pthread $(CXXFLAGS)
 
 #### Compilation Rules
 
-%.o: %.c
+%.o : %.c
 	$(CC) $(CFlags) $< -c -o $*.o 
 
-%.o: %.cc
+%.o : %.cc
 	$(CXX) $(CxxFlags) $< -c -o $*.o 
 
 %.a :
@@ -43,6 +43,9 @@ LFlags = -pthread $(CXXFLAGS)
 
 %.exe :
 	$(CXX) $^ $(LFlags) -o $*.exe
+
+%.run : %.exe
+	sh ../util/exetest.sh $*
 
 -include *.d
 
@@ -77,15 +80,12 @@ test : cxx0x_test.o atomic_c_test.run atomic_cpp_test.run counter_test.run \
 
 atomic_c_test.exe : atomic_c_test.o stdfake.a
 atomic_c_test.run : atomic_c_test.exe
-	./atomic_c_test.exe
 
 atomic_cpp_test.exe : atomic_cpp_test.o stdfake.a
 atomic_cpp_test.run : atomic_cpp_test.exe
-	./atomic_cpp_test.exe
 
 counter_test.exe : counter_test.o stdfake.a
 counter_test.run : counter_test.exe
-	./counter_test.exe
 
 #### GTest GMock Builds
 
@@ -105,7 +105,6 @@ STDFAKE_TESTS := lock_test.o thread_test.o
 $(STDFAKE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 stdfake_test.exe : $(STDFAKE_TESTS) $(GMOCK_OBJ) stdfake.a
 stdfake_test.run : stdfake_test.exe
-	./stdfake_test.exe
 
 #### Test for the Google Concurrency Library Proper
 
@@ -114,7 +113,6 @@ LOWER_TESTS := barrier_test.o serial_executor_test.o mutable_thread_test.o \
 $(LOWER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 lower_test.run : lower_test.exe
-	./lower_test.exe
 
 MUTEX_TESTS := test_mutex_test.o condition_variable_test.o lock_test.o \
 	race_test.o concurrent_priority_queue_test.o blockable_thread.o \
@@ -122,17 +120,14 @@ MUTEX_TESTS := test_mutex_test.o condition_variable_test.o lock_test.o \
 $(MUTEX_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 mutex_test.exe : $(MUTEX_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 mutex_test.run : mutex_test.exe
-	./mutex_test.exe
 
 HIGHER_TESTS := blocking_queue_test.o source_test.o iterator_queue_test.o \
 	stream_mutex_test.o buffer_queue_test.o
 $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 higher_test.run : higher_test.exe
-	./higher_test.exe
 
 PIPELINE_TESTS := pipeline_test.o
 $(PIPELINE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 pipeline_test.exe : $(PIPELINE_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 pipeline_test.run : pipeline_test.exe
-	./pipeline_test.exe
