@@ -44,7 +44,7 @@ LFlags = -pthread $(CXXFLAGS)
 %.exe :
 	$(CXX) $^ $(LFlags) -o $*.exe
 
-%.run : %.exe
+%.pass : %.exe
 	sh ../util/exetest.sh $*
 
 -include *.d
@@ -72,20 +72,20 @@ lower.a : countdown_latch.o serial_executor.o barrier.o \
 
 ######## Testing
 
-test : cxx0x_test.o atomic_c_test.run atomic_cpp_test.run counter_test.run \
-	stdfake_test.run lower_test.run mutex_test.run higher_test.run \
-	pipeline_test.run
+test : cxx0x_test.o atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
+	stdfake_test.pass lower_test.pass mutex_test.pass higher_test.pass \
+	pipeline_test.pass
 
 #### Simple Tests
 
 atomic_c_test.exe : atomic_c_test.o stdfake.a
-atomic_c_test.run : atomic_c_test.exe
+atomic_c_test.pass : atomic_c_test.exe
 
 atomic_cpp_test.exe : atomic_cpp_test.o stdfake.a
-atomic_cpp_test.run : atomic_cpp_test.exe
+atomic_cpp_test.pass : atomic_cpp_test.exe
 
 counter_test.exe : counter_test.o stdfake.a
-counter_test.run : counter_test.exe
+counter_test.pass : counter_test.exe
 
 #### GTest GMock Builds
 
@@ -104,7 +104,7 @@ $(GMOCK_OBJ) : CxxFlags += $(GTEST_INC) $(GTEST_SRC) $(GMOCK_INC) $(GMOCK_SRC)
 STDFAKE_TESTS := lock_test.o thread_test.o
 $(STDFAKE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 stdfake_test.exe : $(STDFAKE_TESTS) $(GMOCK_OBJ) stdfake.a
-stdfake_test.run : stdfake_test.exe
+stdfake_test.pass : stdfake_test.exe
 
 #### Test for the Google Concurrency Library Proper
 
@@ -112,22 +112,22 @@ LOWER_TESTS := barrier_test.o serial_executor_test.o mutable_thread_test.o \
 	simple_thread_pool_test.o
 $(LOWER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
-lower_test.run : lower_test.exe
+lower_test.pass : lower_test.exe
 
 MUTEX_TESTS := test_mutex_test.o condition_variable_test.o lock_test.o \
 	race_test.o concurrent_priority_queue_test.o blockable_thread.o \
 	blocking_queue_closed_test.o test_mutex.o
 $(MUTEX_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 mutex_test.exe : $(MUTEX_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
-mutex_test.run : mutex_test.exe
+mutex_test.pass : mutex_test.exe
 
 HIGHER_TESTS := blocking_queue_test.o source_test.o iterator_queue_test.o \
 	stream_mutex_test.o buffer_queue_test.o
 $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
-higher_test.run : higher_test.exe
+higher_test.pass : higher_test.exe
 
 PIPELINE_TESTS := pipeline_test.o
 $(PIPELINE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 pipeline_test.exe : $(PIPELINE_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
-pipeline_test.run : pipeline_test.exe
+pipeline_test.pass : pipeline_test.exe
