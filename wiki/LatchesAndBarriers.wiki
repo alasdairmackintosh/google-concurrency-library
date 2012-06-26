@@ -226,7 +226,7 @@ common point.
 </ul>
 An example of the first use case would be as follows:
 <pre>
-<code>
+
   void DoWork(threadpool* pool) {
     latch completion_latch(NTASKS);
     for (int i = 0; i &lt; NTASKS; ++i) {
@@ -239,7 +239,7 @@ An example of the first use case would be as follows:
     // Block until work is done
     completion_latch.wait();
   }
-</code>
+
 </pre>
 
 An example of the second use case is shown below. We need to load data and then
@@ -247,7 +247,6 @@ process it using a number of threads. Loading the data is I/O bound, whereas
 starting threads and creating data structures is CPU bound. By running these in
 parallel, throughput can be increased.
 <pre>
-<code>
   void DoWork() {
     latch start_latch(1);
     vector&lt;thread*&gt; workers;
@@ -265,7 +264,6 @@ parallel, throughput can be increased.
     // Threads can now start processing
     start_latch.count_down();
     }
-</code>
 </pre>
 <p>
 The barrier can be used to co-ordinate a set of threads carrying out a repeated
@@ -280,7 +278,6 @@ barrier when this happens.
 </p>
 
 <pre>
-<code>
 
   void DoWork() {
     Tasks& tasks;
@@ -317,7 +314,7 @@ barrier when this happens.
       GetNextStage(tasks);
     }
   }
-</code>
+
 </pre>
 
 <h2><a name="synopsis">Synopsis</a></h2>
@@ -326,7 +323,7 @@ The synopsis is as follows.
 </p>
 
 <pre>
-<code>
+
 class latch {
  public:
   explicit latch(size_t count);
