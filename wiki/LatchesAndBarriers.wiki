@@ -1,0 +1,462 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+
+<meta http-equiv="Content-Type" content="text/html;charset=US-ASCII">
+
+<style type="text/css">
+
+body {
+  color: #000000;
+  background-color: #FFFFFF;
+}
+
+del {
+  text-decoration: line-through;
+  color: #8B0040;
+}
+ins {
+  text-decoration: underline;
+  color: #005100;
+}
+
+p.example {
+  margin: 2em;
+}
+pre.example {
+  margin: 2em;
+}
+div.example {
+  margin: 2em;
+}
+
+code.extract {
+  background-color: #F5F6A2;
+}
+pre.extract {
+  margin: 2em;
+  background-color: #F5F6A2;
+  border: 1px solid #E1E28E;
+}
+
+p.function {
+}
+
+p.attribute {
+  text-indent: 3em;
+}
+
+blockquote.std {
+  color: #000000;
+  background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding: 0.5em;
+}
+
+blockquote.stddel {
+  text-decoration: line-through;
+  color: #000000;
+  background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding: 0.5em;
+}
+
+blockquote.stdins {
+  text-decoration: underline;
+  color: #000000;
+  background-color: #C8FFC8;
+  border: 1px solid #B3EBB3;
+  padding: 0.5em;
+}
+
+table {
+  border: 1px solid black;
+  border-spacing: 0px;
+  margin-left: auto;
+  margin-right: auto;
+}
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+
+</style>
+
+<title>C++ Latches and Barriers</title>
+</head>
+<body>
+<h1>C++ Latches and Barriers</h1>
+
+<p>
+ISO/IEC JTC1 SC22 WG21 DRAFT N???? = 12-???? - 2012-03-30
+</p>
+
+<p>
+Alasdair Mackintosh, alasdair@google.com, alasdair.mackintosh@gmail.com
+</p>
+
+<p>
+<a href="#Introduction">Introduction</a><br>
+<a href="#Solution">Solution</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#latch_operations">Latch Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#barrier_operations">Barrier Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#example">Sample Usage</a><br>
+<a href="#synopsis">Synopsis</a><br>
+</p>
+
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>
+Certain idioms that are commonly used in concurrent programming are missing
+from the standard libraries. Although many of these these can be relatively
+straightforward to implement, we believe it is more efficient to have a
+standard version.
+<p>
+</p>
+In addition, although some idioms can be provided using
+mutexes, higher performance can often be obtained with atomic operations and
+lock-free algorithms which are more complex and prone to error. 
+</p> 
+<p>
+Other standard concurrency idioms may have difficult corner cases, and can be
+hard to implement correctly. For these 
+</p>
+
+<h2><a name="Solution">Solution</a></h2>
+
+<p>
+We propose a set of commonly-used concurrency classes, some of which may be
+implemented using efficient lock-free algorithms where appropriate. This paper
+describes the <i>latch</i> and <i>barrier</i> classes.
+</p>
+<p>
+Latches are a thread co-ordination mechanism that allow one or more threads to
+block until an operation is completed. An individual latch is a single-use
+object; once the operation has been completed, it cannot be re-used.
+</p>
+<p>
+Barriers are a thread co-ordination mechanism that allow multiple threads to
+block until an operation is completed. Unlike a latch, a barrier is re-usable;
+once the operation has been completed, the threads can re-use the same
+barrier. It is thus useful for managing repeated tasks handled by multiple
+threads.
+</p>
+<p>
+A reference implementation of these two classes has been written.
+</p>
+
+<h3><a name="latch_operations">Latch Operations</a></h3>
+A latch maintains an internal counter that is initialized when the latch is
+created. One or more threads may block waiting until the counter is decremented
+to 0.
+
+<dl>
+<dt><code>constructor( size_t );</code></dt>
+<dd>
+<p>
+The parameter is the initial value of the internal counter.
+</p>
+</dd>
+
+<dt><code>destructor( );</code></dt>
+<dd>
+<p>
+Destroys the latch. If the latch is destroyed while other threads are in
+<code>wait()</code>, or are invoking <code>count_down()</code>, the behaviour
+is undefined.
+</p>
+</dd>
+
+<dt><code>void count_down( );</code></dt>
+<dd>
+<p>
+Decrements the internal count by 1, and returns. If the count reaches 0, any
+threads blocked in <code>wait()</code> will be released.
+</p>
+<p>
+Throws <code>std::logic_error</code> if the internal count is already 0.
+</p>
+</dd>
+
+<dt><code>void wait( );</code></dt>
+<dd>
+<p>
+Blocks the calling thread until the internal count is decremented to 0 by one
+or more other threads calling <code>count_down()</code>. If the count is
+already 0, this is a no-op.
+</p>
+</dd>
+
+<dt><code>void count_down_and_wait( );</code></dt>
+<dd>
+<p>
+Decrements the internal count by 1. If the resulting count is not 0, blocks the
+calling thread until the internal count is decremented to 0 by one or more
+other threads calling <code>count_down()</code>.
+</p>
+</dd>
+</dl>
+<p>
+There are no copy or assignment operations.
+</p>
+
+<h4>Memory Ordering</h4>
+All calls to <code>count_down()</code> synchronize with any thread
+returning from <code>wait()</code>.
+
+<h3><a name="barrier_operations">Barrier Operations</a></h3>
+<p>
+A barrier maintains an internal thread counter that is initialized when the
+barrier is created. Threads may decrement the counter and then block waiting
+until the specified number of threads are blocked. All threads will then be
+woken up, and the barrier will reset. In addition, there is a mechanism to
+change the thread count value after the count reaches 0.
+</p>
+
+<dl>
+<dt><code>constructor( size_t );</code></dt>
+<dd>
+<p>
+The parameter is the initial value of the internal thread counter.
+</p>
+<p>
+Throws <code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</dd>
+
+<dt><code>constructor( size_t, std::function&lt;void()&gt; );</code></dt>
+<dd>
+<p>
+The parameters are the initial value of the internal thread counter, and a
+function that will be invoked when the counter reaches 0.
+</p>
+<p>
+Throws <code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</dd>
+
+<dt><code>destructor( );</code></dt>
+<dd>
+<p>
+Destroys the barrier. If the barrier is destroyed while other threads are in
+<code>count_down_and_wait()</code>, the behaviour is undefined.
+</p>
+</dd>
+
+<dt><code>void count_down_and_wait( );</code></dt>
+<dd>
+<p>
+Decrements the internal thread count by 1. If the resulting count is not 0,
+blocks the calling thread until the internal count is decremented to 0 by one
+or more other threads calling <code>count_down_and_wait()</code>.
+</p>
+<p>
+Before any threads are released, the completion function registered in the
+constructor will be invoked (if specified and non-NULL). Note that the
+completion function may be invoked in the context of one of the blocked
+threads.  When the completion function returns, the internal thread count will
+be reset to its initial value, and all blocked threads will be unblocked.
+<p>
+Note that it is safe for a thread to re-enter <code>count_down_and_wait()</code>
+immediately. It is not necessary to ensure that all blocked threads have exited
+<code>count_down_and_wait()</code> before one thread re-enters it.
+</dd>
+<dt><code>reset( size_t );</code></dt>
+<dd>
+<p>
+Resets the barrier with a new value for the initial thread count. This method may
+only be invoked when there are no other threads currently inside the
+<code>count_down_and_wait()</code> method. It may also be invoked from within
+the registered completion function.
+</p>
+<p>
+Once <code>reset()</code> is called, the barrier will automatically reset
+itself to the new thread count as soon as the internal count reaches 0 and all
+blocked threads are released.
+</p>
+</dd>
+
+<dt><code>reset( std::function&lt;void()&gt; );</code></dt>
+<dd>
+<p>
+Resets the barrier with the new completion function. The next time the internal
+thread count reaches 0, this function will be invoked. This method may only be
+invoked when there are no other threads currently inside the
+<code>count_down_and_wait()</code> method. It may also be invoked from within
+the registered completion function.
+</p>
+<p>
+If NULL is passed in, no function will be invoked when the count reaches 0.
+</p>
+</dd>
+
+</dl>
+<p>
+There are no copy or assignment operations.
+</p>
+<p>
+Note that the barrier does not have separate <code>count_down()</code> and
+<code>wait()</code> methods. Every thread that counts down will then block until
+all threads have counted down. Hence only the
+<code>count_down_and_wait()</code> method is supported.
+</p>
+
+<h4>Memory Ordering</h4>
+For threads X and Y that call <code>count_down_and_wait()</code>, the
+call to <code>count_down_and_wait()</code> in X synchronizes with the return from
+<code>count_down_and_wait()</code> in Y.
+
+
+<h3><a name="example">Sample Usage</a></h3>
+Sample use cases for the latch include:
+<ul>
+<li>
+Setting multiple threads to perform a task, and then waiting until all threads
+have reached a common point.
+</li>
+<li>
+Creating multiple threads, which wait for a signal before advancing beyond a
+common point.
+</li>
+</ul>
+An example of the first use case would be as follows:
+<pre>
+<code>
+  void DoWork(threadpool* pool) {
+    latch completion_latch(NTASKS);
+    for (int i = 0; i &lt; NTASKS; ++i) {
+      pool-&gt;add_task([&] {
+        // perform work
+        ...
+        completion_latch.count_down();
+      }));
+    }
+    // Block until work is done
+    completion_latch.wait();
+  }
+</code>
+</pre>
+
+An example of the second use case is shown below. We need to load data and then
+process it using a number of threads. Loading the data is I/O bound, whereas
+starting threads and creating data structures is CPU bound. By running these in
+parallel, throughput can be increased.
+<pre>
+<code>
+  void DoWork() {
+    latch start_latch(1);
+    vector&lt;thread*&gt; workers;
+    for (int i = 0; i &lt; NTHREADS; ++i) {
+      workers.push_back(new thread([&] {
+        // Initialize data structures. This is CPU bound.
+        ...
+        start_latch.wait();
+        // perform work
+        ...
+      }));
+    }
+    // Load input data. This is I/O bound.
+    ...
+    // Threads can now start processing
+    start_latch.count_down();
+    }
+</code>
+</pre>
+<p>
+The barrier can be used to co-ordinate a set of threads carrying out a repeated
+task. The number of threads can be adjusted dynamically to respond to changing
+requirements.
+</p>
+<p>
+In the example below, a number of threads are performing a multi-stage
+task. Some tasks may require fewer steps thanothers, meaning that some threads
+may finish before others. We reduce the number of threads waiting on the
+barrier when this happens.
+</p>
+
+<pre>
+<code>
+
+  void DoWork() {
+    Tasks& tasks;
+    size_t initial_threads;
+    atomic&lt;size_t&gt; current_threads(initial_threads)
+    vector&lt;thread*&gt; workers;
+
+    // Create a barrier, and set a lambda that will be invoked every time the
+    // barrier counts down. If one or more active threads have completed,
+    // reduce the number of threads.
+    barrier task_barrier(n_threads);
+    task_barrier.reset([&] {
+      task_barrier.reset(current_threads);
+    });
+
+    for (int i = 0; i &lt; n_threads; ++i) {
+      workers.push_back(new thread([&] {
+        bool active = true;
+        while(active) {
+          Task task = tasks.get();
+          // perform task
+          ...
+          if (finished(task)) {
+            current_threads--;
+            active = false;
+          }
+          task_barrier.count_down_and_wait();
+         }
+       });
+    }
+
+    // Read each stage of the task until all stages are complete.
+    while (!finished()) {
+      GetNextStage(tasks);
+    }
+  }
+</code>
+</pre>
+
+<h2><a name="synopsis">Synopsis</a></h2>
+<p>
+The synopsis is as follows.
+</p>
+
+<pre>
+<code>
+class latch {
+ public:
+  explicit latch(size_t count);
+  ~latch();
+
+  void count_down();
+
+  void wait();
+
+  void count_down_and_wait();
+};
+
+class barrier {
+ public:
+  explicit barrier(size_t num_threads) throw (std::invalid_argument);
+  explicit barrier(size_t num_threads, std::function&lt;void()&gt; f) throw (std::invalid_argument);
+  ~barrier();
+
+  void count_down_and_wait();
+
+  void reset(size_t num_threads);
+  void reset(function f);
+};
+</code>
+</pre>
+
+</body>
+</html>
