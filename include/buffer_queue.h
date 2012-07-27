@@ -24,10 +24,10 @@ namespace gcl {
 
 template <typename Element>
 class buffer_queue
-:
-    public queue_base<Element>
 {
   public:
+    typedef Element element_type;
+
     buffer_queue() CXX0X_DELETED
     buffer_queue(const buffer_queue&) CXX0X_DELETED
     buffer_queue(size_t max_elems, const char* name);
@@ -37,21 +37,34 @@ class buffer_queue
     template <typename Iter>
     buffer_queue(size_t max_elems, Iter first, Iter last);
     buffer_queue& operator =(const buffer_queue&) CXX0X_DELETED
-    virtual ~buffer_queue();
+    ~buffer_queue();
 
-    virtual void close();
-    virtual bool is_closed();
-    virtual bool is_empty();
+//TODO(crowl): Do we want this?
+#if 0
+    generic_queue_front<element_type> front()
+        { return generic_queue_front<element_type>(this); }
+    generic_queue_back<element_type> back()
+        { return generic_queue_back<element_type>(this); }
+#endif
 
-    virtual Element pop();
-    virtual queue_op_status try_pop(Element&);
-    virtual queue_op_status wait_pop(Element&);
+    void close();
+    bool is_closed();
+    bool is_empty();
 
-    virtual void push(const Element& x);
-    virtual queue_op_status try_push(const Element& x);
-    virtual queue_op_status wait_push(const Element& x);
+    Element value_pop();
+    queue_op_status try_pop(Element&);
+    queue_op_status wait_pop(Element&);
 
-    virtual const char* name();
+    void push(const Element& x);
+    queue_op_status try_push(const Element& x);
+    queue_op_status wait_push(const Element& x);
+#ifdef HAS_CXX0X_RVREF
+    void push(Element&& x);
+    queue_op_status try_push(Element&& x);
+    queue_op_status wait_push(Element&& x);
+#endif
+
+    const char* name();
 
   private:
     mutex mtx_;
@@ -76,7 +89,11 @@ class buffer_queue
     void pop_from(Element& elem, size_t pdx, size_t hdx)
     {
         pop_index_ = next( pdx );
+#ifdef HAS_CXX0X_RVREF
+        elem = std::move(buffer_[pdx]);
+#else
         elem = buffer_[pdx];
+#endif
         if ( waiting_full_ > 0 ) {
             --waiting_full_;
             not_full_.notify_one();
@@ -92,6 +109,18 @@ class buffer_queue
             not_empty_.notify_one();
         }
     }
+
+#ifdef HAS_CXX0X_RVREF
+    void push_at(Element&& elem, size_t hdx, size_t nxt, size_t pdx)
+    {
+        buffer_[hdx] = std::move(elem);
+        push_index_ = nxt;
+        if ( waiting_empty_ > 0 ) {
+            --waiting_empty_;
+            not_empty_.notify_one();
+        }
+    }
+#endif
 
 };
 
@@ -265,7 +294,7 @@ queue_op_status buffer_queue<Element>::wait_pop(Element& elem)
 }
 
 template <typename Element>
-Element buffer_queue<Element>::pop()
+Element buffer_queue<Element>::value_pop()
 {
     /* This try block is here to catch exceptions from the
        user-defined copy assignment operator. */
@@ -273,7 +302,11 @@ Element buffer_queue<Element>::pop()
         Element elem;
         if ( wait_pop( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
             throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+#ifdef HAS_CXX0X_RVREF
+        return std::move(elem);
+#else
         return elem;
+#endif
     } catch (...) {
         close();
         throw;
@@ -341,6 +374,75 @@ void buffer_queue<Element>::push(const Element& elem)
     if ( wait_push( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
         throw CXX0X_ENUM_QUAL(queue_op_status)closed;
 }
+
+#ifdef HAS_CXX0X_RVREF
+
+//TODO(crowl) Refactor with non-move versions.
+
+template <typename Element>
+queue_op_status buffer_queue<Element>::try_push(Element&& elem)
+{
+    /* This try block is here to catch exceptions from the mutex
+       operations or from the user-defined copy assignment
+       operator in push_at. */
+    try {
+        lock_guard<mutex> hold( mtx_ );
+        if ( closed_ )
+            return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        size_t hdx = push_index_;
+        size_t nxt = next( hdx );
+        size_t pdx = pop_index_;
+        if ( nxt == pdx )
+            return CXX0X_ENUM_QUAL(queue_op_status)full;
+        push_at( std::move(elem), hdx, nxt, pdx );
+        return CXX0X_ENUM_QUAL(queue_op_status)success;
+    } catch (...) {
+        close();
+        throw;
+    }
+}
+
+template <typename Element>
+queue_op_status buffer_queue<Element>::wait_push(Element&& elem)
+{
+    /* This try block is here to catch exceptions from the mutex
+       operations or from the user-defined copy assignment
+       operator in push_at. */
+    try {
+        unique_lock<mutex> hold( mtx_ );
+        size_t hdx;
+        size_t nxt;
+        size_t pdx;
+        for (;;) {
+            if ( closed_ )
+                return CXX0X_ENUM_QUAL(queue_op_status)closed;
+            hdx = push_index_;
+            nxt = next( hdx );
+            pdx = pop_index_;
+            if ( nxt != pdx )
+                break;
+            ++waiting_full_;
+            not_full_.wait( hold );
+        }
+        push_at( std::move(elem), hdx, nxt, pdx );
+        return CXX0X_ENUM_QUAL(queue_op_status)success;
+    } catch (...) {
+        close();
+        throw;
+    }
+}
+
+template <typename Element>
+void buffer_queue<Element>::push(Element&& elem)
+{
+    /* Only wait_push can throw, and it protects itself, so there
+       is no need to try/catch here. */
+    if ( wait_push( std::move(elem) )
+         == CXX0X_ENUM_QUAL(queue_op_status)closed )
+        throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+}
+
+#endif
 
 template <typename Element>
 const char* buffer_queue<Element>::name()

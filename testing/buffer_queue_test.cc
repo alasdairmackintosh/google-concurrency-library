@@ -20,6 +20,9 @@ using gcl::buffer_queue;
 const int kSmall = 4;
 const int kLarge = 1000;
 
+typedef queue_wrapper <buffer_queue <int> > wrapped;
+typedef queue_owner <buffer_queue <int> > owned;
+typedef queue_object <buffer_queue <int> > object;
 
 class BufferQueueTest
 :
@@ -41,29 +44,31 @@ TEST_F(BufferQueueTest, InvalidArg0) {
 // Verify single push/pop operations.
 TEST_F(BufferQueueTest, Single) {
   buffer_queue<int> body(1, "body");
-  seq_fill(1, 1, &body);
-  seq_drain(1, 1, &body);
+  wrapped wrap(&body);
+  seq_fill(1, 1, &wrap);
+  seq_drain(1, 1, &wrap);
 }
 
 // Verify single try push/pop operations.
 TEST_F(BufferQueueTest, SingleTry) {
-  buffer_queue<int> body(1, "body");
-  seq_try_fill(1, 1, &body);
-  seq_try_drain(1, 1, &body);
+  owned own( new buffer_queue<int>(1, "body") );
+  seq_try_fill(1, 1, &own);
+  seq_try_drain(1, 1, &own);
 }
 
 // Verify multiple push/pop operations.
 TEST_F(BufferQueueTest, Multiple) {
-  buffer_queue<int> body(kSmall, "body");
-  seq_fill(kSmall, 1, &body);
-  seq_drain(kSmall, 1, &body);
+  object obj(kSmall, "body");
+  seq_fill(kSmall, 1, &obj);
+  seq_drain(kSmall, 1, &obj);
 }
 
 // Verify multiple try push/pop operations.
 TEST_F(BufferQueueTest, MultipleTry) {
   buffer_queue<int> body(kSmall, "body");
-  seq_try_fill(kSmall, 1, &body);
-  seq_try_drain(kSmall, 1, &body);
+  wrapped wrap(&body);
+  seq_try_fill(kSmall, 1, &wrap);
+  seq_try_drain(kSmall, 1, &wrap);
 }
 
 // Verifies that we can create a queue from iterators.
@@ -73,7 +78,8 @@ TEST_F(BufferQueueTest, CreateFromIterators) {
     values.push_back(i);
   ASSERT_EQ(static_cast<size_t>(kSmall), values.size());
   buffer_queue<int> body(values.size(), values.begin(), values.end(), "body");
-  seq_drain(kSmall, 1, &body);
+  wrapped wrap(&body);
+  seq_drain(kSmall, 1, &wrap);
 }
 
 // Verifies that we cannot create a queue from iterators where the
@@ -95,92 +101,134 @@ TEST_F(BufferQueueTest, InvalidIterators) {
 // element is added.
 TEST_F(BufferQueueTest, TryPopEmpty) {
   buffer_queue<int> body(kSmall, "body");
-  seq_try_empty(&body, &body);
+  wrapped wrap(&body);
+  seq_try_empty(&wrap, &wrap);
 }
 
 // Verify that try_push succeeds until we exceed the size limit
 TEST_F(BufferQueueTest, TryPushFull) {
   buffer_queue<int> body(kSmall, "body");
-  seq_try_full(kSmall, &body, &body);
+  wrapped wrap(&body);
+  seq_try_full(kSmall, &wrap, &wrap);
 }
 
 // Verify that we cannot push to a closed queue
 // nor pop from an empty closed queue
 TEST_F(BufferQueueTest, PushPopClosed) {
   buffer_queue<int> body(kSmall, "body");
-  seq_push_pop_closed(kSmall, &body, &body);
+  wrapped wrap(&body);
+  seq_push_pop_closed(kSmall, &wrap, &wrap);
 }
 
 // Verify that we cannot try_push to a closed queue
 // nor try_pop an empty closed queue
 TEST_F(BufferQueueTest, TryPushPopClosed) {
   buffer_queue<int> body(kSmall, "body");
-  seq_try_push_pop_closed(kSmall, &body, &body);
+  wrapped wrap(&body);
+  seq_try_push_pop_closed(kSmall, &wrap, &wrap);
 }
 
 // Verify sequential producer consumer queue.
 TEST_F(BufferQueueTest, SeqProdCom) {
   buffer_queue<int> body(kSmall, "body");
-  seq_producer_consumer(kSmall, body);
+  wrapped wrap(&body);
+  seq_producer_consumer(kSmall, wrap);
 }
 
 // Verify producer consumer queue.
 TEST_F(BufferQueueTest, ProdCom) {
   buffer_queue<int> body(kSmall, "body");
-  producer_consumer(kLarge, body);
+  wrapped wrap(&body);
+  producer_consumer(kLarge, wrap);
 }
 
 // Verify try producer consumer queue.
 TEST_F(BufferQueueTest, TryProdCom) {
   buffer_queue<int> body(kSmall, "body");
-  try_producer_consumer(kLarge, body);
+  wrapped wrap(&body);
+  try_producer_consumer(kLarge, wrap);
 }
 
 // Verify sequential filtering pipes.
 TEST_F(BufferQueueTest, SeqPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  seq_pipe(kSmall, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  seq_pipe(kSmall, hwrap, twrap);
 }
 
 // Verify linear filtering pipes
 TEST_F(BufferQueueTest, LinearPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  linear_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  linear_pipe(kLarge, hwrap, twrap);
 }
 
 // Verify linear filtering try pipes
 TEST_F(BufferQueueTest, LinearTryPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  linear_try_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  linear_try_pipe(kLarge, hwrap, twrap);
 }
 
 // Verify merging filtering pipes
 TEST_F(BufferQueueTest, MergingPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  merging_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  merging_pipe(kLarge, hwrap, twrap);
 }
 
 // Verify merging filtering try pipes
 TEST_F(BufferQueueTest, MergingTryPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  merging_try_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  merging_try_pipe(kLarge, hwrap, twrap);
 }
 
 // Verify parallel filtering pipes
 TEST_F(BufferQueueTest, ParallelPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  parallel_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  parallel_pipe(kLarge, hwrap, twrap);
 }
 
 // Verify parallel filtering mixed pipes
 TEST_F(BufferQueueTest, ParallelMixedPipe) {
   buffer_queue<int> head(kSmall, "head");
   buffer_queue<int> tail(kSmall, "tail");
-  parallel_mixed_pipe(kLarge, head, tail);
+  wrapped hwrap(&head);
+  wrapped twrap(&tail);
+  parallel_mixed_pipe(kLarge, hwrap, twrap);
 }
+
+// Verify ability to create and copy shared queue ends.
+TEST_F(BufferQueueTest, SharedQueueEndsCopy) {
+  CXX0X_AUTO_VAR( x, share_queue_ends< buffer_queue<int> >(kSmall) );
+  shared_queue_front<int> f(x.first);
+  shared_queue_back<int> b(x.second);
+  f.push(3);
+  ASSERT_EQ(3, b.value_pop());
+}
+
+#ifdef HAS_CXX0X_RVREF
+// Verify ability to create and move shared queue ends.
+TEST_F(BufferQueueTest, SharedQueueEndsMove) {
+  CXX0X_AUTO_VAR( x, share_queue_ends< buffer_queue<int> >(kSmall) );
+  shared_queue_front<int> f(std::move(x.first));
+  shared_queue_back<int> b(std::move(x.second));
+  f.push(3);
+  ASSERT_EQ(3, b.value_pop());
+}
+#endif
+

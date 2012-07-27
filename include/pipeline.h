@@ -51,10 +51,10 @@ PipelineTerm do_consume(std::function<void (T)> f, T t) {
   return PipelineTerm();
 }
 template<typename T>
-void call_and_close(std::function< void (queue_front<T>*)> f,
-                    queue_front<T>* qf) {
+void call_and_close(std::function< void (queue_front<T>)> f,
+                    queue_front<T> qf) {
   f(qf);
-  qf->close();
+  qf.close();
 }
 
 template <typename IN_TYPE,
@@ -201,7 +201,7 @@ class filter_function : public filter<IN, OUT> {
 template <typename OUT>
 class filter_thread_point : public filter<PipelineTerm, OUT> {
  public:
-  filter_thread_point(queue_back<OUT> *qb) : qb_(qb) { };
+  filter_thread_point(queue_back<OUT> qb) : qb_(qb) { };
   ~filter_thread_point() { };
   virtual OUT Apply(PipelineTerm IN) {
     throw;
@@ -209,7 +209,7 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
   virtual bool Run(std::function<PipelineTerm (OUT)> r) {
     OUT out;
     // TODO(aberkan): What if this throws?
-    queue_op_status status = qb_->wait_pop(out);
+    queue_op_status status = qb_.wait_pop(out);
     if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
       return false;
     }
@@ -225,7 +225,7 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
   virtual filter<PipelineTerm, OUT>* clone() const {
     return new filter_thread_point<OUT>(qb_);
   }
-  queue_back<OUT> *qb_;
+  queue_back<OUT> qb_;
 };
 
 class filter_producer_point : public filter<PipelineTerm, PipelineTerm> {
@@ -372,7 +372,7 @@ class SimplePipelinePlan {
 // BEGIN CONSTRUCTORS
 
 template<typename OUT>
-FullPipelinePlan<PipelineTerm, OUT> Source(queue_back<OUT> *b) {
+FullPipelinePlan<PipelineTerm, OUT> Source(queue_back<OUT> b) {
   pipeline_segment<OUT>* p =
       new pipeline_segment<OUT>(new filter_thread_point<OUT>(b), NULL);
   return FullPipelinePlan<PipelineTerm, OUT>(NULL, NULL, p);
@@ -380,9 +380,9 @@ FullPipelinePlan<PipelineTerm, OUT> Source(queue_back<OUT> *b) {
 
 template<typename OUT>
 FullPipelinePlan<PipelineTerm, OUT> Produce(
-    std::function<void (queue_front<OUT>*)> f) {
+    std::function<void (queue_front<OUT>)> f) {
   // TODO: ref counting queue, no limit
-  buffer_queue<OUT> *q = new buffer_queue<OUT>(10);
+  CXX0X_AUTO_VAR( q, new queue_object<buffer_queue<OUT> >(10) );
   filter_producer_point *fpp = new filter_producer_point(
       bind(call_and_close<OUT>, f, q));
   pipeline_segment<PipelineTerm>* p1 =
@@ -409,12 +409,14 @@ SimplePipelinePlan<IN, OUT> Filter(std::function<OUT (IN)> f) {
 template<typename IN,
          typename OUT>
 FullPipelinePlan<IN, OUT> Filter(
-    std::function<void (IN, queue_front<OUT>*)> f) {
+    std::function<void (IN, queue_front<OUT>)> f) {
+  typedef queue_object< buffer_queue<OUT> > qtype;
   // TODO: ref counting queue, no limit
-  buffer_queue<OUT> *q = new buffer_queue<OUT>(10);
+  CXX0X_AUTO_VAR( q, new qtype(10) );
+  // TODO: the queue is not deallocated
   std::function <void (IN)> ff = bind(f, std::placeholders::_1, q);
-  std::function<void ()> f2 = bind(&queue_common<IN>::close, q);
-  return Consume(ff, f2) | Source(q);
+  std::function<void ()> f2 = bind(&qtype::close, q);
+  return Consume(ff, f2) | Source(q->back());
 }
 
 template<typename IN>
@@ -439,17 +441,18 @@ SimplePipelinePlan<IN, PipelineTerm> Consume(std::function<void (IN)> consumer) 
 }
 
 template<typename IN>
-SimplePipelinePlan<IN, PipelineTerm> Sink(queue_front<IN> *front) {
+SimplePipelinePlan<IN, PipelineTerm> Sink(queue_front<IN> front) {
   std::function<void (IN)> f1 = std::bind(&queue_front<IN>::push, front,
                                           std::placeholders::_1);
   return Consume(f1);
 }
 
 template<typename IN>
-SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> *front) {
-  std::function<void (IN)> f1 = std::bind(&queue_front<IN>::push, front,
+SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> front) {
+  void (queue_front<IN>::*push)(const IN&) = &queue_front<IN>::push;
+  std::function<void (IN)> f1 = std::bind(push, front,
                                           std::placeholders::_1);
-  std::function<void ()> f2 = std::bind(&queue_common<IN>::close, front);
+  std::function<void ()> f2 = std::bind(&queue_front<IN>::close, front);
   return Consume(f1, f2);
 }
 
@@ -457,8 +460,8 @@ SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> *front) {
 template<typename T>
 FullPipelinePlan<typename T::in, typename T::out> Parallel(T p) {
   // TODO: ref counting queue, no limit
-  buffer_queue<typename T::in> *q = new buffer_queue<typename T::in>(10);
-  return SinkAndClose(q) | Source(q) | p;
+  queue_object<buffer_queue<typename T::in> > q(10);
+  return SinkAndClose(q.front()) | Source(q.back()) | p;
 }
 
 // END CONSTRUCTORS
