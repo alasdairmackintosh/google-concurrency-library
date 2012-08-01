@@ -116,12 +116,12 @@ lower_test.pass : lower_test.exe
 
 MUTEX_TESTS := test_mutex_test.o condition_variable_test.o lock_test.o \
 	race_test.o concurrent_priority_queue_test.o blockable_thread.o \
-	blocking_queue_closed_test.o test_mutex.o
+	test_mutex.o
 $(MUTEX_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 mutex_test.exe : $(MUTEX_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 mutex_test.pass : mutex_test.exe
 
-HIGHER_TESTS := blocking_queue_test.o source_test.o iterator_queue_test.o \
+HIGHER_TESTS := source_test.o iterator_queue_test.o \
 	stream_mutex_test.o buffer_queue_test.o
 $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a

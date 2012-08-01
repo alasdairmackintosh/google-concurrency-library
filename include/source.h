@@ -92,7 +92,7 @@ class source {
     switch (state_) {
       case empty:
       case unknown:
-        return queue_->pop();
+        return queue_->value_pop();
       case value:
         state_ = empty;
         return value_;
@@ -121,7 +121,7 @@ class source {
       }
     }
     try {
-      value_ = queue_->pop();
+      value_ = queue_->value_pop();
       state_ = value;
     } catch (closed_error& e) {
       state_ = closed;

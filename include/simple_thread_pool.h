@@ -90,7 +90,7 @@ class simple_thread_pool {
   
   // TODO: migrate this to use the worker queue since there threads can be
   // interrupted.
-  // blocking_queue<std::function<void()> > work_pool_;
+  // buffer_queue<std::function<void()> > work_pool_;
 };
 
 }

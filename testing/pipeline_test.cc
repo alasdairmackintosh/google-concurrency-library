@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "pipeline.h"
-#include "blocking_queue.h"
 #include "buffer_queue.h"
 #include "countdown_latch.h"
 #include "source.h"

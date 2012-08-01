@@ -25,7 +25,6 @@
 #include <tr1/functional>
 #include <vector>
 
-#include <blocking_queue.h>
 #include <buffer_queue.h>
 #include <thread.h>
 #include <iterator_queue.h>
