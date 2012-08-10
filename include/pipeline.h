@@ -460,8 +460,8 @@ SimplePipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> front) {
 template<typename T>
 FullPipelinePlan<typename T::in, typename T::out> Parallel(T p) {
   // TODO: ref counting queue, no limit
-  queue_object<buffer_queue<typename T::in> > q(10);
-  return SinkAndClose(q.front()) | Source(q.back()) | p;
+  CXX0X_AUTO_VAR( qp, new queue_object<buffer_queue<typename T::in> >(10) );
+  return SinkAndClose(qp->front()) | Source(qp->back()) | p;
 }
 
 // END CONSTRUCTORS
