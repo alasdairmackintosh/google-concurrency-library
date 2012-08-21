@@ -23,8 +23,6 @@
 #include "cleanup_assert.h"
 #include "queue_base.h"
 
-stream_mutex<std::ostream> mcout(std::cout);
-
 namespace tr1 = std::tr1;
 
 using namespace gcl;

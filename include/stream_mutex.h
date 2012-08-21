@@ -117,4 +117,14 @@ stream_guard<Stream> operator>>(stream_mutex<Stream>& mtx, T& arg)
         typename stream_guard<Stream>::already_locked());
 }
 
+extern stream_mutex<std::istream> mcin;
+extern stream_mutex<std::ostream> mcout;
+extern stream_mutex<std::ostream> mcerr;
+extern stream_mutex<std::ostream> mclog;
+
+extern stream_mutex<std::wistream> mwcin;
+extern stream_mutex<std::wostream> mwcout;
+extern stream_mutex<std::wostream> mwcerr;
+extern stream_mutex<std::wostream> mwclog;
+
 #endif

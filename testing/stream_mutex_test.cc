@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
 #include <sstream>
 
 #include "thread.h"
@@ -20,24 +21,21 @@
 
 #include "gmock/gmock.h"
 
-std::ostringstream stream;
-stream_mutex<std::ostream> mstream(stream);
-
 // Test implicit expression locking.
-void implicit()
+void implicit(stream_mutex<std::ostream>& mstream)
 {
     mstream << "1" << "2" << "3" << "4" << "5" << std::endl;
 }
 
 // Test explicit expression locking.
-void holding()
+void holding(stream_mutex<std::ostream>& mstream)
 {
     mstream.hold() << "1" << "2" << "3" << "4" << "5" << std::endl;
 }
 
 
 // Test explicit block locking.
-void block()
+void block(stream_mutex<std::ostream>& mstream)
 {
     stream_guard<std::ostream> gstream(mstream);
     gstream << "1";
@@ -50,7 +48,7 @@ void block()
 
 // Test with lock_guard.
 // The above code is a better approach, but this one must work.
-void glock()
+void glock(stream_mutex<std::ostream>& mstream)
 {
     lock_guard<stream_mutex<std::ostream> > lck(mstream);
     mstream.bypass() << "1";
@@ -64,7 +62,7 @@ void glock()
 // Test with recursive locking.
 // Each write has automatic locking, in addition to the lock_guard.
 // This double locking is not recommended, but it must work.
-void rlock()
+void rlock(stream_mutex<std::ostream>& mstream)
 {
     lock_guard<stream_mutex<std::ostream> > lck(mstream);
     mstream.hold() << "1" << "2" << "3";
@@ -72,7 +70,7 @@ void rlock()
 }
 
 // Test with unique_lock.
-void ulock()
+void ulock(stream_mutex<std::ostream>& mstream)
 {
     unique_lock<stream_mutex<std::ostream> > lck(mstream, defer_lock);
     lck.lock();
@@ -85,7 +83,7 @@ void ulock()
 }
 
 // Test with try_lock.
-void trylock()
+void trylock(stream_mutex<std::ostream>& mstream)
 {
     unique_lock<stream_mutex<std::ostream> > lck(mstream, defer_lock);
     if ( lck.try_lock() ) {
@@ -100,25 +98,26 @@ void trylock()
 
 const int limit = 1000;
 
-template <void Function()>
+std::ostringstream stream;
+stream_mutex<std::ostream> mostrs(stream);
+
+template <void Function(stream_mutex<std::ostream>& sm)>
 void writer()
 {
     for ( int i = 0; i < limit; ++i )
-        Function();
+        Function(mostrs);
 }
 
-void verify()
+void verify(std::istream& is)
 {
-    const std::string result(stream.str());
-    int len = result.length();
-    int idx = 0;
-    while ( idx < len ) {
-        ASSERT_EQ('1', result[idx]); ++idx;
-        ASSERT_EQ('2', result[idx]); ++idx;
-        ASSERT_EQ('3', result[idx]); ++idx;
-        ASSERT_EQ('4', result[idx]); ++idx;
-        ASSERT_EQ('5', result[idx]); ++idx;
-        ASSERT_EQ('\n', result[idx]); ++idx;
+    std::string s;
+    while ( ! is.eof() ) {
+        is >> s;
+	ASSERT_EQ('1', s[0]);
+	ASSERT_EQ('2', s[1]);
+	ASSERT_EQ('3', s[2]);
+	ASSERT_EQ('4', s[3]);
+	ASSERT_EQ('5', s[4]);
     }
 }
 
@@ -128,16 +127,18 @@ class LockStreamTest
 {
 };
 
-// Verifies that we cannot create a queue of size zero
+// Verify sequential operation
 TEST_F(LockStreamTest, Sequential) {
-    implicit();
-    holding();
-    block();
-    glock();
-    rlock();
-    ulock();
-    trylock();
-    verify();
+    implicit(mostrs);
+    holding(mostrs);
+    block(mostrs);
+    glock(mostrs);
+    rlock(mostrs);
+    ulock(mostrs);
+    trylock(mostrs);
+    const std::string result(stream.str());
+    std::istringstream istrs(result);
+    verify(istrs);
 }
 
 // Verify threaded operation
@@ -156,5 +157,7 @@ TEST_F(LockStreamTest, Parallel) {
     thr5.join();
     thr6.join();
     thr7.join();
-    verify();
+    const std::string result(stream.str());
+    std::istringstream istrs(result);
+    verify(istrs);
 }
