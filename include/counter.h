@@ -136,7 +136,7 @@ every count will be extracted by one and only one exchange operation.
 
 WEAK COUNTERS
 
-Duplex counters can are expensive because 
+Duplex counters can be expensive because 
 the counter exchange operation
 and the buffer increment and decrement operations
 require write concurrency to the same object.
