@@ -79,6 +79,8 @@ class barrier {
   // only be invoked when there are no other threads currently inside the
   // count_down_and_wait() method. It is also safe to invoke this method from
   // within the registered completion.
+  // TODO(alasdair): Using this typically involves a static cast. Maybe call it
+  // reset_count() ?
   void reset(size_t num_threads);
 
   // Resets the barrier with the specified completion.  This method should only

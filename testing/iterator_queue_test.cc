@@ -99,6 +99,7 @@ TEST_F(IteratorQueueTest, ThreadedRead) {
   thread1.join();
   thread2.join();
   thread3.join();
+  latches[3]->count_down();
   for(size_t i = 0; i < 4; i++) {
     delete latches[i];
   }

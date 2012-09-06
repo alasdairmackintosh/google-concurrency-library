@@ -15,7 +15,6 @@
 #include <thread.h>
 
 #include "barrier.h"
-#include "debug.h"
 
 namespace gcl {
 using std::atomic;
@@ -37,6 +36,12 @@ barrier::barrier(size_t num_threads) throw (std::invalid_argument)
 }
 
 barrier::~barrier() {
+  // TODO(alasdair): The current documentation does not define the destruct
+  // behaviour, and this assertion may be too strict. Keeping it for now as it
+  // can help with debugging incorrect useage, but we may want to remove it, or
+  // replace it with a more complex test.
+  unique_lock<mutex> lock(mutex_);
+  assert(all_threads_exited());
 }
 
 // These methods could be implemented as C++11 lambdas, but are written as

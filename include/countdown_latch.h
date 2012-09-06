@@ -14,7 +14,6 @@
 
 #ifndef GCL_COUNTDOWN_LATCH_
 #define GCL_COUNTDOWN_LATCH_
-
 #include "mutex.h"
 #include "condition_variable.h"
 
@@ -35,8 +34,7 @@ public:
   // other threads are blocked in wait(), or are invoking count_down(),
   // the behaviour is undefined. Note that a single waiter can safely
   // destroy the latch as soon as it returns from wait().
-  ~countdown_latch() {
-  }
+  ~countdown_latch();
 
   // Waits until the count is decremented to 0. If the count is
   // already 0, this is a no-op.

@@ -65,6 +65,13 @@ void consume_user(User input) {
   printf("Consuming %s\n", input.get_name().c_str());
 }
 
+void consume_string(string input) {
+  printf("Consuming %s\n", input.c_str());
+}
+
+string process_string(string input) {
+  return input + "(processed)";
+}
 
 void print_string(string s) {
   printf("%s", s.c_str());
@@ -93,59 +100,40 @@ TEST_F(PipelineTest, Example) {
   std::function <User (int uid)> f2 = get_user;
   std::function <void (User user)> c = consume_user;
 
-  // Simple one-stage pipeline
-  CXX0X_AUTO_VAR(p1, Filter(find_uid));
-  int uid = p1.Apply("hello");
-  printf("Got uid %d\n", uid);
-
-  // Two-stage pipeline. Combines string->int and int->User to make
-  // string->User
-  printf("Creating p2\n");
-  CXX0X_AUTO_VAR(p2, Filter(find_uid) | Filter(f2));
-  User a2 = p2.Apply("hello world");
-  printf("Got %s from pipeline\n", a2.get_name().c_str());
-
   // A Runnable Pipeline that reads from a queue and write to a sink
-  queue_object< buffer_queue<string> > queue(10);
+  queue_object< buffer_queue<string> > queue(10, "test-queue");
   queue.push("Queued Hello");
 
-  printf("Creating p3\n");
   CXX0X_AUTO_VAR(p3, Source(queue.back()) | Filter(find_uid)
 				| Filter(fr) | Filter(f2));
 
-  printf("Creating p4\n");
   queue_object< buffer_queue<User> > out(10);
-  PipelinePlan p4 = p3|SinkAndClose(out.front());
+  PipelinePlan p4 = p3 | SinkAndClose(out.front());
 
-  printf("Starting p4\n");
   PipelineExecution pex(p4, &pool);
-  printf("Running p4\n");
   queue.push("More stuff");
   queue.push("Yet More stuff");
-  EXPECT_FALSE(pex.is_done());
   queue.push("Are we done yet???");
-  PipelineExecution pex2(Source(out.back())|Consume(c), &pool);
-  EXPECT_FALSE(pex2.is_done());
-  queue.close();
 
-  sleep(1);
-  // RACY!!!!
-  EXPECT_TRUE(pex.is_done());
-  printf("Ending p4\n");
+  PipelineExecution pex2(Source(out.back()) | Consume(c, Nothing), &pool);
+  queue.close();
   pex.wait();
-  printf("Test Done\n");
+  pex2.wait();
+
+  EXPECT_TRUE(pex.is_done());
   EXPECT_TRUE(out.is_closed());
   EXPECT_TRUE(pex2.is_done());
 }
-
+#if 0
+// TODO(alasdair): Fix Parallel test - see comments in pipeline.h
 TEST_F(PipelineTest, ParallelExample) {
 
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
   //FIX CXX0X_AUTO_VAR(p2, Filter(find_uid)|Filter(get_user));
-  SimplePipelinePlan<string,int> f1 = Filter(find_uid);
-  SimplePipelinePlan<int,User> f2 = Filter(get_user);
-  SimplePipelinePlan<string,User> p2 = f1|f2;
+  CXX0X_AUTO_VAR(f1, Filter(find_uid));
+  CXX0X_AUTO_VAR(f2, Filter(get_user));
+  CXX0X_AUTO_VAR(p2, f1|f2);
 
   queue_object< buffer_queue<string> > queue(10);
   queue.push("Queued Hello");
@@ -160,24 +148,22 @@ TEST_F(PipelineTest, ParallelExample) {
   CXX0X_AUTO_VAR(p3, Parallel(p2));
   CXX0X_AUTO_VAR(s, Source(queue.back()));
 
-  PipelinePlan p4 = s|p3|Consume(consume_user);
+  PipelinePlan p4 = s | p3 | Consume(consume_user, Nothing);
 
   simple_thread_pool pool;
   PipelineExecution pex(p4, &pool);
-#if 0
   queue.push("More stuff");
   queue.push("Yet More stuff");
   queue.push("Are we done yet???");
   queue.close();
   pex.wait();
   printf("Done!!!");
-#endif
 }
-
+#endif
 TEST_F(PipelineTest, ProduceExample) {
   simple_thread_pool pool;
   PipelinePlan p5 = Produce<string>(produce_strings) | Filter(find_uid) |
-      Filter(get_user) | Consume(consume_user);
+      Filter(get_user) | Consume(consume_user, Nothing);
   printf("Starting Execution\n");
   PipelineExecution pex3(p5, &pool);
   printf("Waiting for Completion\n");
