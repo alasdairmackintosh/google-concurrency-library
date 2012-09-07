@@ -25,7 +25,7 @@
 
 namespace gcl {
 
-//TODO(crowl): Replace element_type with value_type.
+//TODO(crowl): Replace value_type with value_type.
 
 template <typename Queue>
 class queue_front_iter
@@ -33,7 +33,7 @@ class queue_front_iter
     public std::iterator<std::output_iterator_tag, void, void, void, void>
 {
   public:
-    typedef typename Queue::element_type element_type;
+    typedef typename Queue::value_type value_type;
 
     queue_front_iter(Queue& q) : q_(&q) { }
     queue_front_iter() : q_(static_cast<Queue*>(NULL)) { }
@@ -41,7 +41,7 @@ class queue_front_iter
     queue_front_iter& operator *() { return *this; }
     queue_front_iter& operator ++() { return *this; }
     queue_front_iter& operator ++(int) { return *this; }
-    queue_front_iter& operator =(const element_type& value);
+    queue_front_iter& operator =(const value_type& value);
 
     bool operator ==(const queue_front_iter& y) { return q_ == y.q_; }
     bool operator !=(const queue_front_iter& y) { return q_ != y.q_; }
@@ -56,22 +56,22 @@ class queue_back_iter
     public std::iterator<std::input_iterator_tag, void, void, void, void>
 {
   public:
-    typedef typename Queue::element_type element_type;
+    typedef typename Queue::value_type value_type;
 
     class value
     {
       public:
-        value(element_type v) : v_(v) { }
-        element_type operator *() const { return v_; }
+        value(value_type v) : v_(v) { }
+        value_type operator *() const { return v_; }
       private:
-        element_type v_;
+        value_type v_;
     };
 
     queue_back_iter(Queue& q) : q_(&q) { if ( q_ ) next(); }
     queue_back_iter() : q_(static_cast<Queue*>(NULL)) { }
 
-    const element_type& operator *() const { return v_; }
-    const element_type* operator ->() const { return &v_; }
+    const value_type& operator *() const { return v_; }
+    const value_type* operator ->() const { return &v_; }
     queue_back_iter& operator ++() { next(); return *this; }
     value operator ++(int) { value t = v_; next(); return t; }
 
@@ -84,7 +84,7 @@ class queue_back_iter
     void next();
 
     Queue* q_;
-    element_type v_;
+    value_type v_;
 };
 
 CXX0X_ENUM_CLASS queue_op_status
@@ -96,13 +96,13 @@ CXX0X_ENUM_CLASS queue_op_status
 };
 
 #if 0
-template <typename Element>
+template <typename Value>
 class queue_common
 {
   public:
-    typedef Element& reference;
-    typedef const Element& const_reference;
-    typedef Element element_type;
+    typedef Value& reference;
+    typedef const Value& const_reference;
+    typedef Value value_type;
 
     virtual void close() = 0;
     virtual bool is_closed() = 0;
@@ -114,17 +114,17 @@ class queue_common
     virtual ~queue_common();
 };
 
-template <typename Element>
-queue_common<Element>::~queue_common() CXX0X_DEFAULTED_EASY
+template <typename Value>
+queue_common<Value>::~queue_common() CXX0X_DEFAULTED_EASY
 #endif
 
 template <typename Queue>
 class generic_queue_front
 {
   public:
-    typedef typename Queue::element_type element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef typename Queue::value_type value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     typedef queue_front_iter<generic_queue_front> iterator;
     typedef const queue_front_iter<generic_queue_front> const_iterator;
@@ -147,18 +147,18 @@ class generic_queue_front
     const iterator cbegin() { return const_iterator(*this); }
     const iterator cend() { return const_iterator(); }
 
-    void push(const element_type& x)
+    void push(const value_type& x)
         { queue_->push(x); }
-    queue_op_status try_push(const element_type& x)
+    queue_op_status try_push(const value_type& x)
         { return queue_->try_push(x); }
-    queue_op_status wait_push(const element_type& x)
+    queue_op_status wait_push(const value_type& x)
         { return queue_->wait_push(x); }
 #ifdef HAS_CXX0X_RVREF
-    void push(element_type&& x)
+    void push(value_type&& x)
         { queue_->push( std::move(x) ); }
-    queue_op_status try_push(element_type&& x)
+    queue_op_status try_push(value_type&& x)
         { return queue_->try_push( std::move(x) ); }
-    queue_op_status wait_push(element_type&& x)
+    queue_op_status wait_push(value_type&& x)
         { return queue_->wait_push( std::move(x) ); }
 #endif
 
@@ -170,9 +170,9 @@ template <typename Queue>
 class generic_queue_back
 {
   public:
-    typedef typename Queue::element_type element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef typename Queue::value_type value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     typedef queue_back_iter<generic_queue_back> iterator;
     typedef queue_back_iter<generic_queue_back> const_iterator;
@@ -195,11 +195,11 @@ class generic_queue_back
     const iterator cbegin() { return const_iterator(*this); }
     const iterator cend() { return const_iterator(); }
 
-    element_type value_pop()
+    value_type value_pop()
         { return queue_->value_pop(); }
-    queue_op_status try_pop(element_type& x)
+    queue_op_status try_pop(value_type& x)
         { return queue_->try_pop(x); }
-    queue_op_status wait_pop(element_type& x)
+    queue_op_status wait_pop(value_type& x)
         { return queue_->wait_pop(x); }
 
   protected:
@@ -208,7 +208,7 @@ class generic_queue_back
 
 template <typename Queue>
 queue_front_iter<Queue>&
-queue_front_iter<Queue>::operator =(const element_type& value)
+queue_front_iter<Queue>::operator =(const value_type& value)
 {
     queue_op_status s = q_->wait_push(value);
     if ( s != CXX0X_ENUM_QUAL(queue_op_status)success ) {
@@ -227,13 +227,13 @@ queue_back_iter<Queue>::next()
         q_ = NULL;
 }
 
-template <typename Element>
+template <typename Value>
 class queue_base
 {
   public:
-    typedef Element element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef Value value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     typedef queue_back_iter<queue_base> iterator;
     typedef queue_back_iter<queue_base> const_iterator;
@@ -251,61 +251,61 @@ class queue_base
 
     virtual const char* name() = 0;
 
-    virtual void push(const Element& x) = 0;
-    virtual queue_op_status try_push(const Element& x) = 0;
-    virtual queue_op_status wait_push(const Element& x) = 0;
+    virtual void push(const Value& x) = 0;
+    virtual queue_op_status try_push(const Value& x) = 0;
+    virtual queue_op_status wait_push(const Value& x) = 0;
 #ifdef HAS_CXX0X_RVREF
-    virtual void push(Element&& x) = 0;
-    virtual queue_op_status try_push(Element&& x) = 0;
-    virtual queue_op_status wait_push(Element&& x) = 0;
+    virtual void push(Value&& x) = 0;
+    virtual queue_op_status try_push(Value&& x) = 0;
+    virtual queue_op_status wait_push(Value&& x) = 0;
 #endif
 
-    virtual Element value_pop() = 0;
-    virtual queue_op_status try_pop(Element&) = 0;
-    virtual queue_op_status wait_pop(Element&) = 0;
+    virtual Value value_pop() = 0;
+    virtual queue_op_status try_pop(Value&) = 0;
+    virtual queue_op_status wait_pop(Value&) = 0;
 };
 
 //TODO(crowl): Use template aliases for queue_front and queue_back?
 
-template <typename Element>
+template <typename Value>
 class queue_front
-: public generic_queue_front< queue_base<Element> >
+: public generic_queue_front< queue_base<Value> >
 {
   public:
     queue_front() CXX0X_DEFAULTED_EASY
-    queue_front(queue_base<Element>& queue)
-        : generic_queue_front< queue_base<Element> >(queue) { }
-    queue_front(queue_base<Element>* queue)
-        : generic_queue_front< queue_base<Element> >(queue) { }
-    queue_front(const queue_front<Element>& other)
-        : generic_queue_front< queue_base<Element> >(other.queue_) { }
+    queue_front(queue_base<Value>& queue)
+        : generic_queue_front< queue_base<Value> >(queue) { }
+    queue_front(queue_base<Value>* queue)
+        : generic_queue_front< queue_base<Value> >(queue) { }
+    queue_front(const queue_front<Value>& other)
+        : generic_queue_front< queue_base<Value> >(other.queue_) { }
 };
 
-template <typename Element>
+template <typename Value>
 class queue_back
-: public generic_queue_back< queue_base<Element> >
+: public generic_queue_back< queue_base<Value> >
 {
   public:
     queue_back() CXX0X_DEFAULTED_EASY
-    queue_back(queue_base<Element>& queue)
-        : generic_queue_back< queue_base<Element> >(queue) { }
-    queue_back(queue_base<Element>* queue)
-        : generic_queue_back< queue_base<Element> >(queue) { }
-    queue_back(const queue_back<Element>& other)
-        : generic_queue_back< queue_base<Element> >(other.queue_) { }
+    queue_back(queue_base<Value>& queue)
+        : generic_queue_back< queue_base<Value> >(queue) { }
+    queue_back(queue_base<Value>* queue)
+        : generic_queue_back< queue_base<Value> >(queue) { }
+    queue_back(const queue_back<Value>& other)
+        : generic_queue_back< queue_base<Value> >(other.queue_) { }
 };
 
 template <typename Queue>
 class queue_wrapper
 :
-    public virtual queue_base <typename Queue::element_type>
+    public virtual queue_base <typename Queue::value_type>
 {
     Queue* ptr;
 
   public:
-    typedef typename Queue::element_type element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef typename Queue::value_type value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     queue_wrapper(Queue* arg)
     : ptr(arg)
@@ -330,46 +330,46 @@ class queue_wrapper
     virtual const char* name()
     { return ptr->name(); }
 
-    virtual void push(const element_type& x)
+    virtual void push(const value_type& x)
     { ptr->push(x); }
 
-    virtual queue_op_status try_push(const element_type& x)
+    virtual queue_op_status try_push(const value_type& x)
     { return ptr->try_push(x); }
 
-    virtual queue_op_status wait_push(const element_type& x)
+    virtual queue_op_status wait_push(const value_type& x)
     { return ptr->wait_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
-    virtual void push(element_type&& x)
+    virtual void push(value_type&& x)
     { ptr->push(x); }
 
-    virtual queue_op_status try_push(element_type&& x)
+    virtual queue_op_status try_push(value_type&& x)
     { return ptr->try_push(x); }
 
-    virtual queue_op_status wait_push(element_type&& x)
+    virtual queue_op_status wait_push(value_type&& x)
     { return ptr->wait_push(x); }
 #endif
 
-    virtual element_type value_pop()
+    virtual value_type value_pop()
     { return ptr->value_pop(); }
 
-    virtual queue_op_status try_pop(element_type& x)
+    virtual queue_op_status try_pop(value_type& x)
     { return ptr->try_pop(x); }
 
-    virtual queue_op_status wait_pop(element_type& x)
+    virtual queue_op_status wait_pop(value_type& x)
     { return ptr->wait_pop(x); }
 
-    queue_front<element_type> front()
-    { return queue_front<element_type>(this); }
+    queue_front<value_type> front()
+    { return queue_front<value_type>(this); }
 
-    queue_back<element_type> back()
-    { return queue_back<element_type>(this); }
+    queue_back<value_type> back()
+    { return queue_back<value_type>(this); }
 };
 
-template <typename Element>
+template <typename Value>
 class queue_counted
 :
-    public queue_base<Element>
+    public queue_base<Value>
 {
   public:
     queue_counted() : f_(0), r_(0) { }
@@ -387,20 +387,20 @@ class queue_counted
     std::atomic<int> r_;
 };
 
-template <typename Element>
+template <typename Value>
 class shared_queue_front
 {
   public:
-    typedef Element element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef Value value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     typedef queue_front_iter<shared_queue_front> iterator;
     typedef const queue_front_iter<shared_queue_front> const_iterator;
 
     //FIX shared_queue_front()
     //FIX     : queue_(NULL) { }
-    shared_queue_front(queue_counted<element_type>* queue)
+    shared_queue_front(queue_counted<value_type>* queue)
         : queue_(queue) { queue->inc_front(); }
     shared_queue_front(const shared_queue_front& other)
         : queue_(other.queue_) { queue_->inc_front(); }
@@ -455,39 +455,39 @@ class shared_queue_front
     const iterator cbegin() { return const_iterator(*this); }
     const iterator cend() { return const_iterator(); }
 
-    void push(const element_type& x)
+    void push(const value_type& x)
         { queue_->push(x); }
-    queue_op_status try_push(const element_type& x)
+    queue_op_status try_push(const value_type& x)
         { return queue_->try_push(x); }
-    queue_op_status wait_push(const element_type& x)
+    queue_op_status wait_push(const value_type& x)
         { return queue_->wait_push(x); }
 #ifdef HAS_CXX0X_RVREF
-    void push(element_type&& x)
+    void push(value_type&& x)
         { queue_->push( std::move(x) ); }
-    queue_op_status try_push(element_type&& x)
+    queue_op_status try_push(value_type&& x)
         { return queue_->try_push( std::move(x) ); }
-    queue_op_status wait_push(element_type&& x)
+    queue_op_status wait_push(value_type&& x)
         { return queue_->wait_push( std::move(x) ); }
 #endif
 
   private:
-    queue_counted<element_type>* queue_;
+    queue_counted<value_type>* queue_;
 };
 
-template <typename Element>
+template <typename Value>
 class shared_queue_back
 {
   public:
-    typedef Element element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef Value value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     typedef queue_back_iter<shared_queue_back> iterator;
     typedef queue_back_iter<shared_queue_back> const_iterator;
 
     //FIX shared_queue_back()
     //FIX     : queue_(NULL) { }
-    shared_queue_back(queue_counted<element_type>* queue)
+    shared_queue_back(queue_counted<value_type>* queue)
         : queue_(queue) { queue->inc_back(); }
     shared_queue_back(const shared_queue_back& other)
         : queue_(other.queue_) { queue_->inc_back(); }
@@ -542,65 +542,65 @@ class shared_queue_back
     const iterator cbegin() { return const_iterator(*this); }
     const iterator cend() { return const_iterator(); }
 
-    element_type value_pop()
+    value_type value_pop()
         { return queue_->value_pop(); }
-    queue_op_status try_pop(element_type& x)
+    queue_op_status try_pop(value_type& x)
         { return queue_->try_pop(x); }
-    queue_op_status wait_pop(element_type& x)
+    queue_op_status wait_pop(value_type& x)
         { return queue_->wait_pop(x); }
 
   private:
-    queue_counted<element_type>* queue_;
+    queue_counted<value_type>* queue_;
 };
 
 template <typename Queue>
 class queue_owner
 :
-    public queue_counted <typename Queue::element_type>
+    public queue_counted <typename Queue::value_type>
 {
     Queue* ptr;
 
   public:
-    typedef typename Queue::element_type element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef typename Queue::value_type value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     queue_owner(const queue_owner&) CXX0X_DELETED
     queue_owner(Queue* arg) : ptr(arg) { }
 
     virtual ~queue_owner() { delete ptr; }
 
-    queue_front<element_type> front()
-        { return queue_front<element_type>(this); }
-    queue_back<element_type> back()
-        { return queue_back<element_type>(this); }
+    queue_front<value_type> front()
+        { return queue_front<value_type>(this); }
+    queue_back<value_type> back()
+        { return queue_back<value_type>(this); }
 
     virtual void close() { ptr->close(); }
     virtual bool is_closed() { return ptr->is_closed(); }
     virtual bool is_empty() { return ptr->is_empty(); }
     virtual const char* name() { return ptr->name(); }
 
-    virtual void push(const element_type& x)
+    virtual void push(const value_type& x)
         { ptr->push(x); }
-    virtual queue_op_status try_push(const element_type& x)
+    virtual queue_op_status try_push(const value_type& x)
         { return ptr->try_push(x); }
-    virtual queue_op_status wait_push(const element_type& x)
+    virtual queue_op_status wait_push(const value_type& x)
         { return ptr->wait_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
-    virtual void push(element_type&& x)
+    virtual void push(value_type&& x)
         { ptr->push(x); }
-    virtual queue_op_status try_push(element_type&& x)
+    virtual queue_op_status try_push(value_type&& x)
         { return ptr->try_push(x); }
-    virtual queue_op_status wait_push(element_type&& x)
+    virtual queue_op_status wait_push(value_type&& x)
         { return ptr->wait_push(x); }
 #endif
 
-    virtual element_type value_pop()
+    virtual value_type value_pop()
         { return ptr->value_pop(); }
-    virtual queue_op_status try_pop(element_type& x)
+    virtual queue_op_status try_pop(value_type& x)
         { return ptr->try_pop(x); }
-    virtual queue_op_status wait_pop(element_type& x)
+    virtual queue_op_status wait_pop(value_type& x)
         { return ptr->wait_pop(x); }
 };
 
@@ -608,14 +608,14 @@ class queue_owner
 template <typename Queue>
 class queue_object
 :
-    public queue_counted <typename Queue::element_type>
+    public queue_counted <typename Queue::value_type>
 {
     Queue obj_;
 
   public:
-    typedef typename Queue::element_type element_type;
-    typedef element_type& reference;
-    typedef const element_type& const_reference;
+    typedef typename Queue::value_type value_type;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
 
     queue_object(const queue_object&) CXX0X_DELETED
 #ifdef HAS_CXX0X_VARIADIC_TMPL
@@ -630,39 +630,39 @@ class queue_object
 
     virtual ~queue_object() { }
 
-    operator queue_front<element_type>() //TODO(crowl) Really?
-        { return queue_front<element_type>(this); }
-    queue_front<element_type> front()
-        { return queue_front<element_type>(this); }
-    queue_back<element_type> back()
-        { return queue_back<element_type>(this); }
+    operator queue_front<value_type>() //TODO(crowl) Really?
+        { return queue_front<value_type>(this); }
+    queue_front<value_type> front()
+        { return queue_front<value_type>(this); }
+    queue_back<value_type> back()
+        { return queue_back<value_type>(this); }
 
     virtual void close() { obj_.close(); }
     virtual bool is_closed() { return obj_.is_closed(); }
     virtual bool is_empty() { return obj_.is_empty(); }
     virtual const char* name() { return obj_.name(); }
 
-    virtual void push(const element_type& x)
+    virtual void push(const value_type& x)
         { obj_.push(x); }
-    virtual queue_op_status try_push(const element_type& x)
+    virtual queue_op_status try_push(const value_type& x)
         { return obj_.try_push(x); }
-    virtual queue_op_status wait_push(const element_type& x)
+    virtual queue_op_status wait_push(const value_type& x)
         { return obj_.wait_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
-    virtual void push(element_type&& x)
+    virtual void push(value_type&& x)
         { obj_.push(x); }
-    virtual queue_op_status try_push(element_type&& x)
+    virtual queue_op_status try_push(value_type&& x)
         { return obj_.try_push(x); }
-    virtual queue_op_status wait_push(element_type&& x)
+    virtual queue_op_status wait_push(value_type&& x)
         { return obj_.wait_push(x); }
 #endif
 
-    virtual element_type value_pop()
+    virtual value_type value_pop()
         { return obj_.value_pop(); }
-    virtual queue_op_status try_pop(element_type& x)
+    virtual queue_op_status try_pop(value_type& x)
         { return obj_.try_pop(x); }
-    virtual queue_op_status wait_pop(element_type& x)
+    virtual queue_op_status wait_pop(value_type& x)
         { return obj_.wait_pop(x); }
 };
 
@@ -670,11 +670,11 @@ class queue_object
 #ifdef HAS_CXX0X_VARIADIC_TMPL
 
 template <typename Queue, typename ... Args>
-std::pair< shared_queue_front<typename Queue::element_type>,
-           shared_queue_back<typename Queue::element_type> >
+std::pair< shared_queue_front<typename Queue::value_type>,
+           shared_queue_back<typename Queue::value_type> >
 share_queue_ends(Args ... args)
 {
-  typedef typename Queue::element_type elemtype;
+  typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(args...) );
   return std::make_pair(shared_queue_front<elemtype>(q),
                         shared_queue_back<elemtype>(q));
@@ -683,22 +683,22 @@ share_queue_ends(Args ... args)
 #else
 
 template <typename Queue, typename Arg>
-std::pair< shared_queue_front<typename Queue::element_type>,
-           shared_queue_back<typename Queue::element_type> >
+std::pair< shared_queue_front<typename Queue::value_type>,
+           shared_queue_back<typename Queue::value_type> >
 share_queue_ends(Arg arg)
 {
-  typedef typename Queue::element_type elemtype;
+  typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(arg) );
   return std::make_pair(shared_queue_front<elemtype>(q),
                         shared_queue_back<elemtype>(q));
 }
 
 template <typename Queue, typename Arg1, typename Arg2>
-std::pair< shared_queue_front<typename Queue::element_type>,
-           shared_queue_back<typename Queue::element_type> >
+std::pair< shared_queue_front<typename Queue::value_type>,
+           shared_queue_back<typename Queue::value_type> >
 share_queue_ends(Arg1 arg1, Arg2 arg2)
 {
-  typedef typename Queue::element_type elemtype;
+  typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(arg1, arg2) );
   return std::make_pair(shared_queue_front<elemtype>(q),
                         shared_queue_back<elemtype>(q));

@@ -22,11 +22,11 @@
 
 namespace gcl {
 
-template <typename Element>
+template <typename Value>
 class buffer_queue
 {
   public:
-    typedef Element element_type;
+    typedef Value value_type;
 
     buffer_queue() CXX0X_DELETED
     buffer_queue(const buffer_queue&) CXX0X_DELETED
@@ -41,27 +41,27 @@ class buffer_queue
 
 //TODO(crowl): Do we want this?
 #if 0
-    generic_queue_front<element_type> front()
-        { return generic_queue_front<element_type>(this); }
-    generic_queue_back<element_type> back()
-        { return generic_queue_back<element_type>(this); }
+    generic_queue_front<value_type> front()
+        { return generic_queue_front<value_type>(this); }
+    generic_queue_back<value_type> back()
+        { return generic_queue_back<value_type>(this); }
 #endif
 
     void close();
     bool is_closed();
     bool is_empty();
 
-    Element value_pop();
-    queue_op_status try_pop(Element&);
-    queue_op_status wait_pop(Element&);
+    Value value_pop();
+    queue_op_status try_pop(Value&);
+    queue_op_status wait_pop(Value&);
 
-    void push(const Element& x);
-    queue_op_status try_push(const Element& x);
-    queue_op_status wait_push(const Element& x);
+    void push(const Value& x);
+    queue_op_status try_push(const Value& x);
+    queue_op_status wait_push(const Value& x);
 #ifdef HAS_CXX0X_RVREF
-    void push(Element&& x);
-    queue_op_status try_push(Element&& x);
-    queue_op_status wait_push(Element&& x);
+    void push(Value&& x);
+    queue_op_status try_push(Value&& x);
+    queue_op_status wait_push(Value&& x);
 #endif
 
     const char* name();
@@ -72,7 +72,7 @@ class buffer_queue
     condition_variable not_full_;
     size_t waiting_full_;
     size_t waiting_empty_;
-    Element* buffer_;
+    Value* buffer_;
     size_t push_index_;
     size_t pop_index_;
     size_t num_slots_;
@@ -86,7 +86,7 @@ class buffer_queue
 
     size_t next(size_t idx) { return (idx + 1) % num_slots_; }
 
-    void pop_from(Element& elem, size_t pdx, size_t hdx)
+    void pop_from(Value& elem, size_t pdx, size_t hdx)
     {
         pop_index_ = next( pdx );
 #ifdef HAS_CXX0X_RVREF
@@ -100,7 +100,7 @@ class buffer_queue
         }
     }
 
-    void push_at(const Element& elem, size_t hdx, size_t nxt, size_t pdx)
+    void push_at(const Value& elem, size_t hdx, size_t nxt, size_t pdx)
     {
         buffer_[hdx] = elem;
         push_index_ = nxt;
@@ -111,7 +111,7 @@ class buffer_queue
     }
 
 #ifdef HAS_CXX0X_RVREF
-    void push_at(Element&& elem, size_t hdx, size_t nxt, size_t pdx)
+    void push_at(Value&& elem, size_t hdx, size_t nxt, size_t pdx)
     {
         buffer_[hdx] = std::move(elem);
         push_index_ = nxt;
@@ -124,19 +124,19 @@ class buffer_queue
 
 };
 
-template <typename Element>
-void buffer_queue<Element>::init(size_t max_elems)
+template <typename Value>
+void buffer_queue<Value>::init(size_t max_elems)
 {
     if ( max_elems < 1 )
         throw std::invalid_argument("number of elements must be at least one");
 }
 
-template <typename Element>
-buffer_queue<Element>::buffer_queue(size_t max_elems, const char* name)
+template <typename Value>
+buffer_queue<Value>::buffer_queue(size_t max_elems, const char* name)
 :
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[max_elems+1] ),
+    buffer_( new Value[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
@@ -146,13 +146,13 @@ buffer_queue<Element>::buffer_queue(size_t max_elems, const char* name)
     init(max_elems);
 }
 
-template <typename Element>
-buffer_queue<Element>::buffer_queue(size_t max_elems)
+template <typename Value>
+buffer_queue<Value>::buffer_queue(size_t max_elems)
 :
     // would rather do buffer_queue(max_elems, "")
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[max_elems+1] ),
+    buffer_( new Value[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
@@ -162,9 +162,9 @@ buffer_queue<Element>::buffer_queue(size_t max_elems)
     init(max_elems);
 }
 
-template <typename Element>
+template <typename Value>
 template <typename Iter>
-void buffer_queue<Element>::iter_init(size_t max_elems, Iter first, Iter last)
+void buffer_queue<Value>::iter_init(size_t max_elems, Iter first, Iter last)
 {
     size_t hdx = 0;
     for ( Iter cur = first; cur != last; ++cur ) {
@@ -177,15 +177,15 @@ void buffer_queue<Element>::iter_init(size_t max_elems, Iter first, Iter last)
     }
 }
 
-template <typename Element>
+template <typename Value>
 template <typename Iter>
-buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last,
+buffer_queue<Value>::buffer_queue(size_t max_elems, Iter first, Iter last,
                                     const char* name)
 :
     // would rather do buffer_queue(max_elems, name)
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[max_elems+1] ),
+    buffer_( new Value[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
@@ -195,14 +195,14 @@ buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last,
     iter_init(max_elems, first, last);
 }
 
-template <typename Element>
+template <typename Value>
 template <typename Iter>
-buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last)
+buffer_queue<Value>::buffer_queue(size_t max_elems, Iter first, Iter last)
 :
     // would rather do buffer_queue(max_elems, first, last, "")
     waiting_full_( 0 ),
     waiting_empty_( 0 ),
-    buffer_( new Element[max_elems+1] ),
+    buffer_( new Value[max_elems+1] ),
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
@@ -212,14 +212,14 @@ buffer_queue<Element>::buffer_queue(size_t max_elems, Iter first, Iter last)
     iter_init(max_elems, first, last);
 }
 
-template <typename Element>
-buffer_queue<Element>::~buffer_queue()
+template <typename Value>
+buffer_queue<Value>::~buffer_queue()
 {
     delete[] buffer_;
 }
 
-template <typename Element>
-void buffer_queue<Element>::close()
+template <typename Value>
+void buffer_queue<Value>::close()
 {
     lock_guard<mutex> hold( mtx_ );
     closed_ = true;
@@ -227,22 +227,22 @@ void buffer_queue<Element>::close()
     not_full_.notify_all();
 }
 
-template <typename Element>
-bool buffer_queue<Element>::is_closed()
+template <typename Value>
+bool buffer_queue<Value>::is_closed()
 {
     lock_guard<mutex> hold( mtx_ );
     return closed_;
 }
 
-template <typename Element>
-bool buffer_queue<Element>::is_empty()
+template <typename Value>
+bool buffer_queue<Value>::is_empty()
 {
     lock_guard<mutex> hold( mtx_ );
     return push_index_ == pop_index_;
 }
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::try_pop(Element& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::try_pop(Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment operator
@@ -265,8 +265,8 @@ queue_op_status buffer_queue<Element>::try_pop(Element& elem)
     }
 }
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::wait_pop(Element& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::wait_pop(Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment operator
@@ -293,13 +293,13 @@ queue_op_status buffer_queue<Element>::wait_pop(Element& elem)
     }
 }
 
-template <typename Element>
-Element buffer_queue<Element>::value_pop()
+template <typename Value>
+Value buffer_queue<Value>::value_pop()
 {
     /* This try block is here to catch exceptions from the
        user-defined copy assignment operator. */
     try {
-        Element elem;
+        Value elem;
         if ( wait_pop( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
             throw CXX0X_ENUM_QUAL(queue_op_status)closed;
 #ifdef HAS_CXX0X_RVREF
@@ -313,8 +313,8 @@ Element buffer_queue<Element>::value_pop()
     }
 }
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::try_push(const Element& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::try_push(const Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment
@@ -336,8 +336,8 @@ queue_op_status buffer_queue<Element>::try_push(const Element& elem)
     }
 }
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::wait_push(const Element& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::wait_push(const Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment
@@ -366,8 +366,8 @@ queue_op_status buffer_queue<Element>::wait_push(const Element& elem)
     }
 }
 
-template <typename Element>
-void buffer_queue<Element>::push(const Element& elem)
+template <typename Value>
+void buffer_queue<Value>::push(const Value& elem)
 {
     /* Only wait_push can throw, and it protects itself, so there
        is no need to try/catch here. */
@@ -379,8 +379,8 @@ void buffer_queue<Element>::push(const Element& elem)
 
 //TODO(crowl) Refactor with non-move versions.
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::try_push(Element&& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::try_push(Value&& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment
@@ -402,8 +402,8 @@ queue_op_status buffer_queue<Element>::try_push(Element&& elem)
     }
 }
 
-template <typename Element>
-queue_op_status buffer_queue<Element>::wait_push(Element&& elem)
+template <typename Value>
+queue_op_status buffer_queue<Value>::wait_push(Value&& elem)
 {
     /* This try block is here to catch exceptions from the mutex
        operations or from the user-defined copy assignment
@@ -432,8 +432,8 @@ queue_op_status buffer_queue<Element>::wait_push(Element&& elem)
     }
 }
 
-template <typename Element>
-void buffer_queue<Element>::push(Element&& elem)
+template <typename Value>
+void buffer_queue<Value>::push(Value&& elem)
 {
     /* Only wait_push can throw, and it protects itself, so there
        is no need to try/catch here. */
@@ -444,8 +444,8 @@ void buffer_queue<Element>::push(Element&& elem)
 
 #endif
 
-template <typename Element>
-const char* buffer_queue<Element>::name()
+template <typename Value>
+const char* buffer_queue<Value>::name()
 {
     return name_;
 }
