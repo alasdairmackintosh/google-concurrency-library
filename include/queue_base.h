@@ -25,8 +25,6 @@
 
 namespace gcl {
 
-//TODO(crowl): Replace value_type with value_type.
-
 template <typename Queue>
 class queue_front_iter
 :
