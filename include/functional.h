@@ -13,6 +13,7 @@ using tr1::function;
 using tr1::bind;
 using tr1::ref;
 namespace placeholders = tr1::placeholders;
+using tr1::hash;
 }
 
 #endif

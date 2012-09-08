@@ -79,9 +79,9 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
           active_threads_.insert(next_thread);
         }  // else do nothing, we're out of threads
       } else {
-          next_thread = *unused_threads_.begin();
-          active_threads_.insert(next_thread);
-          unused_threads_.erase(unused_threads_.find(next_thread));
+        next_thread = *unused_threads_.begin();
+        active_threads_.insert(next_thread);
+        unused_threads_.erase(unused_threads_.find(next_thread));
       }
     }
   }

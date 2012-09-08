@@ -32,10 +32,10 @@ LFlags = -pthread $(CXXFLAGS)
 #### Compilation Rules
 
 %.o : %.c
-	$(CC) $(CFlags) $< -c -o $*.o 
+	$(CC) $(CFlags) $< -c -o $*.o
 
 %.o : %.cc
-	$(CXX) $(CxxFlags) $< -c -o $*.o 
+	$(CXX) $(CxxFlags) $< -c -o $*.o
 
 %.a :
 	/bin/rm -f $@
@@ -126,6 +126,12 @@ HIGHER_TESTS := source_test.o iterator_queue_test.o \
 $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 higher_test.pass : higher_test.exe
+
+MAP_REDUCE_TESTS := map_reduce_test.o
+$(MAP_REDUCE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
+map_reduce_test.exe : $(MAP_REDUCE_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
+map_reduce_test.run : map_reduce_test.exe
+	./map_reduce_test.exe
 
 PIPELINE_TESTS := pipeline_test.o
 $(PIPELINE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
