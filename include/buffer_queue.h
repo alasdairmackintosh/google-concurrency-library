@@ -371,8 +371,9 @@ void buffer_queue<Value>::push(const Value& elem)
 {
     /* Only wait_push can throw, and it protects itself, so there
        is no need to try/catch here. */
-    if ( wait_push( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
+    if ( wait_push( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed ) {
         throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+    }
 }
 
 #ifdef HAS_CXX0X_RVREF
