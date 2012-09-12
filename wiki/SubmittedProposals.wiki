@@ -1,0 +1,11 @@
+#summary List of Proposals that have been sent to the C++ Committee.
+
+Pending proposals:
+
+[http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3353.html]
+
+[http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3354.html]
+
+[http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3355.html]
+
+[http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3356.html]
