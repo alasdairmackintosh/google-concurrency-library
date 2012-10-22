@@ -38,11 +38,13 @@ using std::vector;
 
 namespace gcl {
 
+namespace pipeline {
+
 // BEGIN UTILITIES
 //TODO(aberkan): Common naming scheme
 //TODO(aberkan): Better commenting
 //TODO(aberkan): Move some of this out of this file
-//TODO(aberkan): Simplify filter and segment stuff
+//TODO(aberkan): Simplify filter_base and segment stuff
 //TODO(aberkan): Move excecution strategy to template parameter
 //TODO(aberkan): Reduce Cloning
 // TODO(alasdair): Remove debug methods (principally names for instances), or
@@ -53,7 +55,7 @@ namespace gcl {
 // Static variables used for assigning names and IDs to various
 // pipeline elements. These are very messy.
 
-std::atomic<int> FullPipelinePlan_id_count_(0);
+std::atomic<int> plan_id_count_(0);
 std::atomic<int> filter_thread_point_count(0);
 std::atomic<int> filter_count(0);
 std::atomic<int> segment_count(0);
@@ -71,15 +73,15 @@ const char* get_q_name(const char* prefix) {
 // END DEBUGGING VARIABLES
 
 
-class PipelineTerm { };
+class terminated { };
 
 template <typename T>
-PipelineTerm ignore(T t) { return PipelineTerm(); };
+terminated ignore(T t) { return terminated(); };
 
 template<typename T>
-PipelineTerm do_consume(std::function<void (T)> f, T t) {
+terminated do_consume(std::function<void (T)> f, T t) {
   f(t);
-  return PipelineTerm();
+  return terminated();
 }
 template<typename T>
 void call_and_close(std::function< void (queue_front<T>)> f,
@@ -99,17 +101,18 @@ static OUT_TYPE chain(std::function<INTERMEDIATE (IN_TYPE in)> intermediate_fn,
 
 template <typename IN,
           typename OUT>
-class filter {
+class filter_base {
  public:
-  filter() {
+  filter_base() {
     set_id();
   }
-  virtual ~filter() {};
+  virtual ~filter_base() {
+  }
   virtual OUT Apply(IN in) = 0;
-  virtual bool Run(std::function<PipelineTerm (OUT)> r) = 0;
+  virtual bool Run(std::function<terminated (OUT)> r) = 0;
   virtual bool Run() = 0;
   virtual void Close() = 0;
-  virtual filter<IN, OUT>* clone() const = 0;
+  virtual filter_base<IN, OUT>* clone() const = 0;
   // TODO(alasdair): Debug methods - remove this or formalise it.
   virtual string get_id() const = 0;
  protected:
@@ -120,15 +123,15 @@ class filter {
 };
 
 template <typename IN, typename OUT>
-class FullPipelinePlan;
+class segment;
 
-typedef FullPipelinePlan<PipelineTerm, PipelineTerm> PipelinePlan;
+typedef segment<terminated, terminated> plan;
 
-class PipelineExecution {
+class execution {
  public:
-  PipelineExecution(const PipelinePlan& pp, simple_thread_pool* pool);
+  execution(const plan& pp, simple_thread_pool* pool);
 
-  ~PipelineExecution();
+  ~execution();
 
   bool is_done() {
     return done_;
@@ -140,14 +143,14 @@ class PipelineExecution {
   }
   void cancel();
 
-  void execute(filter<PipelineTerm, PipelineTerm> *f);
+  void execute(filter_base<terminated, terminated> *f);
 
   void threads_done() {
     // This method is invoked after all threads have called
     // count_down_and_wait(), but not before they have all exited. To ensure
     // that a caller cannot return from wait() until all threads have exited
     // count_down_and_wait(), we reset the barrier, and re-use it for a final
-    // test in PipelineExecution::wait(). We clear the callback method for the
+    // test in execution::wait(). We clear the callback method for the
     // barrier so that this doesn't get called again.
     done_ = true;
     thread_end_->reset(static_cast<size_t>(1));
@@ -155,7 +158,7 @@ class PipelineExecution {
     end_.count_down();
   }
 
-  PipelinePlan* pp_;
+  plan* pp_;
   simple_thread_pool* pool_;
   countdown_latch start_;
   barrier* thread_end_;
@@ -168,10 +171,10 @@ class PipelineExecution {
 template <typename IN,
           typename MID,
           typename OUT>
-class filter_chain : public filter<IN, OUT> {
+class filter_chain : public filter_base<IN, OUT> {
  public:
-  filter_chain(class filter<IN, MID> *first,
-               class filter<MID, OUT> *second)
+  filter_chain(class filter_base<IN, MID> *first,
+               class filter_base<MID, OUT> *second)
       : first_(first),
         second_(second) {assert(first && second);};
   virtual ~filter_chain() {
@@ -181,18 +184,18 @@ class filter_chain : public filter<IN, OUT> {
   virtual OUT Apply(IN in) {
     return second_->Apply(first_->Apply(in));
   };
-  virtual filter<IN, OUT>* clone() const {
+  virtual filter_base<IN, OUT>* clone() const {
     return new filter_chain<IN, MID, OUT>(first_->clone(), second_->clone());
   };
   //TODO(aberkan): Make calling run on non-runnable a compile time error.
-  virtual bool Run(std::function<PipelineTerm (OUT)> r);
+  virtual bool Run(std::function<terminated (OUT)> r);
   virtual bool Run();
   virtual void Close() {
     first_->Close();
     second_->Close();
   }
-  class filter<IN, MID>* first_;
-  class filter<MID, OUT>* second_;
+  class filter_base<IN, MID>* first_;
+  class filter_base<MID, OUT>* second_;
 
   // TODO(alasdair): Debug method - remove this or formalise it.
   virtual string get_id() const {
@@ -206,11 +209,11 @@ class filter_chain : public filter<IN, OUT> {
 template <typename IN,
           typename MID,
           typename OUT>
-bool filter_chain<IN, MID, OUT>::Run(std::function<PipelineTerm (OUT)> r) {
-  std::function<OUT (MID)> m = std::bind(&filter<MID, OUT>::Apply, second_,
+bool filter_chain<IN, MID, OUT>::Run(std::function<terminated (OUT)> r) {
+  std::function<OUT (MID)> m = std::bind(&filter_base<MID, OUT>::Apply, second_,
                                          std::placeholders::_1);
-  std::function<PipelineTerm (MID)> p
-    = std::bind(chain<MID, OUT, PipelineTerm>, m, r, std::placeholders::_1);
+  std::function<terminated (MID)> p
+    = std::bind(chain<MID, OUT, terminated>, m, r, std::placeholders::_1);
   return first_->Run(p);
 };
 
@@ -218,19 +221,19 @@ template <typename IN,
           typename MID,
           typename OUT>
 bool filter_chain<IN, MID, OUT>::Run() {
-  std::function<OUT (MID)> m = std::bind(&filter<MID, OUT>::Apply, second_,
+  std::function<OUT (MID)> m = std::bind(&filter_base<MID, OUT>::Apply, second_,
                                          std::placeholders::_1);
-  std::function<PipelineTerm (OUT)> r = ignore<OUT>;
-  std::function<PipelineTerm (MID)> p =
-    std::bind(chain<MID, OUT, PipelineTerm>, m, r, std::placeholders::_1);
+  std::function<terminated (OUT)> r = ignore<OUT>;
+  std::function<terminated (MID)> p =
+    std::bind(chain<MID, OUT, terminated>, m, r, std::placeholders::_1);
   return first_->Run(p);
 };
 
-void Nothing() {};
+void nothing() {};
 
 template <typename IN,
           typename OUT>
-class filter_function : public filter<IN, OUT> {
+class filter_function : public filter_base<IN, OUT> {
  public:
   filter_function(std::function<OUT (IN)> f)
       : f_(f), close_(NULL) {
@@ -242,7 +245,7 @@ class filter_function : public filter<IN, OUT> {
   virtual OUT Apply(IN in) {
     return f_(in);
   }
-  virtual bool Run(std::function<PipelineTerm (OUT)> r) {
+  virtual bool Run(std::function<terminated (OUT)> r) {
     throw;
   }
   virtual bool Run() {
@@ -251,7 +254,7 @@ class filter_function : public filter<IN, OUT> {
   virtual void Close() {
     close_();
   }
-  virtual class filter<IN, OUT>* clone() const {
+  virtual class filter_base<IN, OUT>* clone() const {
     return new filter_function<IN, OUT>(f_, close_);
   }
   std::function<OUT (IN)> f_;
@@ -266,16 +269,16 @@ class filter_function : public filter<IN, OUT> {
 };
 
 template <typename OUT>
-class filter_thread_point : public filter<PipelineTerm, OUT> {
+class filter_thread_point : public filter_base<terminated, OUT> {
  public:
   filter_thread_point(queue_back<OUT> qb) : qb_(qb), name_(qb.name()) {
     set_id();
   };
   ~filter_thread_point() { };
-  virtual OUT Apply(PipelineTerm IN) {
+  virtual OUT Apply(terminated IN) {
     throw;
   }
-  virtual bool Run(std::function<PipelineTerm (OUT)> r) {
+  virtual bool Run(std::function<terminated (OUT)> r) {
     OUT out;
     // TODO(aberkan): What if this throws?
     queue_op_status status = qb_.wait_pop(out);
@@ -291,7 +294,7 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
 
   virtual void Close() { };
 
-  virtual filter<PipelineTerm, OUT>* clone() const {
+  virtual filter_base<terminated, OUT>* clone() const {
     return new filter_thread_point<OUT>(qb_);
   }
   queue_back<OUT> qb_;
@@ -312,13 +315,13 @@ class filter_thread_point : public filter<PipelineTerm, OUT> {
   const char* name_;
 };
 
-class filter_producer_point : public filter<PipelineTerm, PipelineTerm> {
+class filter_producer_point : public filter_base<terminated, terminated> {
  public:
   filter_producer_point(std::function<void ()> f) : f_(f) { };
-  virtual PipelineTerm Apply(PipelineTerm) {
+  virtual terminated Apply(terminated) {
     throw;
   }
-  virtual bool Run(std::function<PipelineTerm (PipelineTerm)> r) {
+  virtual bool Run(std::function<terminated (terminated)> r) {
     throw;
   }
   virtual bool Run() {
@@ -327,7 +330,7 @@ class filter_producer_point : public filter<PipelineTerm, PipelineTerm> {
   }
 
   virtual void Close() { };
-  virtual filter<PipelineTerm, PipelineTerm>* clone() const {
+  virtual filter_base<terminated, terminated>* clone() const {
     return new filter_producer_point(f_);
   }
   std::function<void ()> f_;
@@ -341,23 +344,23 @@ class filter_producer_point : public filter<PipelineTerm, PipelineTerm> {
 };
 
 template <typename OUT>
-class pipeline_segment {
+class run_point {
  public:
-  pipeline_segment(filter<PipelineTerm, OUT> *f,
-                   pipeline_segment<PipelineTerm> *next)
+  run_point(filter_base<terminated, OUT> *f,
+                   run_point<terminated> *next)
       : f_(f), next_(next) {
     set_id();
   };
-  virtual ~pipeline_segment() {
+  virtual ~run_point() {
     delete f_;
     delete next_;
   }
-  void Run(PipelineExecution* pex);
-  pipeline_segment<OUT> *clone() const {
-    return new pipeline_segment<OUT>(f_->clone(),
+  void Run(execution* pex);
+  run_point<OUT> *clone() const {
+    return new run_point<OUT>(f_->clone(),
                                      next_ ? next_->clone() : NULL);
   }
-  pipeline_segment<OUT>* add_segment(pipeline_segment<PipelineTerm>* p) {
+  run_point<OUT>* add_segment(run_point<terminated>* p) {
     if (next_) {
       next_->add_segment(p);
     } else {
@@ -366,8 +369,8 @@ class pipeline_segment {
     return this;
   }
 
-  filter<PipelineTerm, OUT> *f_;
-  pipeline_segment<PipelineTerm> *next_;
+  filter_base<terminated, OUT> *f_;
+  run_point<terminated> *next_;
 
   // TODO(alasdair): Debug method - remove this or formalise it.
   string get_id() const {
@@ -375,7 +378,7 @@ class pipeline_segment {
       return "NULL";
     } else {
       std::stringstream result;
-      result << "segment " << count_ << " filter [" << f_->get_id()
+      result << "segment " << count_ << " filter_base [" << f_->get_id()
              << "] -> next " << next_->get_id();
       return result.str();
     }
@@ -390,12 +393,12 @@ class pipeline_segment {
 };
 
 template <typename OUT>
-void pipeline_segment<OUT>::Run(PipelineExecution* pex) {
+void run_point<OUT>::Run(execution* pex) {
   throw;
 }
 
 template <>
-void pipeline_segment<PipelineTerm>::Run(PipelineExecution* pex) {
+void run_point<terminated>::Run(execution* pex) {
   pex->execute(f_);
   if(next_) {
     next_->Run(pex);
@@ -404,13 +407,13 @@ void pipeline_segment<PipelineTerm>::Run(PipelineExecution* pex) {
 
 template<typename MID,
          typename OUT>
-pipeline_segment<OUT>* chain(const pipeline_segment<MID>* p,
-                             const filter<MID, OUT>* f) {
-  pipeline_segment<OUT> *ps = new pipeline_segment<OUT>(
-      new filter_chain<PipelineTerm, MID, OUT>(p->f_->clone(),
-                                               f->clone()),
-      NULL);
-  return ps;
+run_point<OUT>* chain(const run_point<MID>* p, const filter_base<MID, OUT>* f) {
+  filter_base<terminated, MID> *blah = p->f_;
+  filter_base<terminated, MID> *f1 = blah->clone();
+  filter_base<MID, OUT> *f2 = f->clone();
+  filter_chain<terminated, MID, OUT> *fc =
+      new filter_chain<terminated, MID, OUT>(f1, f2);
+  return new run_point<OUT>(fc, NULL);
 }
 
 // END UTILITIES
@@ -419,18 +422,18 @@ pipeline_segment<OUT>* chain(const pipeline_segment<MID>* p,
 
 template<typename IN,
          typename OUT>
-class FullPipelinePlan {
+class segment {
  public:
-  FullPipelinePlan(filter<IN, PipelineTerm> *leading,
-                   pipeline_segment<PipelineTerm> *chain,
-                   pipeline_segment<OUT> *trailing)
+  segment(filter_base<IN, terminated> *leading,
+          run_point<terminated> *chain,
+          run_point<OUT> *trailing)
       : leading_(leading),
         chain_(chain),
         trailing_(trailing) {
     set_id();
   };
 
-  ~FullPipelinePlan() {
+  ~segment() {
     if (leading_) {
       delete leading_;
     }
@@ -441,42 +444,55 @@ class FullPipelinePlan {
       delete trailing_;
     }
   };
-  void run(PipelineExecution* pex);
-  filter<IN, PipelineTerm> *leading_clone() const {
+
+  segment(const segment<IN, OUT>& p) {
+    leading_ = p.leading_ ? p.leading_->clone() : NULL;
+    chain_ = p.chain_ ? p.chain_->clone() : NULL;
+    trailing_ = p.trailing_ ? p.trailing_->clone() : NULL;
+  }
+  segment(std::function<OUT (IN)>f);
+  segment(std::function<void (IN, queue_front<OUT>)> f);
+
+  typedef OUT out;
+  typedef IN in;
+
+  //
+  // Implementation:
+  //
+
+  void run(execution* pex);
+  filter_base<IN, terminated> *leading_clone() const {
     return leading_ ? leading_->clone() : NULL;
   }
-  pipeline_segment<PipelineTerm> *chain_clone() const {
+  run_point<terminated> *chain_clone() const {
     return chain_ ? chain_->clone() : NULL;
   }
-  pipeline_segment<OUT> *trailing_clone() const {
+  run_point<OUT> *trailing_clone() const {
     return trailing_ ? trailing_->clone() : NULL;
   }
 
-  FullPipelinePlan<IN, OUT>* clone() const {
-    return new FullPipelinePlan<IN, OUT>(leading_clone(),
+  segment<IN, OUT>* clone() const {
+    return new segment<IN, OUT>(leading_clone(),
                                          chain_clone(),
                                          trailing_clone());
   }
 
-  filter<IN, PipelineTerm> *leading_;
-  pipeline_segment<PipelineTerm> *chain_;
-  pipeline_segment<OUT> *trailing_;
-
-  typedef OUT out;
-  typedef IN in;
+  filter_base<IN, terminated> *leading_;
+  run_point<terminated> *chain_;
+  run_point<OUT> *trailing_;
 
 
   // TODO(alasdair): Debug method - remove this or formalise it.
   std::string get_id() {
     std::stringstream ss;
-    ss << "FullPipelinePlan-" << id_;
+    ss << "segment-" << id_;
     return ss.str();
   }
 
  private:
   // TODO(alasdair): Debug method - remove this or formalise it.
   void set_id() {
-    id_ = ++FullPipelinePlan_id_count_;
+    id_ = ++plan_id_count_;
   }
   int id_;
 };
@@ -486,32 +502,42 @@ class FullPipelinePlan {
 // BEGIN CONSTRUCTORS
 
 template<typename OUT>
-FullPipelinePlan<PipelineTerm, OUT> Source(queue_back<OUT> b) {
-  pipeline_segment<OUT>* p =
-      new pipeline_segment<OUT>(new filter_thread_point<OUT>(b), NULL);
-  return FullPipelinePlan<PipelineTerm, OUT>(NULL, NULL, p);
+segment<terminated, OUT> from(queue_back<OUT> b) {
+  run_point<OUT>* p =
+      new run_point<OUT>(new filter_thread_point<OUT>(b), NULL);
+  return segment<terminated, OUT>(NULL, NULL, p);
+}
+
+template<typename Q>
+segment<terminated, typename Q::value_type> from(Q& q) {
+  return from(q.back());
 }
 
 template<typename OUT>
-FullPipelinePlan<PipelineTerm, OUT> Produce(
+segment<terminated, OUT> produce(
     std::function<void (queue_front<OUT>)> f) {
   // TODO: ref counting queue, no limit
   CXX0X_AUTO_VAR( q, new queue_object<buffer_queue<OUT> >(
       10, get_q_name("produceq") ));
   filter_producer_point *fpp = new filter_producer_point(
       bind(call_and_close<OUT>, f, q));
-  pipeline_segment<PipelineTerm>* p1 =
-          new pipeline_segment<PipelineTerm>(
+  run_point<terminated>* p1 =
+          new run_point<terminated>(
               fpp, NULL);
-  pipeline_segment<OUT>* p2 =
-      new pipeline_segment<OUT>(
+  run_point<OUT>* p2 =
+      new run_point<OUT>(
           new filter_thread_point<OUT>(q), NULL);
-  return FullPipelinePlan<PipelineTerm, OUT>(NULL, p1, p2);
+  return segment<terminated, OUT>(NULL, p1, p2);
+}
+
+template<typename OUT>
+segment<terminated, OUT> produce(void f(queue_front<OUT>)) {
+  return produce(std::function<void (queue_front<OUT>)>(f));
 }
 
 template<typename IN,
          typename OUT>
-FullPipelinePlan<IN, OUT> Filter(std::function<OUT (IN)>f) {
+segment<IN, OUT>::segment(std::function<OUT (IN)> f) {
   // TODO: ref counting queue, no limit
   typedef queue_object< buffer_queue<OUT> > qtype;
   qtype* q = new qtype(10, get_q_name("filterq"));
@@ -523,108 +549,217 @@ FullPipelinePlan<IN, OUT> Filter(std::function<OUT (IN)>f) {
   std::function<void (IN)> f2 =
       std::bind(chain<IN, OUT, void>, f, f1, std::placeholders::_1);
 
-  std::function<PipelineTerm (IN)> f3 =  std::bind(do_consume<IN>, f2,
+  std::function<terminated (IN)> f3 =  std::bind(do_consume<IN>, f2,
                                                    std::placeholders::_1);
 
   std::function<void ()> f4 = bind(&qtype::close, q);
 
-  return FullPipelinePlan<IN, OUT>(
-      new filter_function<IN, PipelineTerm>(f3, f4), NULL,
-      new pipeline_segment<OUT>(
-          new filter_thread_point<OUT>(q->back()), NULL));
+  leading_ = new filter_function<IN, terminated>(f3, f4);
+  chain_ = NULL;
+  trailing_ = new run_point<OUT>(new filter_thread_point<OUT>(q->back()), NULL);
 }
 
 template<typename IN,
          typename OUT>
-FullPipelinePlan<IN, OUT> Filter(OUT f(IN)) {
-    return Filter(static_cast<std::function<OUT (IN)> >(f));
-}
-
-template<typename IN,
-         typename OUT>
-FullPipelinePlan<IN, OUT> Filter(
-    std::function<void (IN, queue_front<OUT>)> f) {
+segment<IN, OUT>::segment(std::function<void (IN, queue_front<OUT>)> f) {
   typedef queue_object< buffer_queue<OUT> > qtype;
   // TODO: ref counting queue, no limit
-  CXX0X_AUTO_VAR( q, new qtype(10, get_q_name("filter")));
+  CXX0X_AUTO_VAR( q, new qtype(10, get_q_name("filter_base")));
   // TODO: the queue is not deallocated
   std::function <void (IN)> ff = bind(f, std::placeholders::_1, q);
+  std::function<terminated (IN)> fz =  std::bind(do_consume<IN>, ff,
+                                                   std::placeholders::_1);
   std::function<void ()> f2 = bind(&qtype::close, q);
-  return Consume(ff, f2) | Source(q->back());
+
+  leading_ = new filter_function<IN, terminated>(fz, f2);
+  chain_ = NULL;
+  trailing_ = new run_point<OUT>(new filter_thread_point<OUT>(q->back()), NULL);
 }
 
 template<typename IN>
-FullPipelinePlan<IN, PipelineTerm> Consume(std::function<void (IN)> consumer,
-                                           std::function<void ()> close) {
-  return FullPipelinePlan<IN, PipelineTerm>(
-      new filter_function<IN, PipelineTerm>(bind(do_consume<IN>, consumer,
+segment<IN, terminated> consume(std::function<void (IN)> consumer,
+                               std::function<void ()> close = nothing) {
+  return segment<IN, terminated>(
+      new filter_function<IN, terminated>(bind(do_consume<IN>, consumer,
                                                  std::placeholders::_1), close),
       NULL, NULL);
 }
 
 template<typename IN>
-FullPipelinePlan<IN, PipelineTerm> Consume(void consumer(IN),
-                                           void close()) {
-  return Consume(static_cast<std::function<void (IN)> >(consumer),
+segment<IN, terminated> consume(void consumer(IN),
+                               void close() = nothing) {
+  return consume(static_cast<std::function<void (IN)> >(consumer),
                  static_cast<std::function<void ()> >(close));
 }
 
 template<typename IN>
-FullPipelinePlan<IN, PipelineTerm> SinkAndClose(queue_front<IN> front) {
+segment<IN, terminated> to(queue_front<IN> front) {
   void (queue_front<IN>::*push)(const IN&) = &queue_front<IN>::push;
   std::function<void (IN)> f1 = std::bind(push, front,
                                           std::placeholders::_1);
   std::function<void ()> f2 = std::bind(&queue_front<IN>::close, front);
-  return Consume(f1, f2);
+  return consume(f1, f2);
 }
 
-// This can take Full or Simple PipelinePlans
+template<typename Q>
+segment<typename Q::value_type, terminated> to(Q& q) {
+  return to(q.front());
+}
+
+
+template<typename IN,
+         typename OUT>
+segment<IN, OUT> make_segment(std::function<OUT (IN)> f) {
+  return segment<IN, OUT>(f);
+}
+
+template<typename IN,
+         typename OUT>
+segment<IN, OUT> make_segment(OUT f(IN)) {
+  return segment<IN, OUT>(std::function<OUT (IN)>(f));
+}
+
+template<typename IN,
+         typename OUT>
+segment<IN, OUT> make_segment(std::function<void (IN, queue_front<OUT>)> f) {
+  return segment<IN, OUT>(f);
+}
+
+template<typename IN,
+         typename OUT>
+segment<IN, OUT> make_segment(void f(IN, queue_front<OUT>)) {
+  return segment<IN, OUT>(std::function<void (IN, queue_front<OUT>)>(f));
+}
+
+// This can take Full or Simple pipeline
 template<typename T>
-FullPipelinePlan<typename T::in, typename T::out> Parallel(T p) {
+segment<typename T::in, typename T::out> parallel(T p) {
   // TODO: ref counting queue, no limit
   CXX0X_AUTO_VAR( qp, new queue_object<buffer_queue<typename T::in> >(10) );
 
 #if 0
   // TODO(alasdair): Fix Parallel test. The code as written gives us an access
-  // violation because we are deleting a FullPipelinePlan twice. The code in
+  // violation because we are deleting a segment twice. The code in
   // this #if 0 block doesn't give the error, but never terminates. WTF?
-  CXX0X_AUTO_VAR( src, Source(qp->back()) | p);
-  return SinkAndClose(qp->front()) | src;
+  CXX0X_AUTO_VAR( src, from(qp->back()) | p);
+  return to(qp->front()) | src;
 #endif
 
-  return SinkAndClose(qp->front()) | Source(qp->back()) | p;
+  return to(qp->front()) | from(qp->back()) | p;
 }
 
 // END CONSTRUCTORS
 
 // BEGIN PIPES
+//
+// 1:1 MID->OUT
 template<typename IN,
          typename MID,
          typename OUT>
-FullPipelinePlan<IN, OUT> operator|(const FullPipelinePlan<IN, MID>& p1,
-                                    const FullPipelinePlan<MID, OUT>& p2) {
-  pipeline_segment<PipelineTerm> *p =
-      chain(p1.trailing_, p2.leading_)->add_segment(p2.chain_clone());
+segment<IN, OUT> operator|(const segment<IN, MID>& p1,
+                           const segment<MID, OUT>& p2) {
+  run_point<terminated> *p =
+      chain(p1.trailing_, p2.leading_);
+  p->add_segment(p2.chain_clone());
+
   if (p1.chain_) {
     p = p1.chain_clone()->add_segment(p);
   }
-  return FullPipelinePlan<IN, OUT>(p1.leading_clone(),
-                               p,
-                               p2.trailing_clone());
+  return segment<IN, OUT>(p1.leading_clone(),
+                          p,
+                          p2.trailing_clone());
 }
 
 template<typename IN,
+         typename MID,
          typename OUT>
-FullPipelinePlan<IN, OUT> operator|(
-    const FullPipelinePlan<IN, PipelineTerm>& p1,
-    const FullPipelinePlan<PipelineTerm, OUT>& p2) {
-  pipeline_segment<PipelineTerm> *p = NULL;
+segment<IN, OUT> operator|(const segment<IN, MID>& p1,
+                           std::function<OUT (MID)> f) {
+  return p1 | make_segment(f);
+}
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+segment<IN, OUT> operator|(const segment<IN, MID>& p1,
+                           OUT f(MID)) {
+  return p1 | make_segment(f);
+}
+
+// disconnected pipe linker
+template<typename IN,
+         typename OUT>
+segment<IN, OUT> operator|(
+    const segment<IN, terminated>& p1,
+    const segment<terminated, OUT>& p2) {
+  run_point<terminated> *p = NULL;
   if (p1.chain_) {
     p = p1.chain_clone();
   }
-  return FullPipelinePlan<IN, OUT>(p1.leading_clone(),
-                                   p,
-                                   p2.trailing_clone());
+  return segment<IN, OUT>(p1.leading_clone(),
+                          p,
+                          p2.trailing_clone());
+}
+
+// 1:N MID->OUT
+template<typename IN,
+         typename MID,
+         typename OUT>
+segment<IN, OUT> operator|(const segment<IN, MID>& p1,
+                           std::function<void (MID, queue_front<OUT>)> f) {
+  return p1 | make_segment(f);
+}
+
+template<typename IN,
+         typename MID,
+         typename OUT>
+segment<IN, OUT> operator|(const segment<IN, MID>& p1,
+                           void f(MID, queue_front<OUT>)) {
+  return p1 | make_segment(f);
+}
+
+// 1:0 MID->OUT
+template<typename IN,
+         typename MID>
+segment<IN, terminated> operator|(const segment<IN, MID>& p1,
+                                  std::function<void (MID)> f) {
+  return p1 | consume(f);
+}
+
+template<typename IN,
+         typename MID>
+segment<IN, terminated> operator|(const segment<IN, MID>& p1,
+                                  void f(MID)) {
+  return p1 | consume(f);
+}
+
+
+template<typename MID,
+         typename OUT>
+segment<MID, terminated> operator|(queue_back<MID> back,
+                                   const segment<MID, OUT>& p1) {
+  return from(back) | p1;
+}
+
+template<typename OUT,
+         typename Q>
+segment<terminated, OUT> operator|(Q& q,
+                                  const segment<typename Q::value_type, OUT>& p1) {
+  return from(q) | p1;
+}
+
+template<typename IN,
+         typename MID>
+segment<IN, terminated> operator|(const segment<IN, MID>& p1,
+                                  queue_front<MID> front) {
+  return p1 | to(front);
+}
+
+template<typename IN,
+         typename Q>
+segment<IN, terminated> operator|(const segment<IN, typename Q::value_type>& p1,
+                                  Q& q) {
+  return p1 | to(q);
 }
 
 // END PIPES
@@ -632,8 +767,8 @@ FullPipelinePlan<IN, OUT> operator|(
 // START PIPELINE IMPLEMENTATION
 
 template<>
-void FullPipelinePlan<PipelineTerm, PipelineTerm>::run(
-    PipelineExecution* pex) {
+void segment<terminated, terminated>::run(
+    execution* pex) {
   if(chain_) {
     chain_->Run(pex);
   }
@@ -646,8 +781,8 @@ void FullPipelinePlan<PipelineTerm, PipelineTerm>::run(
 
 // START PIPELINE_EXECUTION IMPLEMENTATION
 
-void RunFilter(PipelineExecution* pex,
-               filter<PipelineTerm, PipelineTerm> *f) {
+void RunFilter(execution* pex,
+               filter_base<terminated, terminated> *f) {
   pex->start_.wait();
   bool b = true;
   while (b) {
@@ -658,24 +793,26 @@ void RunFilter(PipelineExecution* pex,
   pex->thread_end_->count_down_and_wait();
 }
 
-PipelineExecution::PipelineExecution(const PipelinePlan& pp,
-                                     simple_thread_pool* pool)
+execution::execution(const plan& pp, simple_thread_pool* pool)
       : pp_(pp.clone()), pool_(pool),
         start_(1), thread_end_(NULL), end_(1),
         num_threads_(0), done_(false) {
   pp_->run(this);
   thread_end_ = new barrier(num_threads_,
-                            std::bind(&PipelineExecution::threads_done, this));
+                            std::bind(&execution::threads_done, this));
   start_.count_down();  // Start the threads
 }
 
-PipelineExecution::~PipelineExecution() {
+// TODO(aberkan): Should we allow the destructor to be non-blocking (i.e. thread
+// semantics).  We'd have to manage resources in a separate object that would be
+// shared by the pipeline and the execution objects.
+execution::~execution() {
   wait();
   delete pp_;
   delete thread_end_;
 }
 
-void PipelineExecution::execute(filter<PipelineTerm, PipelineTerm> *f) {
+void execution::execute(filter_base<terminated, terminated> *f) {
   num_threads_++;
   pool_->try_get_unused_thread()->execute(std::bind(RunFilter, this, f));
 }
@@ -684,6 +821,7 @@ void PipelineExecution::execute(filter<PipelineTerm, PipelineTerm> *f) {
 // END PIPELINE_EXECUTION IMPLEMENTATION
 
 
+} // namespace pipeline
 
-} // namespace
+} // namespace gcl
 #endif  // GCL_PIPELINE_
