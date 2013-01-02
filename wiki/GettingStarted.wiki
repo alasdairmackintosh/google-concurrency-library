@@ -49,4 +49,4 @@ If you don't want to edit the wiki from the browser, do this:
   * Checkout the wiki files from the repository. `svn checkout https://google-concurrency-library.googlecode.com/svn/wiki` (This will create a new directory with all wiki pages. Do it once)
   * Edit the wiki page using your favourite editor.
   * Commit the changes as described above. 
-  * `hg commit -m "Edited wiki" && hg push`
+  * `svn commit -m "Edited wiki" && hg push`
