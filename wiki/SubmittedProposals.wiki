@@ -9,3 +9,5 @@ Pending proposals:
 [http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3355.html]
 
 [http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3356.html]
+
+[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3446.pdf]
