@@ -99,11 +99,11 @@ void trylock(stream_mutex<std::ostream>& mstream)
 const int limit = 1000;
 
 std::ostringstream stream;
-stream_mutex<std::ostream> mostrs(stream);
 
 template <void Function(stream_mutex<std::ostream>& sm)>
 void writer()
 {
+    stream_mutex<std::ostream> mostrs(stream);
     for ( int i = 0; i < limit; ++i )
         Function(mostrs);
 }
@@ -129,6 +129,7 @@ class LockStreamTest
 
 // Verify sequential operation
 TEST_F(LockStreamTest, Sequential) {
+    stream_mutex<std::ostream> mostrs(stream);
     implicit(mostrs);
     holding(mostrs);
     block(mostrs);

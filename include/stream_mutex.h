@@ -15,9 +15,12 @@
 #ifndef STREAM_MUTEX_H
 #define STREAM_MUTEX_H
 
+#include "unordered_map.h"
 #include "mutex.h"
 
 #include "cxx0x.h"
+
+extern recursive_mutex* get_stream_mutex_map( void *stm_ptr );
 
 template <class Stream >
 class stream_mutex;
@@ -39,15 +42,16 @@ template <class Stream >
 class stream_mutex
 {
   public:
-    CXX0X_CONSTEXPR_CTOR stream_mutex(Stream& stm) : stm_(stm) { }
-    void lock() { mtx_.lock(); }
-    void unlock() { mtx_.unlock(); }
-    bool try_lock() { return mtx_.try_lock(); }
+    stream_mutex(Stream& stm)
+        : stm_(stm), mtx_( get_stream_mutex_map( &stm ) ) { }
+    void lock() { mtx_->lock(); }
+    void unlock() { mtx_->unlock(); }
+    bool try_lock() { return mtx_->try_lock(); }
     stream_guard<Stream> hold() { return stream_guard<Stream>(*this); }
     Stream& bypass() { return stm_; }
   private:
     Stream& stm_;
-    recursive_mutex mtx_;
+    recursive_mutex* mtx_;
 };
 
 template <class Stream >
