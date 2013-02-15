@@ -42,23 +42,9 @@
 #include <ostream>  // NOLINT
 #include <string>
 
-#include <gmock/internal/gmock-generated-internal-utils.h>
-#include <gmock/internal/gmock-port.h>
-#include <gtest/gtest.h>
-
-// Concatenates two pre-processor symbols; works for concatenating
-// built-in macros like __FILE__ and __LINE__.
-#define GMOCK_CONCAT_TOKEN_IMPL_(foo, bar) foo##bar
-#define GMOCK_CONCAT_TOKEN_(foo, bar) GMOCK_CONCAT_TOKEN_IMPL_(foo, bar)
-
-#ifdef __GNUC__
-#define GMOCK_ATTRIBUTE_UNUSED_ __attribute__ ((unused))
-#else
-#define GMOCK_ATTRIBUTE_UNUSED_
-#endif  // __GNUC__
-
-class ProtocolMessage;
-namespace proto2 { class Message; }
+#include "gmock/internal/gmock-generated-internal-utils.h"
+#include "gmock/internal/gmock-port.h"
+#include "gtest/gtest.h"
 
 namespace testing {
 namespace internal {
@@ -68,66 +54,6 @@ namespace internal {
 // treated as one word.  For example, both "FooBar123" and
 // "foo_bar_123" are converted to "foo bar 123".
 string ConvertIdentifierNameToWords(const char* id_name);
-
-// Defining a variable of type CompileAssertTypesEqual<T1, T2> will cause a
-// compiler error iff T1 and T2 are different types.
-template <typename T1, typename T2>
-struct CompileAssertTypesEqual;
-
-template <typename T>
-struct CompileAssertTypesEqual<T, T> {
-};
-
-// Removes the reference from a type if it is a reference type,
-// otherwise leaves it unchanged.  This is the same as
-// tr1::remove_reference, which is not widely available yet.
-template <typename T>
-struct RemoveReference { typedef T type; };  // NOLINT
-template <typename T>
-struct RemoveReference<T&> { typedef T type; };  // NOLINT
-
-// A handy wrapper around RemoveReference that works when the argument
-// T depends on template parameters.
-#define GMOCK_REMOVE_REFERENCE_(T) \
-    typename ::testing::internal::RemoveReference<T>::type
-
-// Removes const from a type if it is a const type, otherwise leaves
-// it unchanged.  This is the same as tr1::remove_const, which is not
-// widely available yet.
-template <typename T>
-struct RemoveConst { typedef T type; };  // NOLINT
-template <typename T>
-struct RemoveConst<const T> { typedef T type; };  // NOLINT
-
-// A handy wrapper around RemoveConst that works when the argument
-// T depends on template parameters.
-#define GMOCK_REMOVE_CONST_(T) \
-    typename ::testing::internal::RemoveConst<T>::type
-
-// Adds reference to a type if it is not a reference type,
-// otherwise leaves it unchanged.  This is the same as
-// tr1::add_reference, which is not widely available yet.
-template <typename T>
-struct AddReference { typedef T& type; };  // NOLINT
-template <typename T>
-struct AddReference<T&> { typedef T& type; };  // NOLINT
-
-// A handy wrapper around AddReference that works when the argument T
-// depends on template parameters.
-#define GMOCK_ADD_REFERENCE_(T) \
-    typename ::testing::internal::AddReference<T>::type
-
-// Adds a reference to const on top of T as necessary.  For example,
-// it transforms
-//
-//   char         ==> const char&
-//   const char   ==> const char&
-//   char&        ==> const char&
-//   const char&  ==> const char&
-//
-// The argument T must depend on some template parameters.
-#define GMOCK_REFERENCE_TO_CONST_(T) \
-    GMOCK_ADD_REFERENCE_(const GMOCK_REMOVE_REFERENCE_(T))
 
 // PointeeOf<Pointer>::type is the type of a value pointed to by a
 // Pointer, which can be either a smart pointer or a raw pointer.  The
@@ -157,86 +83,176 @@ inline Element* GetRawPointer(Element* p) { return p; }
 // This comparator allows linked_ptr to be stored in sets.
 template <typename T>
 struct LinkedPtrLessThan {
-  bool operator()(const ::testing::internal::linked_ptr<T>& lhs, 
+  bool operator()(const ::testing::internal::linked_ptr<T>& lhs,
                   const ::testing::internal::linked_ptr<T>& rhs) const {
     return lhs.get() < rhs.get();
   }
 };
 
-// ImplicitlyConvertible<From, To>::value is a compile-time bool
-// constant that's true iff type From can be implicitly converted to
-// type To.
-template <typename From, typename To>
-class ImplicitlyConvertible {
- private:
-  // We need the following helper functions only for their types.
-  // They have no implementations.
-
-  // MakeFrom() is an expression whose type is From.  We cannot simply
-  // use From(), as the type From may not have a public default
-  // constructor.
-  static From MakeFrom();
-
-  // These two functions are overloaded.  Given an expression
-  // Helper(x), the compiler will pick the first version if x can be
-  // implicitly converted to type To; otherwise it will pick the
-  // second version.
-  //
-  // The first version returns a value of size 1, and the second
-  // version returns a value of size 2.  Therefore, by checking the
-  // size of Helper(x), which can be done at compile time, we can tell
-  // which version of Helper() is used, and hence whether x can be
-  // implicitly converted to type To.
-  static char Helper(To);
-  static char (&Helper(...))[2];  // NOLINT
-
-  // We have to put the 'public' section after the 'private' section,
-  // or MSVC refuses to compile the code.
- public:
-  // MSVC warns about implicitly converting from double to int for
-  // possible loss of data, so we need to temporarily disable the
-  // warning.
-#ifdef _MSC_VER
-#pragma warning(push)          // Saves the current warning state.
-#pragma warning(disable:4244)  // Temporarily disables warning 4244.
-  static const bool value =
-      sizeof(Helper(ImplicitlyConvertible::MakeFrom())) == 1;
-#pragma warning(pop)           // Restores the warning state.
+// Symbian compilation can be done with wchar_t being either a native
+// type or a typedef.  Using Google Mock with OpenC without wchar_t
+// should require the definition of _STLP_NO_WCHAR_T.
+//
+// MSVC treats wchar_t as a native type usually, but treats it as the
+// same as unsigned short when the compiler option /Zc:wchar_t- is
+// specified.  It defines _NATIVE_WCHAR_T_DEFINED symbol when wchar_t
+// is a native type.
+#if (GTEST_OS_SYMBIAN && defined(_STLP_NO_WCHAR_T)) || \
+    (defined(_MSC_VER) && !defined(_NATIVE_WCHAR_T_DEFINED))
+// wchar_t is a typedef.
 #else
-  static const bool value =
-      sizeof(Helper(ImplicitlyConvertible::MakeFrom())) == 1;
-#endif  // _MSV_VER
+# define GMOCK_WCHAR_T_IS_NATIVE_ 1
+#endif
+
+// signed wchar_t and unsigned wchar_t are NOT in the C++ standard.
+// Using them is a bad practice and not portable.  So DON'T use them.
+//
+// Still, Google Mock is designed to work even if the user uses signed
+// wchar_t or unsigned wchar_t (obviously, assuming the compiler
+// supports them).
+//
+// To gcc,
+//   wchar_t == signed wchar_t != unsigned wchar_t == unsigned int
+#ifdef __GNUC__
+// signed/unsigned wchar_t are valid types.
+# define GMOCK_HAS_SIGNED_WCHAR_T_ 1
+#endif
+
+// In what follows, we use the term "kind" to indicate whether a type
+// is bool, an integer type (excluding bool), a floating-point type,
+// or none of them.  This categorization is useful for determining
+// when a matcher argument type can be safely converted to another
+// type in the implementation of SafeMatcherCast.
+enum TypeKind {
+  kBool, kInteger, kFloatingPoint, kOther
 };
+
+// KindOf<T>::value is the kind of type T.
+template <typename T> struct KindOf {
+  enum { value = kOther };  // The default kind.
+};
+
+// This macro declares that the kind of 'type' is 'kind'.
+#define GMOCK_DECLARE_KIND_(type, kind) \
+  template <> struct KindOf<type> { enum { value = kind }; }
+
+GMOCK_DECLARE_KIND_(bool, kBool);
+
+// All standard integer types.
+GMOCK_DECLARE_KIND_(char, kInteger);
+GMOCK_DECLARE_KIND_(signed char, kInteger);
+GMOCK_DECLARE_KIND_(unsigned char, kInteger);
+GMOCK_DECLARE_KIND_(short, kInteger);  // NOLINT
+GMOCK_DECLARE_KIND_(unsigned short, kInteger);  // NOLINT
+GMOCK_DECLARE_KIND_(int, kInteger);
+GMOCK_DECLARE_KIND_(unsigned int, kInteger);
+GMOCK_DECLARE_KIND_(long, kInteger);  // NOLINT
+GMOCK_DECLARE_KIND_(unsigned long, kInteger);  // NOLINT
+
+#if GMOCK_WCHAR_T_IS_NATIVE_
+GMOCK_DECLARE_KIND_(wchar_t, kInteger);
+#endif
+
+// Non-standard integer types.
+GMOCK_DECLARE_KIND_(Int64, kInteger);
+GMOCK_DECLARE_KIND_(UInt64, kInteger);
+
+// All standard floating-point types.
+GMOCK_DECLARE_KIND_(float, kFloatingPoint);
+GMOCK_DECLARE_KIND_(double, kFloatingPoint);
+GMOCK_DECLARE_KIND_(long double, kFloatingPoint);
+
+#undef GMOCK_DECLARE_KIND_
+
+// Evaluates to the kind of 'type'.
+#define GMOCK_KIND_OF_(type) \
+  static_cast< ::testing::internal::TypeKind>( \
+      ::testing::internal::KindOf<type>::value)
+
+// Evaluates to true iff integer type T is signed.
+#define GMOCK_IS_SIGNED_(T) (static_cast<T>(-1) < 0)
+
+// LosslessArithmeticConvertibleImpl<kFromKind, From, kToKind, To>::value
+// is true iff arithmetic type From can be losslessly converted to
+// arithmetic type To.
+//
+// It's the user's responsibility to ensure that both From and To are
+// raw (i.e. has no CV modifier, is not a pointer, and is not a
+// reference) built-in arithmetic types, kFromKind is the kind of
+// From, and kToKind is the kind of To; the value is
+// implementation-defined when the above pre-condition is violated.
+template <TypeKind kFromKind, typename From, TypeKind kToKind, typename To>
+struct LosslessArithmeticConvertibleImpl : public false_type {};
+
+// Converting bool to bool is lossless.
+template <>
+struct LosslessArithmeticConvertibleImpl<kBool, bool, kBool, bool>
+    : public true_type {};  // NOLINT
+
+// Converting bool to any integer type is lossless.
+template <typename To>
+struct LosslessArithmeticConvertibleImpl<kBool, bool, kInteger, To>
+    : public true_type {};  // NOLINT
+
+// Converting bool to any floating-point type is lossless.
+template <typename To>
+struct LosslessArithmeticConvertibleImpl<kBool, bool, kFloatingPoint, To>
+    : public true_type {};  // NOLINT
+
+// Converting an integer to bool is lossy.
+template <typename From>
+struct LosslessArithmeticConvertibleImpl<kInteger, From, kBool, bool>
+    : public false_type {};  // NOLINT
+
+// Converting an integer to another non-bool integer is lossless iff
+// the target type's range encloses the source type's range.
 template <typename From, typename To>
-const bool ImplicitlyConvertible<From, To>::value;
+struct LosslessArithmeticConvertibleImpl<kInteger, From, kInteger, To>
+    : public bool_constant<
+      // When converting from a smaller size to a larger size, we are
+      // fine as long as we are not converting from signed to unsigned.
+      ((sizeof(From) < sizeof(To)) &&
+       (!GMOCK_IS_SIGNED_(From) || GMOCK_IS_SIGNED_(To))) ||
+      // When converting between the same size, the signedness must match.
+      ((sizeof(From) == sizeof(To)) &&
+       (GMOCK_IS_SIGNED_(From) == GMOCK_IS_SIGNED_(To)))> {};  // NOLINT
 
-// IsAProtocolMessage<T>::value is a compile-time bool constant that's
-// true iff T is type ProtocolMessage, proto2::Message, or a subclass
-// of those.
-template <typename T>
-struct IsAProtocolMessage {
-  static const bool value =
-      ImplicitlyConvertible<const T*, const ::ProtocolMessage*>::value ||
-      ImplicitlyConvertible<const T*, const ::proto2::Message*>::value;
-};
-template <typename T>
-const bool IsAProtocolMessage<T>::value;
+#undef GMOCK_IS_SIGNED_
 
-// When the compiler sees expression IsContainerTest<C>(0), the first
-// overload of IsContainerTest will be picked if C is an STL-style
-// container class (since C::const_iterator* is a valid type and 0 can
-// be converted to it), while the second overload will be picked
-// otherwise (since C::const_iterator will be an invalid type in this
-// case).  Therefore, we can determine whether C is a container class
-// by checking the type of IsContainerTest<C>(0).  The value of the
-// expression is insignificant.
-typedef int IsContainer;
-template <class C>
-IsContainer IsContainerTest(typename C::const_iterator*) { return 0; }
+// Converting an integer to a floating-point type may be lossy, since
+// the format of a floating-point number is implementation-defined.
+template <typename From, typename To>
+struct LosslessArithmeticConvertibleImpl<kInteger, From, kFloatingPoint, To>
+    : public false_type {};  // NOLINT
 
-typedef char IsNotContainer;
-template <class C>
-IsNotContainer IsContainerTest(...) { return '\0'; }
+// Converting a floating-point to bool is lossy.
+template <typename From>
+struct LosslessArithmeticConvertibleImpl<kFloatingPoint, From, kBool, bool>
+    : public false_type {};  // NOLINT
+
+// Converting a floating-point to an integer is lossy.
+template <typename From, typename To>
+struct LosslessArithmeticConvertibleImpl<kFloatingPoint, From, kInteger, To>
+    : public false_type {};  // NOLINT
+
+// Converting a floating-point to another floating-point is lossless
+// iff the target type is at least as big as the source type.
+template <typename From, typename To>
+struct LosslessArithmeticConvertibleImpl<
+  kFloatingPoint, From, kFloatingPoint, To>
+    : public bool_constant<sizeof(From) <= sizeof(To)> {};  // NOLINT
+
+// LosslessArithmeticConvertible<From, To>::value is true iff arithmetic
+// type From can be losslessly converted to arithmetic type To.
+//
+// It's the user's responsibility to ensure that both From and To are
+// raw (i.e. has no CV modifier, is not a pointer, and is not a
+// reference) built-in arithmetic types; the value is
+// implementation-defined when the above pre-condition is violated.
+template <typename From, typename To>
+struct LosslessArithmeticConvertible
+    : public LosslessArithmeticConvertibleImpl<
+  GMOCK_KIND_OF_(From), From, GMOCK_KIND_OF_(To), To> {};  // NOLINT
 
 // This interface knows how to report a Google Mock failure (either
 // non-fatal or fatal).
@@ -289,7 +305,7 @@ inline void Expect(bool condition, const char* file, int line) {
 // Severity level of a log.
 enum LogSeverity {
   INFO = 0,
-  WARNING = 1,
+  WARNING = 1
 };
 
 // Valid values for the --gmock_verbose flag.
@@ -301,6 +317,10 @@ const char kWarningVerbosity[] = "warning";
 // No logs are printed.
 const char kErrorVerbosity[] = "error";
 
+// Returns true iff a log with the given severity is visible according
+// to the --gmock_verbose flag.
+bool LogIsVisible(LogSeverity severity);
+
 // Prints the given message to stdout iff 'severity' >= the level
 // specified by the --gmock_verbose flag.  If stack_frames_to_skip >=
 // 0, also prints the stack trace excluding the top
@@ -310,9 +330,7 @@ const char kErrorVerbosity[] = "error";
 // conservative.
 void Log(LogSeverity severity, const string& message, int stack_frames_to_skip);
 
-// The universal value printer (public/gmock-printers.h) needs this
-// to declare an unused << operator in the global namespace.
-struct Unused {};
+// TODO(wan@google.com): group all type utilities together.
 
 // Type traits.
 
@@ -325,8 +343,8 @@ template <typename T1, typename T2> struct type_equals : public false_type {};
 template <typename T> struct type_equals<T, T> : public true_type {};
 
 // remove_reference<T>::type removes the reference from type T, if any.
-template <typename T> struct remove_reference { typedef T type; };
-template <typename T> struct remove_reference<T&> { typedef T type; };
+template <typename T> struct remove_reference { typedef T type; };  // NOLINT
+template <typename T> struct remove_reference<T&> { typedef T type; }; // NOLINT
 
 // Invalid<T>() returns an invalid value of type T.  This is useful
 // when a value of type T is needed for compilation, but the statement
@@ -338,6 +356,106 @@ inline T Invalid() {
 }
 template <>
 inline void Invalid<void>() {}
+
+// Given a raw type (i.e. having no top-level reference or const
+// modifier) RawContainer that's either an STL-style container or a
+// native array, class StlContainerView<RawContainer> has the
+// following members:
+//
+//   - type is a type that provides an STL-style container view to
+//     (i.e. implements the STL container concept for) RawContainer;
+//   - const_reference is a type that provides a reference to a const
+//     RawContainer;
+//   - ConstReference(raw_container) returns a const reference to an STL-style
+//     container view to raw_container, which is a RawContainer.
+//   - Copy(raw_container) returns an STL-style container view of a
+//     copy of raw_container, which is a RawContainer.
+//
+// This generic version is used when RawContainer itself is already an
+// STL-style container.
+template <class RawContainer>
+class StlContainerView {
+ public:
+  typedef RawContainer type;
+  typedef const type& const_reference;
+
+  static const_reference ConstReference(const RawContainer& container) {
+    // Ensures that RawContainer is not a const type.
+    testing::StaticAssertTypeEq<RawContainer,
+        GTEST_REMOVE_CONST_(RawContainer)>();
+    return container;
+  }
+  static type Copy(const RawContainer& container) { return container; }
+};
+
+// This specialization is used when RawContainer is a native array type.
+template <typename Element, size_t N>
+class StlContainerView<Element[N]> {
+ public:
+  typedef GTEST_REMOVE_CONST_(Element) RawElement;
+  typedef internal::NativeArray<RawElement> type;
+  // NativeArray<T> can represent a native array either by value or by
+  // reference (selected by a constructor argument), so 'const type'
+  // can be used to reference a const native array.  We cannot
+  // 'typedef const type& const_reference' here, as that would mean
+  // ConstReference() has to return a reference to a local variable.
+  typedef const type const_reference;
+
+  static const_reference ConstReference(const Element (&array)[N]) {
+    // Ensures that Element is not a const type.
+    testing::StaticAssertTypeEq<Element, RawElement>();
+#if GTEST_OS_SYMBIAN
+    // The Nokia Symbian compiler confuses itself in template instantiation
+    // for this call without the cast to Element*:
+    // function call '[testing::internal::NativeArray<char *>].NativeArray(
+    //     {lval} const char *[4], long, testing::internal::RelationToSource)'
+    //     does not match
+    // 'testing::internal::NativeArray<char *>::NativeArray(
+    //     char *const *, unsigned int, testing::internal::RelationToSource)'
+    // (instantiating: 'testing::internal::ContainsMatcherImpl
+    //     <const char * (&)[4]>::Matches(const char * (&)[4]) const')
+    // (instantiating: 'testing::internal::StlContainerView<char *[4]>::
+    //     ConstReference(const char * (&)[4])')
+    // (and though the N parameter type is mismatched in the above explicit
+    // conversion of it doesn't help - only the conversion of the array).
+    return type(const_cast<Element*>(&array[0]), N, kReference);
+#else
+    return type(array, N, kReference);
+#endif  // GTEST_OS_SYMBIAN
+  }
+  static type Copy(const Element (&array)[N]) {
+#if GTEST_OS_SYMBIAN
+    return type(const_cast<Element*>(&array[0]), N, kCopy);
+#else
+    return type(array, N, kCopy);
+#endif  // GTEST_OS_SYMBIAN
+  }
+};
+
+// This specialization is used when RawContainer is a native array
+// represented as a (pointer, size) tuple.
+template <typename ElementPointer, typename Size>
+class StlContainerView< ::std::tr1::tuple<ElementPointer, Size> > {
+ public:
+  typedef GTEST_REMOVE_CONST_(
+      typename internal::PointeeOf<ElementPointer>::type) RawElement;
+  typedef internal::NativeArray<RawElement> type;
+  typedef const type const_reference;
+
+  static const_reference ConstReference(
+      const ::std::tr1::tuple<ElementPointer, Size>& array) {
+    using ::std::tr1::get;
+    return type(get<0>(array), get<1>(array), kReference);
+  }
+  static type Copy(const ::std::tr1::tuple<ElementPointer, Size>& array) {
+    using ::std::tr1::get;
+    return type(get<0>(array), get<1>(array), kCopy);
+  }
+};
+
+// The following specialization prevents the user from instantiating
+// StlContainer with a reference type.
+template <typename T> class StlContainerView<T&>;
 
 }  // namespace internal
 }  // namespace testing
