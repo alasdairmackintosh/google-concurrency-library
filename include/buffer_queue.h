@@ -52,16 +52,19 @@ class buffer_queue
     bool is_empty();
 
     Value value_pop();
-    queue_op_status try_pop(Value&);
     queue_op_status wait_pop(Value&);
+    queue_op_status try_pop(Value&);
+    queue_op_status nonblocking_pop(Value&);
 
     void push(const Value& x);
-    queue_op_status try_push(const Value& x);
     queue_op_status wait_push(const Value& x);
+    queue_op_status try_push(const Value& x);
+    queue_op_status nonblocking_push(const Value& x);
 #ifdef HAS_CXX0X_RVREF
     void push(Value&& x);
-    queue_op_status try_push(Value&& x);
     queue_op_status wait_push(Value&& x);
+    queue_op_status try_push(Value&& x);
+    queue_op_status nonblocking_push(Value&& x);
 #endif
 
     const char* name();
@@ -85,6 +88,12 @@ class buffer_queue
     void iter_init(size_t max_elems, Iter first, Iter last);
 
     size_t next(size_t idx) { return (idx + 1) % num_slots_; }
+
+    queue_op_status try_pop_common(Value& x);
+    queue_op_status try_push_common(const Value& x);
+#ifdef HAS_CXX0X_RVREF
+    queue_op_status try_push_common(Value&& x);
+#endif
 
     void pop_from(Value& elem, size_t pdx, size_t hdx)
     {
@@ -242,6 +251,21 @@ bool buffer_queue<Value>::is_empty()
 }
 
 template <typename Value>
+queue_op_status buffer_queue<Value>::try_pop_common(Value& elem)
+{
+    size_t pdx = pop_index_;
+    size_t hdx = push_index_;
+    if ( pdx == hdx ) {
+        if ( closed_ )
+            return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        else
+            return CXX0X_ENUM_QUAL(queue_op_status)empty;
+    }
+    pop_from( elem, pdx, hdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
+}
+
+template <typename Value>
 queue_op_status buffer_queue<Value>::try_pop(Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
@@ -249,22 +273,30 @@ queue_op_status buffer_queue<Value>::try_pop(Value& elem)
        in the pop_from operation. */
     try {
         lock_guard<mutex> hold( mtx_ );
-        size_t pdx = pop_index_;
-        size_t hdx = push_index_;
-        if ( pdx == hdx ) {
-            if ( closed_ )
-                return CXX0X_ENUM_QUAL(queue_op_status)closed;
-            else
-                return CXX0X_ENUM_QUAL(queue_op_status)empty;
-        }
-        pop_from( elem, pdx, hdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return try_pop_common(elem);
     } catch (...) {
         close();
         throw;
     }
 }
 
+template <typename Value>
+queue_op_status buffer_queue<Value>::nonblocking_pop(Value& elem)
+{
+    /* This try block is here to catch exceptions from the mutex
+       operations or from the user-defined copy assignment operator
+       in the pop_from operation. */
+    try {
+        unique_lock<mutex> hold( mtx_, try_to_lock );
+        if ( !hold.owns_lock() ) {
+            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+        }
+        return try_pop_common(elem);
+    } catch (...) {
+        close();
+        throw;
+    }
+}
 template <typename Value>
 queue_op_status buffer_queue<Value>::wait_pop(Value& elem)
 {
@@ -314,6 +346,21 @@ Value buffer_queue<Value>::value_pop()
 }
 
 template <typename Value>
+queue_op_status buffer_queue<Value>::try_push_common(const Value& elem)
+{
+    if ( closed_ )
+        return CXX0X_ENUM_QUAL(queue_op_status)closed;
+    size_t hdx = push_index_;
+    size_t nxt = next( hdx );
+    size_t pdx = pop_index_;
+    if ( nxt == pdx )
+        return CXX0X_ENUM_QUAL(queue_op_status)full;
+
+    push_at( elem, hdx, nxt, pdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
+}
+
+template <typename Value>
 queue_op_status buffer_queue<Value>::try_push(const Value& elem)
 {
     /* This try block is here to catch exceptions from the mutex
@@ -321,15 +368,24 @@ queue_op_status buffer_queue<Value>::try_push(const Value& elem)
        operator in push_at. */
     try {
         lock_guard<mutex> hold( mtx_ );
-        if ( closed_ )
-            return CXX0X_ENUM_QUAL(queue_op_status)closed;
-        size_t hdx = push_index_;
-        size_t nxt = next( hdx );
-        size_t pdx = pop_index_;
-        if ( nxt == pdx )
-            return CXX0X_ENUM_QUAL(queue_op_status)full;
-        push_at( elem, hdx, nxt, pdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return try_push_common(elem);
+    } catch (...) {
+        close();
+        throw;
+    }
+}
+
+template <typename Value>
+queue_op_status buffer_queue<Value>::nonblocking_push(const Value& elem)
+{
+    /* This try block is here to catch exceptions from the mutex
+       operations or from the user-defined copy assignment
+       operator in push_at. */
+    try {
+        unique_lock<mutex> hold( mtx_, try_to_lock );
+        if ( !hold.owns_lock() )
+            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+        return try_push_common(elem);
     } catch (...) {
         close();
         throw;
@@ -381,6 +437,21 @@ void buffer_queue<Value>::push(const Value& elem)
 //TODO(crowl) Refactor with non-move versions.
 
 template <typename Value>
+queue_op_status buffer_queue<Value>::try_push_common(Value&& elem)
+{
+    if ( closed_ )
+        return CXX0X_ENUM_QUAL(queue_op_status)closed;
+    size_t hdx = push_index_;
+    size_t nxt = next( hdx );
+    size_t pdx = pop_index_;
+    if ( nxt == pdx )
+        return CXX0X_ENUM_QUAL(queue_op_status)full;
+    push_at( std::move(elem), hdx, nxt, pdx );
+    return CXX0X_ENUM_QUAL(queue_op_status)success;
+}
+
+
+template <typename Value>
 queue_op_status buffer_queue<Value>::try_push(Value&& elem)
 {
     /* This try block is here to catch exceptions from the mutex
@@ -388,15 +459,25 @@ queue_op_status buffer_queue<Value>::try_push(Value&& elem)
        operator in push_at. */
     try {
         lock_guard<mutex> hold( mtx_ );
-        if ( closed_ )
-            return CXX0X_ENUM_QUAL(queue_op_status)closed;
-        size_t hdx = push_index_;
-        size_t nxt = next( hdx );
-        size_t pdx = pop_index_;
-        if ( nxt == pdx )
-            return CXX0X_ENUM_QUAL(queue_op_status)full;
-        push_at( std::move(elem), hdx, nxt, pdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return try_push_common(elem);
+    } catch (...) {
+        close();
+        throw;
+    }
+}
+
+template <typename Value>
+queue_op_status buffer_queue<Value>::nonblocking_push(Value&& elem)
+{
+    /* This try block is here to catch exceptions from the mutex
+       operations or from the user-defined copy assignment
+       operator in push_at. */
+    try {
+        unique_lock<mutex> hold( mtx_, try_to_lock );
+        if (!hold.owns_lock()) {
+            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+        }
+        return try_push_common(elem);
     } catch (...) {
         close();
         throw;

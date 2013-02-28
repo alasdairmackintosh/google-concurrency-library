@@ -90,7 +90,8 @@ CXX0X_ENUM_CLASS queue_op_status
     success = 0,
     empty,
     full,
-    closed
+    closed,
+    busy
 };
 
 #if 0
@@ -147,17 +148,21 @@ class generic_queue_front
 
     void push(const value_type& x)
         { queue_->push(x); }
-    queue_op_status try_push(const value_type& x)
-        { return queue_->try_push(x); }
     queue_op_status wait_push(const value_type& x)
         { return queue_->wait_push(x); }
+    queue_op_status try_push(const value_type& x)
+        { return queue_->try_push(x); }
+    queue_op_status nonblocking_push(const value_type& x)
+        { return queue_->nonblocking_push(x); }
 #ifdef HAS_CXX0X_RVREF
     void push(value_type&& x)
         { queue_->push( std::move(x) ); }
-    queue_op_status try_push(value_type&& x)
-        { return queue_->try_push( std::move(x) ); }
     queue_op_status wait_push(value_type&& x)
         { return queue_->wait_push( std::move(x) ); }
+    queue_op_status try_push(value_type&& x)
+        { return queue_->try_push( std::move(x) ); }
+    queue_op_status nonblocking_push(value_type&& x)
+        { return queue_->nonblocking_push( std::move(x) ); }
 #endif
 
   protected:
@@ -195,10 +200,12 @@ class generic_queue_back
 
     value_type value_pop()
         { return queue_->value_pop(); }
-    queue_op_status try_pop(value_type& x)
-        { return queue_->try_pop(x); }
     queue_op_status wait_pop(value_type& x)
         { return queue_->wait_pop(x); }
+    queue_op_status try_pop(value_type& x)
+        { return queue_->try_pop(x); }
+    queue_op_status nonblocking_pop(value_type& x)
+        { return queue_->nonblocking_pop(x); }
 
   protected:
     Queue* queue_;
@@ -250,17 +257,21 @@ class queue_base
     virtual const char* name() = 0;
 
     virtual void push(const Value& x) = 0;
-    virtual queue_op_status try_push(const Value& x) = 0;
     virtual queue_op_status wait_push(const Value& x) = 0;
+    virtual queue_op_status try_push(const Value& x) = 0;
+    virtual queue_op_status nonblocking_push(const Value& x) = 0;
+
 #ifdef HAS_CXX0X_RVREF
     virtual void push(Value&& x) = 0;
-    virtual queue_op_status try_push(Value&& x) = 0;
     virtual queue_op_status wait_push(Value&& x) = 0;
+    virtual queue_op_status try_push(Value&& x) = 0;
+    virtual queue_op_status nonblocking_push(Value&& x) = 0;
 #endif
 
     virtual Value value_pop() = 0;
-    virtual queue_op_status try_pop(Value&) = 0;
     virtual queue_op_status wait_pop(Value&) = 0;
+    virtual queue_op_status try_pop(Value&) = 0;
+    virtual queue_op_status nonblocking_pop(Value&) = 0;
 };
 
 //TODO(crowl): Use template aliases for queue_front and queue_back?
@@ -331,31 +342,41 @@ class queue_wrapper
     virtual void push(const value_type& x)
     { ptr->push(x); }
 
+    virtual queue_op_status wait_push(const value_type& x)
+    { return ptr->wait_push(x); }
+
     virtual queue_op_status try_push(const value_type& x)
     { return ptr->try_push(x); }
 
-    virtual queue_op_status wait_push(const value_type& x)
-    { return ptr->wait_push(x); }
+    virtual queue_op_status nonblocking_push(const value_type& x)
+    { return ptr->nonblocking_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
     virtual void push(value_type&& x)
     { ptr->push(x); }
 
+    virtual queue_op_status wait_push(value_type&& x)
+    { return ptr->wait_push(x); }
+
     virtual queue_op_status try_push(value_type&& x)
     { return ptr->try_push(x); }
 
-    virtual queue_op_status wait_push(value_type&& x)
-    { return ptr->wait_push(x); }
+    virtual queue_op_status nonblocking_push(value_type&& x)
+    { return ptr->nonblocking_push(x); }
+
 #endif
 
     virtual value_type value_pop()
     { return ptr->value_pop(); }
 
+    virtual queue_op_status wait_pop(value_type& x)
+    { return ptr->wait_pop(x); }
+
     virtual queue_op_status try_pop(value_type& x)
     { return ptr->try_pop(x); }
 
-    virtual queue_op_status wait_pop(value_type& x)
-    { return ptr->wait_pop(x); }
+    virtual queue_op_status nonblocking_pop(value_type& x)
+    { return ptr->nonblocking_pop(x); }
 
     queue_front<value_type> front()
     { return queue_front<value_type>(this); }
@@ -455,17 +476,21 @@ class shared_queue_front
 
     void push(const value_type& x)
         { queue_->push(x); }
-    queue_op_status try_push(const value_type& x)
-        { return queue_->try_push(x); }
     queue_op_status wait_push(const value_type& x)
         { return queue_->wait_push(x); }
+    queue_op_status try_push(const value_type& x)
+        { return queue_->try_push(x); }
+    queue_op_status nonblocking_push(const value_type& x)
+        { return queue_->nonblocking_push(x); }
 #ifdef HAS_CXX0X_RVREF
     void push(value_type&& x)
         { queue_->push( std::move(x) ); }
-    queue_op_status try_push(value_type&& x)
-        { return queue_->try_push( std::move(x) ); }
     queue_op_status wait_push(value_type&& x)
         { return queue_->wait_push( std::move(x) ); }
+    queue_op_status try_push(value_type&& x)
+        { return queue_->try_push( std::move(x) ); }
+    queue_op_status nonblocking_push(value_type&& x)
+        { return queue_->nonblocking_push( std::move(x) ); }
 #endif
 
   private:
@@ -542,10 +567,12 @@ class shared_queue_back
 
     value_type value_pop()
         { return queue_->value_pop(); }
-    queue_op_status try_pop(value_type& x)
-        { return queue_->try_pop(x); }
     queue_op_status wait_pop(value_type& x)
         { return queue_->wait_pop(x); }
+    queue_op_status try_pop(value_type& x)
+        { return queue_->try_pop(x); }
+    queue_op_status nonblocking_pop(value_type& x)
+        { return queue_->nonblocking_pop(x); }
 
   private:
     queue_counted<value_type>* queue_;
@@ -580,26 +607,32 @@ class queue_owner
 
     virtual void push(const value_type& x)
         { ptr->push(x); }
-    virtual queue_op_status try_push(const value_type& x)
-        { return ptr->try_push(x); }
     virtual queue_op_status wait_push(const value_type& x)
         { return ptr->wait_push(x); }
+    virtual queue_op_status try_push(const value_type& x)
+        { return ptr->try_push(x); }
+    virtual queue_op_status nonblocking_push(const value_type& x)
+        { return ptr->nonblocking_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
     virtual void push(value_type&& x)
         { ptr->push(x); }
-    virtual queue_op_status try_push(value_type&& x)
-        { return ptr->try_push(x); }
     virtual queue_op_status wait_push(value_type&& x)
         { return ptr->wait_push(x); }
+    virtual queue_op_status try_push(value_type&& x)
+        { return ptr->try_push(x); }
+    virtual queue_op_status nonblocking_push(value_type&& x)
+        { return ptr->nonblocking_push(x); }
 #endif
 
     virtual value_type value_pop()
         { return ptr->value_pop(); }
-    virtual queue_op_status try_pop(value_type& x)
-        { return ptr->try_pop(x); }
     virtual queue_op_status wait_pop(value_type& x)
         { return ptr->wait_pop(x); }
+    virtual queue_op_status try_pop(value_type& x)
+        { return ptr->try_pop(x); }
+    virtual queue_op_status nonblocking_pop(value_type& x)
+        { return ptr->nonblocking_pop(x); }
 };
 
 
@@ -642,26 +675,32 @@ class queue_object
 
     virtual void push(const value_type& x)
         { obj_.push(x); }
-    virtual queue_op_status try_push(const value_type& x)
-        { return obj_.try_push(x); }
     virtual queue_op_status wait_push(const value_type& x)
         { return obj_.wait_push(x); }
+    virtual queue_op_status try_push(const value_type& x)
+        { return obj_.try_push(x); }
+    virtual queue_op_status nonblocking_push(const value_type& x)
+        { return obj_.nonblocking_push(x); }
 
 #ifdef HAS_CXX0X_RVREF
     virtual void push(value_type&& x)
         { obj_.push(x); }
-    virtual queue_op_status try_push(value_type&& x)
-        { return obj_.try_push(x); }
     virtual queue_op_status wait_push(value_type&& x)
         { return obj_.wait_push(x); }
+    virtual queue_op_status try_push(value_type&& x)
+        { return obj_.try_push(x); }
+    virtual queue_op_status nonblocking_push(value_type&& x)
+        { return obj_.nonblocking_push(x); }
 #endif
 
     virtual value_type value_pop()
         { return obj_.value_pop(); }
-    virtual queue_op_status try_pop(value_type& x)
-        { return obj_.try_pop(x); }
     virtual queue_op_status wait_pop(value_type& x)
         { return obj_.wait_pop(x); }
+    virtual queue_op_status try_pop(value_type& x)
+        { return obj_.try_pop(x); }
+    virtual queue_op_status nonblocking_pop(value_type& x)
+        { return obj_.nonblocking_pop(x); }
 };
 
 

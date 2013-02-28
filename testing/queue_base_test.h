@@ -83,6 +83,21 @@ void seq_drain(
 }
 
 // Test the sequential "try" filling of any empty queue.
+template <typename Queue>
+void seq_try_fill(
+    int count,
+    int multiplier,
+    Queue* f )
+{
+    ASSERT_TRUE(f->is_empty());
+    for ( int i = 1; i <= count; ++i ) {
+        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success,
+                  f->try_push(i * multiplier));
+        ASSERT_FALSE(f->is_empty());
+    }
+}
+
+// Test the sequential "try" filling of any empty queue.
 void seq_try_fill(
     int count,
     int multiplier,
@@ -94,6 +109,22 @@ void seq_try_fill(
                   f.try_push(i * multiplier));
         ASSERT_FALSE(f.is_empty());
     }
+}
+
+// Test the sequential "try" draining of any empty queue.
+template <typename Queue>
+void seq_try_drain(
+    int count,
+    int multiplier,
+    Queue* b )
+{
+    for ( int i = 1; i <= count; ++i ) {
+        int popped;
+        ASSERT_FALSE(b->is_empty());
+        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, b->try_pop(popped));
+        ASSERT_EQ(i * multiplier, popped);
+    }
+    ASSERT_TRUE(b->is_empty());
 }
 
 // Test the sequential "try" draining of any empty queue.
@@ -112,6 +143,18 @@ void seq_try_drain(
 }
 
 // Test the sequential try_pop on an empty queue.
+template <typename Queue>
+void seq_try_empty( Queue* q )
+{
+    int result;
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)empty, q->try_pop(result));
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, q->try_push(1));
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, q->try_pop(result));
+    ASSERT_EQ(1, result);
+    ASSERT_TRUE(q->is_empty());
+}
+
+// Test the sequential try_pop on an empty queue.
 // The front and back must refer to the same queue.
 void seq_try_empty(
     queue_front<int> f,
@@ -126,11 +169,32 @@ void seq_try_empty(
 }
 
 // Test the sequential try_push on a full queue.
-// The front and back must refer to the same queue.
+template <typename Queue>
+void seq_try_full(
+    int count,
+    Queue* q )
+{
+    seq_try_fill(count, 1, q);
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)full, q->try_push(count + 1));
+    // This assert might fail if try_pop doesn't return success.
+    int val;
+    while (q->try_pop(val) != CXX0X_ENUM_QUAL(queue_op_status)success) {}
+    ASSERT_EQ(1, val);
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, q->try_push(count + 1));
+    for ( int i = 2; i <= count + 1; ++i ) {
+        int popped;
+        ASSERT_FALSE(q->is_empty());
+        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, q->try_pop(popped));
+        ASSERT_EQ(i, popped);
+    }
+    ASSERT_TRUE(q->is_empty());
+}
+
+// Test the sequential try_push on a full queue.
 void seq_try_full(
     int count,
     queue_front<int> f,
-    queue_back<int> b )
+    queue_back<int> b)
 {
     seq_try_fill(count, 1, f);
     ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)full, f.try_push(count + 1));

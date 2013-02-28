@@ -74,7 +74,7 @@ lower.a : stream_mutex.o countdown_latch.o serial_executor.o barrier.o \
 
 test : cxx0x_test.o atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
 	stdfake_test.pass lower_test.pass mutex_test.pass higher_test.pass \
-	pipeline_test.pass
+	pipeline_test.pass queue_perf_test.exe lock_free_buffer_queue_test.pass
 
 #### Simple Tests
 
@@ -127,6 +127,12 @@ $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 higher_test.pass : higher_test.exe
 
+LOCK_FREE_BUFFER_QUEUE_TESTS := lock_free_buffer_queue_test.o
+$(LOCK_FREE_BUFFER_QUEUE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
+lock_free_buffer_queue_test.exe : $(LOCK_FREE_BUFFER_QUEUE_TESTS) $(GMOCK_OBJ) \
+    lower.a stdfake.a
+lock_free_buffer_queue_test.pass : lock_free_buffer_queue_test.exe
+
 MAP_REDUCE_TESTS := map_reduce_test.o
 $(MAP_REDUCE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 map_reduce_test.exe : $(MAP_REDUCE_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
@@ -137,3 +143,9 @@ PIPELINE_TESTS := pipeline_test.o
 $(PIPELINE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 pipeline_test.exe : $(PIPELINE_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 pipeline_test.pass : pipeline_test.exe
+
+QUEUE_PERF_TESTS := queue_perf_test.o
+$(QUEUE_PERF_TESTS) : CxxFlags += $(GTEST_INC)
+queue_perf_test.exe : $(QUEUE_PERF_TESTS) lower.a stdfake.a
+queue_perf_test.run : queue_perf_test.exe
+	./queue_perf_test.exe

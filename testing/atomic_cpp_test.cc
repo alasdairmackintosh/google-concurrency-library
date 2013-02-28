@@ -67,7 +67,7 @@ int lazy_example_weak_c( void )
         }
         else {
             lazy_value = 42;
-            atomic_store_explicit( &lazy_ready, true, memory_order_release );
+            (void)atomic_store_explicit( &lazy_ready, true, memory_order_release );
         }
     }
     return lazy_value;
@@ -103,7 +103,7 @@ int integer_example( void )
 {
     atomic_ulong a = { 3 };
     unsigned long x = atomic_load( &auln ) + atomic_load( &a );
-    atomic_store_explicit( &aulv, x, memory_order_release );
+    (void)atomic_store_explicit( &aulv, x, memory_order_release );
     unsigned long y = atomic_fetch_add_explicit( &aulv, 1,
                                                  memory_order_relaxed );
     unsigned long z = atomic_fetch_xor( &auln, 4 );
