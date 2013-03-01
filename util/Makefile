@@ -22,7 +22,7 @@ VPATH = ../src ../testing \
 #### Compilation Flags
 
 DFlags = -MMD -MP
-EFlags = -Wall -Werror
+EFlags = -Wall -Werror -Wno-error=c++0x-compat
 IFlags = -I. -I../include
 BFlags = $(DFlags) $(EFlags) $(IFlags) $(BFLAGS)
 CFlags = $(BFlags) $(CFLAGS)

@@ -39,7 +39,7 @@ class User {
  public:
   User(int uid = 0) : uid_(uid) {
   }
-  string get_name() {
+  string get_name() const {
     std::stringstream o;
     o << "(User : " << uid_ << ")";
     return o.str();
@@ -47,6 +47,12 @@ class User {
  private:
   int uid_;
 };
+
+std::ostream& operator<<(std::ostream& os, const User u) {
+  os << u.get_name();
+  return os;
+}
+
 
 // String -> UID
 int find_uid(string val) {
@@ -62,7 +68,7 @@ User get_user(int uid) {
 
 // Processes the User
 void consume_user(User input) {
-  printf("Consuming %s\n", input.get_name().c_str());
+  printf("Consuming user %s\n", input.get_name().c_str());
 }
 
 void consume_string(string input) {
@@ -82,6 +88,20 @@ void repeat(int i, queue_front<int> q) {
   q.push(i);
 }
 
+int sum_two(queue_back<int> q) {
+  int i;
+  queue_op_status status = q.wait_pop(i);
+  if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
+    return -1;
+  }
+  int j;
+  status = q.wait_pop(j);
+  if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
+    return i;
+  }
+  return i + j;
+}
+
 void produce_strings(queue_front<string> queue) {
   printf("Producing strings\n");
   queue.push("Produced String1");
@@ -93,6 +113,31 @@ void produce_strings(queue_front<string> queue) {
 class PipelineTest : public testing::Test {
 };
 
+TEST_F(PipelineTest, ManualBuild) {
+  simple_thread_pool pool;
+  queue_object< buffer_queue<int> > queue(10, "test-queue");
+
+  pipeline::segment<pipeline::terminated, int> p1 = pipeline::from(queue);
+
+  pipeline::segment<int, int> p6 = pipeline::make(repeat);
+  pipeline::segment<int, int> p7 = pipeline::make(sum_two);
+
+  pipeline::segment<int, User> p2 = pipeline::make(get_user);
+
+  pipeline::segment<pipeline::terminated, User> p3 = p1 | p6 | p7| p2;
+
+  pipeline::segment<User, pipeline::terminated> p4 = pipeline::to(consume_user);
+
+  pipeline::segment<pipeline::terminated, pipeline::terminated> p = p3 | p4;
+
+
+  pipeline::execution exec = p.run(&pool);
+
+  queue.push(10);
+  queue.close();
+}
+
+
 TEST_F(PipelineTest, Example) {
   simple_thread_pool pool;
 
@@ -101,19 +146,19 @@ TEST_F(PipelineTest, Example) {
   queue_object< buffer_queue<string> > queue(10, "test-queue");
   queue.push("Queued Hello");
 
-  CXX0X_AUTO_VAR(p1, pipeline::make_segment(find_uid));
+  CXX0X_AUTO_VAR(p1, pipeline::make(find_uid));
   CXX0X_AUTO_VAR(p2, p1 | repeat);
   CXX0X_AUTO_VAR(p3, queue | p2 | get_user );
 
   queue_object< buffer_queue<User> > out(10);
   pipeline::plan p4 = p3 | out;
 
-  pipeline::execution pex(p4, &pool);
+  pipeline::execution pex = p4.run(&pool);
   queue.push("More stuff");
   queue.push("Yet More stuff");
   queue.push("Are we done yet???");
 
-  pipeline::execution pex2(pipeline::from(out) | consume_user, &pool);
+  pipeline::execution pex2 = (pipeline::from(out) | consume_user).run(&pool);
   queue.close();
   pex.wait();
   pex2.wait();
@@ -123,13 +168,30 @@ TEST_F(PipelineTest, Example) {
   EXPECT_TRUE(pex2.is_done());
 }
 
-TEST_F(PipelineTest, ParallelExample) {
+int pass_through(int i) { return i; }
 
+TEST_F(PipelineTest, SimpleParallel) {
+  simple_thread_pool pool;
+  queue_object< buffer_queue<int> > in_queue(10);
+  queue_object< buffer_queue<int> > out_queue(10);
+  in_queue.push(1);
+  in_queue.push(2);
+  in_queue.push(3);
+  in_queue.close();
+
+  pipeline::plan p = pipeline::from(in_queue)
+      | pipeline::parallel(pipeline::make(pass_through), 2)
+      | out_queue;
+  pipeline::execution pex = p.run(&pool);
+  pex.wait();
+  EXPECT_TRUE(out_queue.is_closed());
+}
+
+TEST_F(PipelineTest, ParallelExample) {
   // Two-stage pipeline. Combines string->int and int->User to make
   // string->User
   pipeline::segment<string, User> p2 =
-      pipeline::make_segment(find_uid) | get_user;
-
+      pipeline::make(find_uid) | get_user;
   queue_object< buffer_queue<string> > queue(10);
   queue.push("Queued Hello");
   queue.push("queued world");
@@ -138,13 +200,14 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("queued 333");
   queue.push("queued 4444");
 
-  CXX0X_AUTO_VAR(p3, pipeline::parallel(p2));
+  CXX0X_AUTO_VAR(p3, pipeline::parallel(p2, 2));
   CXX0X_AUTO_VAR(s, pipeline::from(queue));
+  CXX0X_AUTO_VAR(px, s | p3);
 
-  pipeline::plan p4 = s | p3 | consume_user;
+  pipeline::plan p4 = px | consume_user;
 
   simple_thread_pool pool;
-  pipeline::execution pex(p4, &pool);
+  pipeline::execution pex = p4.run(&pool);
   queue.push("More stuff");
   queue.push("Yet More stuff");
   queue.push("Are we done yet???");
@@ -156,9 +219,9 @@ TEST_F(PipelineTest, ParallelExample) {
 TEST_F(PipelineTest, ProduceExample) {
   simple_thread_pool pool;
   pipeline::plan p5 =
-      pipeline::produce(produce_strings) | find_uid | get_user | consume_user;
+      pipeline::from(produce_strings) | find_uid | get_user | consume_user;
   printf("Starting Execution\n");
-  pipeline::execution pex3(p5, &pool);
+  pipeline::execution pex3 = p5.run(&pool);
   printf("Waiting for Completion\n");
   pex3.wait();
 }
