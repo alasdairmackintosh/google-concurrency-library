@@ -59,7 +59,7 @@ void test_enq(function<queue_op_status(const unsigned int&)> enq_fn,
     // started.
 
     // Create work.
-    srandomdev();
+    srandom(time(NULL));
     const int size = 50;
     double arr[size];
     for (int j = 0; j < size; ++j) {
@@ -267,5 +267,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-
