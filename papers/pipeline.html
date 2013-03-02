@@ -1,0 +1,546 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+
+<meta http-equiv="Content-Type" content="text/html;charset=US-ASCII">
+
+<style type="text/css">
+
+body {
+  color: #000000;
+  background-color: #FFFFFF;
+}
+
+del {
+  text-decoration: line-through;
+  color: #8B0040;
+}
+ins {
+  text-decoration: underline;
+  color: #005100;
+}
+
+p {
+  margin: 1em 0em 0em 0em;
+}
+p.example {
+  margin: 1em 2em;
+}
+pre{
+  margin: 0em 1em 2em 1em;
+}
+pre.example {
+  margin: 0em 2em 1em;
+}
+div.example {
+  margin: 2em;
+}
+
+code.extract {
+  background-color: #F5F6A2;
+}
+pre.extract {
+  margin: 2em;
+  background-color: #F5F6A2;
+  border: 1px solid #E1E28E;
+}
+
+p.function {
+}
+
+p.attribute {
+  text-indent: 3em;
+}
+
+blockquote.std {
+  color: #000000;
+  background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding: 0.5em;
+}
+
+blockquote.stddel {
+  text-decoration: line-through;
+  color: #000000;
+  background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding: 0.5em;
+}
+
+blockquote.stdins {
+  text-decoration: underline;
+  color: #000000;
+  background-color: #C8FFC8;
+  border: 1px solid #B3EBB3;
+  padding: 0.5em;
+}
+
+table {
+  border: 1px solid black;
+  border-spacing: 0px;
+  margin-left: auto;
+  margin-right: auto;
+}
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+
+</style>
+
+<title>C++ Pipelines</title>
+</head>
+<body>
+<h1>C++ Pipelines</h1>
+
+<p>
+ISO/IEC JTC1 SC22 WG21 DRAFT N???? = 12-???? - 2013-02-21
+</p>
+
+<p>
+Adam Berkan, aberkan@google.com, adam.berkan@gmail.com<br>
+Alasdair Mackintosh, alasdair@google.com, alasdair.mackintosh@gmail.com
+</p>
+<p>
+<a href="#Introduction">Introduction</a><br>
+<a href="#Problem">Problem</a><br>
+<a href="#Solution">Solution</a><br>
+<a href="#Proposal">Proposal - Pipelines in C++</a><br>
+<a href="#Parallel">Parallel Pipelines</a><br>
+<a href="#Abstractions">Abstractions</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#segment">Pipeline Segments</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#plan">Pipeline Plans</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#execution">Pipeline Executions</a><br>
+<a href="#Implementation">Interface Details</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#segmentimpl">Pipeline Segments</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#planimpl">Pipeline Plans</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#parallelimpl">Running in Parallel</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#executionimpl">Pipeline Executions</a><br>
+<a href="#Additional">Additional Features</a><br>
+</p>
+<h2><a name="Introduction">Introduction - Multithreaded Pipelines in the Unix Shell</a></h2>
+<p>
+One of the simplest ways to write a multi-threaded application is to use
+the Unix shell:</p>
+<pre class="example"><code>
+# Get all error messages in the log, filter out the test account, and format them:
+cat log.txt | grep '^Error:' | grep -v 'test@example.com' |
+  sed 's/^Error:.*Message: //' &gt; output.txt
+</code></pre>
+This is a multi-threaded pipeline. Each of the operations is running independently in
+its own process, and there are no potential deadlocks, data races or undefined behaviours.<br>
+<br>
+Although not all multi-threaded operations can be performed in this way, we
+believe that the programming approach used here (simple tasks, each performing
+a self-contained operation in its own thread) can be used produce robust and reliable
+applications.
+<br>
+
+<h2><a name="Problem">Problem</a></h2>
+In C++, trying to write multi-threaded applications by hand, using
+mutexes and threading primitives, is difficult and error prone, and
+many such tasks would be simpler if the application logic could be
+separated out into small independent sections.&nbsp;However, in C++
+there is no straightforward and threadsafe way of joining such tasks
+together.
+<h2><a name="Solution">Solution</h2>
+We propose a C++ pipeline library that allows application programmers
+to combine simple data transformations into a complete multithreaded
+data-processing pipeline. Individual transformation functions are
+isolated from each other, and may be run in parallel. We use a pipe
+syntax that should be familiar to users of Unix or Microsoft shells.
+<br>
+<pre class="example"><code>
+pipeline::from(input_queue) |
+  bind(grep, "^Error") |
+  bind(vgrep, "test@example.com") |
+  bind(sed, "'s/^Error:.*Message: //") |
+  output_queue).run(&amp;threadpool);
+</code></pre>
+Although not universally applicable, we believe that this approach
+will simplify the writing of certain classes of data-processing
+applications.
+<h2><a name="Proposal">Proposal - Pipelines in C++</a></h2>
+<p>A pipeline is made up of functions that read data from an input
+queue, transform it in some way, and write it to an output queue. (The
+pipeline framework makes use of the proposed C++ queue and executor
+libraries. See "C++ Concurrent Queues,&nbsp;ISO/IEC JTC1 SC22 WG21
+N3353&nbsp;12-0043 - 2012-01-14" and "A preliminary proposal for work
+executors, ISO/IEC JTC1 SC22 WG21 N3378=12-0068")</p>
+
+<p>The overloaded pipe operators ('|') that separates stages in the
+pipeline represent concurrent queues that buffer the outputs from one
+stage, and pass it to the input for the next stage. Consider the
+example shown in the previous section, where we have a 'grep' function
+that reads a sequence of strings and&nbsp;outputs those values that
+match a filter. If we wrote the 'grep' function explicitly, using
+input and output queues, it would be of the form:</p>
+<pre class="example"><code>
+void grep_error(queue_front<string> in, queue_back<string> out) {
+  string item;
+  while (in.wait_pop(item) == queue_op_status::success) {
+    if (re::match("^Error", item)) {
+      out.push(item);
+    }
+  }
+}
+</code></pre>
+<p>
+The 'vgrep' function would be similar, while the 'sed' function would apply a transform to each input.
+</p>
+<pre class="example"><code>
+void sed_message(queue_front<string> in, queue_back<string> out) {
+  string item;
+  while (in.wait_pop(item) == queue_op_status::success) {
+    re::apply("s/^Error:.*Message: //", item);
+    out.push(item);
+  }
+}
+</code></pre>
+Given these functions, we can then run the pipeline as follows:<br>
+<pre class="example"><code>
+pipeline::from(input_queue) | grep_error |
+  vgrep_test |  sed_message | output_queue).run(&thread_pool);</code></pre>
+<pre class="example"><code>
+</code></pre>
+<p>General purpose functions would be better, which we can do concisely&nbsp;by binding additional parameters.</p>
+
+<p>We would then invoke the pipeline with specific values:</p>
+<pre class="example"><code>
+void grep(const string& re, queue_front<string> in, queue_back<string> out) {
+  string item;
+  while (in.wait_pop(item) == queue_op_status::success) {
+    if (re::match(re, item)) {
+      out.push(item);
+    }
+  }
+}
+void vgrep(const string& re, queue_front<string> in, queue_back<string> out) {
+  ...
+}
+void sed(const string& re, queue_front<string> in, queue_back<string> out) {
+  string item;
+  while (in.wait_pop(item) == queue_op_status::success) {
+    re::apply(re, item);
+    out.push(item);
+  }
+}
+</code></pre>
+<p>To avoid boilerplate code for processing input and output queues, we would prefer to write just the data-transformation logic. When each input is processed into a single output, we can simply write:</p>
+<pre class="example"><code>
+string sed(const string& re, string item) {
+  re::apply(re, item);
+  return item;
+}
+</code></pre>
+<p>A more common case is to have one input that maps to a variable number of outputs. In that case we will have a single input argument, still use an output queue.</p>
+<pre class="example"><code>
+void grep(const string& re, string item, queue_back<string> out) {
+  if (re::match(re, item)) {
+    out.push(item);
+  }
+}
+</code></pre>
+<p>
+In each case the pipeline framework will wrap these functions in the
+appropriate queue-handling logic.
+</p>
+<p>
+Note that although the above examples use strings as input and output
+types, the actual implementation is fully templated, and will work
+with any queueable type.
+</p>
+<h2><a name="Parallel">Beyond Shell Scripts - Parallel Pipelines</a></h2>
+
+The previous example uses a single file as input. Suppose we are
+reading from multiple files? We can add an extra stage to the
+pipeline:
+
+<pre class="example"><code>
+void read_file(const string& filename, queue_back<string> out) {
+  File file(filename);
+  for (string line : file.readLines()) {
+    out.push(line);
+  }
+}
+
+queue&lt;string&gt; filenames = ...
+
+pipeline::execution task(
+  pipeline::from(filenames) |
+  read_file | grep_fn | vgrep_fn | sed_fn |
+  output_queue, &thread_pool);
+
+</code></pre>
+In this case, the read_file function will process each file sequentially. However, if these files were&nbsp;stored on multiple devices it might be faster to read them in parallel.
+<br>
+<pre class="example"><code>
+pipeline::execution task(
+  pipeline::from(filenames) |
+  pipeline::parallel(read_file | grep_fn | vgrep_fn | sed_fn, 8) |
+  output_queue).run(&thread_pool);
+</code></pre>
+
+
+This will run 8 separate pipelines in parallel. Each pipeline will read the next file from the input queue, open it, process it, and write the result into the same output queue. Alternatively, if we only want to run the first part of the process in parallel, we can write:<br>
+
+<pre class="example"><code>
+pipeline::execution task(
+  pipeline::from(filenames) |
+  pipeline::parallel(read_file | grep_fn, 8) | vgrep_fn | sed_fn |
+  output_queue).run(&thread_pool);
+</code></pre>
+This will run 8 parallel segments that read input files and perform the initial 'grep' filtering, but will then write into a single thread running the vgrep function.
+<br>
+Note that each parallel segment runs independently, and will have independent queues within each stage.
+
+
+
+<h2><a name="Abstractions">Pipeline Abstractions</a></h2>
+<p>
+The pipeline framework has several classes that represent
+important abstractions:
+</p>
+<h3><a name="segment">Pipeline Segments</a></h3>
+<p>
+A segment represents a series of connected operations. It is analogous to a
+shell function containing a series of filter commands:</p>
+<pre class="example"><code>
+function f1() {
+  grep '^Error:' | grep -v "test@example.com" | sed 's/^Error:.*Message:'
+}
+</pre></code>
+
+The C++ equivalent would be:
+
+<pre class="example"><code>
+pipeline::segment<string, string> s1 = pipeline::from(grep_fn) | vgrep_fn | sed_fn;
+</pre></code>
+
+Segments can themselves be joined together to create longer segments. In a shell:
+
+<pre class="example"><code>
+function f3() {
+  f1 | f2
+}
+</pre></code>
+
+<p>In C++:</p>
+<pre class="example"><code>
+pipeline::segment<string, int> s2 = ...
+pipeline::segment<string, int> s3 = s1 | s2;
+</pre></code>
+
+<h3><a name="plan">Pipeline Plans</a></h3>
+<p>
+The script in the above example cannot be run in isolation: it needs
+an input and an output. Unless we plan to use stdin and stdout,
+we would normally invoke the function with input and output files:</p>
+
+<pre class="example"><code>
+function plan() {
+  cat log.txt | f1 > output.txt
+}
+</pre></code>
+In C++ we use queues as input and output. (There is no explicit stdin/stdout).
+<pre class="example"><code>
+pipeline::plan plan = pipeline::from(input_queue) | s1 | output_queue;
+</pre></code>
+In addition to queues, we can also use producer and consumer functions as input and output:
+<pre class="example"><code>
+void read_file(const string& filename, queue_back<string> out) {
+  File file(filename);
+  for (string line : file.readLines()) {
+    out.push(line);
+  }
+}
+pipeline::plan plan = pipeline::produce(bind(read_file, "log.txt") | s1 | output_queue;
+</pre></code>
+
+
+<h3><a name="execution">Pipeline Executions</a></h3>
+<p>
+A pipeline plan can be executed by providing it a threadpool in which to
+run. This is analogous to executing the plan function at the shell prompt, and
+allowing it to run in the background:
+
+<pre class="example"><code>
+$> plan &
+[1] 2263
+</pre></code>
+
+In C++:
+
+<pre class="example"><code>
+pipeline::execution execn = plan.run(&threadpool);
+if (execn.is_done()) ...
+execn.wait();
+</pre></code>
+
+Creating a pipeline execution will cause the pipeline plan to start running in the given threadpool. It will continue to run until the input queue is closed, and will then close the output queue when all input has been processed.
+
+<h2><a name="Implementation">Interface Details</a></h2>
+<h3><a name="segmentimpl">Pipeline Segments</a></h3>
+<p>
+A segment is created with <code>pipeline::make()</code>. The base function must
+convert an input to an output type, either directly or via a queue. Input queues and funcitons that are producers can be made into pipelines with&nbsp;<code style="line-height:1.6;font-size:10pt">pipeline::from()&nbsp;</code>and consumers and output queues use&nbsp;pipeline::to(). &nbsp;The following functions all convert integer input to string output:</p>
+<pre class="example"><code>
+string direct_fn(int input);
+string queue_in_fn(queue_front&lt;int&gt; input_queue);
+void queue_out_fn(int input, queue_back&lt;string&gt; output_queue);
+void queue_in_out_fn(queue_front&lt;int&gt; input_queue, queue_back&lt;string&gt; output_queue);
+
+// Segment that converts ints to strings
+pipeline::segment&lt;int, string&gt; s1;
+
+// Can create the same segment type from any suitable function
+s1 = pipeline::make(direct_fn);
+s1 = pipeline::make(queue_in_fn);
+s1 = pipeline::make(queue_out_fn);
+s1 = pipeline::make(queue_in_out_fn);
+</code></pre>
+<p>
+Segments can be piped together. As before, any suitable function can be used</p>
+<pre class="example"><code>Name create_name(string input);
+void create_names(string input, queue_back&lt;Name&gt; output_queue););
+
+// Segment that converts ints to Names. Can be created by piping "s1"
+// into any suitable function
+pipeline::segment&lt;int, Name&gt; s2;</code>
+
+<code>s2 = s1 | create_name;
+s2 = s1 | create_names;</code></pre>
+
+<p>The <code style="color:rgb(68,68,68);line-height:1.6;font-size:10pt">'make()'</code> function is used to create the correct segment type. Once this has been created, subsequent elements can be added using the overloaded '|' operator, which will return the corerct type for subsequent pipeline operations. In theory we could write:</p>
+
+
+
+<pre class="example"><code>s2 = make(direct_fn) | make(create_name);</code>
+</pre>
+but it is simpler to write:<br>
+<br>
+<code>s2 = make(direct_fn) | create_name;</code>
+<h3><a name="planimpl">Pipeline Plans</a></h3>
+<p>A plan is created by terminating a segment at either end. The start terminator
+may either be a queue, or a function that writes to a queue_back. The end
+terminator may be a queue, a function that reads from a queue_front, or a function
+that repeatedly reads inputs. Conceptually a plan may be represented as:</p>
+<pre class="example"><code>(input_queue's queue_front) -&gt; segment -&gt; (queue_back of output_queue)</code></pre>
+<p>Some examples would be:</p>
+<pre class="example"><code>// Sources
+void write_ints(queue_back&lt;int&gt; output_queue) {
+  for(...) {
+    output_queue.push(n);
+  }
+}
+
+queue&lt;int&gt; source_queue;
+
+// Sinks
+void process_name_queue(queue_front&lt;Name&gt; input_queue) {
+}
+
+void process_name(Name input) {
+}
+
+queue&lt;Name&gt; name_output_queue;
+
+// Possible plans using these sources and sinks, plus the "s2" segment defined above.
+// (Three out of six combinations shown.)
+pipeline::plan p1 = pipeline::from(source_queue) | s2 | process_name;
+pipeline::plan p2 = pipeline::from(write_ints) | s2 | process_name_queue;
+pipeline::plan p3 = pipeline::from(source_queue) | s2 | name_output_queue;
+
+</code></pre>
+<p>
+Alternatively, if a predefined segment is not available, the entire plan can be
+created as follows:</p>
+<pre class="example"><code>// Two out of N combinations shown
+pipeline::plan p1 = pipeline::from(source_queue) | queue_in_fn | make_names | process_name_queue;
+pipeline::plan p2 = pipeline::from(source_queue) | direct_fn | make_name | name_output_queue;</code></pre>
+Note that it is also possible to create a segment that is terminated at either the start or the end, and then combine that partially terminated segment into a full plan.
+<br>
+
+<code>pipeline::segment&lt;pipeline::terminated, Name&gt; s3 =&nbsp;pipeline::from(source_queue) | s2;</code><br>
+<code>pipeline::plan p3 = s3 | process_name_queue;</code>
+<br>
+
+Plans are always created using the '<code>pipeline::from()</code>' function. This is necessary to create the correct pipeline type. Additional segments can then be added by using then overloaded '|' operator, which will return objects of the correct type for the next stage in the pipeline.<br>
+
+<h3><a name="parallelimpl" style="font-size:1.4em;line-height:1.6">Running in Parallel</a></h3>
+<p>
+Any segment may be run in parallel, by wrapping it in a <code>parallel()</code>
+function.
+</p>
+<pre class="example"><code>
+segment&lt;int, string&gt; s1;
+
+// Run s1 in parallel, into a single make_names call
+segment&lt;int, Name&gt; parallel_1 = parallel(s1, n_threads) | make_names;
+
+// Run s1 into make_names, both in parallel
+segment&lt;int, Name&gt; parallel_2 = parallel(s1 | make_names, n_threads);
+
+</code></pre>
+<p>
+Running in parallel will run each function (or chain of functions) in a
+parallel thread. The n_threads argument determines the number of threads used.</p>
+
+<h3><a name="executionimpl">Pipeline Executions</a></h3>
+<p>
+Creating an execution causes the plan to start running immediately, just as
+creating a new <code>std::thread</code> causes the thread to begin executing.</p>
+<pre class="example"><code>pipeline::execution exec = p1.run(&amp;thread_pool);
+</code></pre>
+The caller can block until the execution finishes by calling <code>wait()</code>
+<pre class="example"><code>pipeline::execution exec = p1.run(thread_pool);
+exec.wait();
+</code></pre>
+
+<h2><a name="Implementation">Implementation</a></h2>
+<p>The open-source implementation is freely available at
+<a href="http://code.google.com/p/google-concurrency-library/source/browse/include/pipeline.h">
+http://code.google.com/p/google-concurrency-library/source/browse/include/pipeline.h</a>.</p>
+
+<h2><a name="Additional">Additional Features</a></h2>
+We are considering the following additional features:
+<h4>Iterators as inputs and outputs</h4>
+</b>As well as queues for inputs and outputs we could also support iterators:</h4>
+
+<pre class="example"><code>
+vector&lt;string&gt; inputs = ...</code>
+pipeline::from(input.begin(), input.end()) | grep_fn | ...<br>
+</pre></code>
+
+<h4>Iterators as parameters to functions</h4>
+Similarly, we could support iterators as argument to pipeline functions:
+<pre class="example"><code>
+typedef iterator<input_iterator_tag, string> Input;
+typedef iterator<output_iterator_tag, string> Input;
+void grep(const string& re, Input first, Input last, Output out)
+{
+  while (first != last) {
+    if re::match(re, *first) {
+      *result = *first;
+    }
+    ++result; ++first;
+  }
+}
+</pre></code>
+
+<h4>Streams as inputs and outputs</h4>
+Standard iostreams could be used as input and output.
+<h4>Internal optimizations. Threading and workstealing</h4>
+<p>The current pipeline framework uses one thread for each stage of
+the pipeline. To limit the use of resources, it should be possible to
+run with fewer threads, using work-stealing or work-sharing
+techniques.</p>
