@@ -54,12 +54,12 @@ inline std::ostream& operator<<(
 void seq_fill(
     int count,
     int multiplier,
-    queue_front<int> f )
+    queue_back<int> bk )
 {
-    ASSERT_TRUE(f.is_empty());
+    ASSERT_TRUE(bk.is_empty());
     for ( int i = 1; i <= count; ++i ) {
-        f.push(i * multiplier);
-        ASSERT_FALSE(f.is_empty());
+        bk.push(i * multiplier);
+        ASSERT_FALSE(bk.is_empty());
     }
 }
 
@@ -67,14 +67,14 @@ void seq_fill(
 void seq_drain(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     try {
         for ( int i = 1; i <= count; ++i ) {
-            ASSERT_FALSE(b.is_empty());
-            ASSERT_EQ(i * multiplier, b.value_pop());
+            ASSERT_FALSE(ft.is_empty());
+            ASSERT_EQ(i * multiplier, ft.value_pop());
         }
-        ASSERT_TRUE(b.is_empty());
+        ASSERT_TRUE(ft.is_empty());
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in seq_drain " << std::endl;
@@ -101,13 +101,13 @@ void seq_try_fill(
 void seq_try_fill(
     int count,
     int multiplier,
-    queue_front<int> f )
+    queue_back<int> bk )
 {
-    ASSERT_TRUE(f.is_empty());
+    ASSERT_TRUE(bk.is_empty());
     for ( int i = 1; i <= count; ++i ) {
         ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success,
-                  f.try_push(i * multiplier));
-        ASSERT_FALSE(f.is_empty());
+                  bk.try_push(i * multiplier));
+        ASSERT_FALSE(bk.is_empty());
     }
 }
 
@@ -131,15 +131,15 @@ void seq_try_drain(
 void seq_try_drain(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     for ( int i = 1; i <= count; ++i ) {
         int popped;
-        ASSERT_FALSE(b.is_empty());
-        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, b.try_pop(popped));
+        ASSERT_FALSE(ft.is_empty());
+        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, ft.try_pop(popped));
         ASSERT_EQ(i * multiplier, popped);
     }
-    ASSERT_TRUE(b.is_empty());
+    ASSERT_TRUE(ft.is_empty());
 }
 
 // Test the sequential try_pop on an empty queue.
@@ -155,17 +155,17 @@ void seq_try_empty( Queue* q )
 }
 
 // Test the sequential try_pop on an empty queue.
-// The front and back must refer to the same queue.
+// The back and front must refer to the same queue.
 void seq_try_empty(
-    queue_front<int> f,
-    queue_back<int> b )
+    queue_back<int> bk,
+    queue_front<int> ft )
 {
     int result;
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)empty, b.try_pop(result));
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, f.try_push(1));
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, b.try_pop(result));
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)empty, ft.try_pop(result));
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, bk.try_push(1));
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, ft.try_pop(result));
     ASSERT_EQ(1, result);
-    ASSERT_TRUE(b.is_empty());
+    ASSERT_TRUE(ft.is_empty());
 }
 
 // Test the sequential try_push on a full queue.
@@ -193,42 +193,42 @@ void seq_try_full(
 // Test the sequential try_push on a full queue.
 void seq_try_full(
     int count,
-    queue_front<int> f,
-    queue_back<int> b)
+    queue_back<int> bk,
+    queue_front<int> ft)
 {
-    seq_try_fill(count, 1, f);
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)full, f.try_push(count + 1));
-    ASSERT_EQ(1, b.value_pop());
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, f.try_push(count + 1));
+    seq_try_fill(count, 1, bk);
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)full, bk.try_push(count + 1));
+    ASSERT_EQ(1, ft.value_pop());
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, bk.try_push(count + 1));
     for ( int i = 2; i <= count + 1; ++i ) {
         int popped;
-        ASSERT_FALSE(b.is_empty());
-        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, b.try_pop(popped));
+        ASSERT_FALSE(ft.is_empty());
+        ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)success, ft.try_pop(popped));
         ASSERT_EQ(i, popped);
     }
-    ASSERT_TRUE(b.is_empty());
+    ASSERT_TRUE(ft.is_empty());
 }
 
 // Test sequential operations on a closed queue.
-// The front and back must refer to the same queue.
+// The back and front must refer to the same queue.
 void seq_push_pop_closed(
     int count,
-    queue_front<int> f,
-    queue_back<int> b )
+    queue_back<int> bk,
+    queue_front<int> ft )
 {
-    seq_fill(count, 1, f);
-    f.close();
-    ASSERT_TRUE(f.is_closed());
+    seq_fill(count, 1, bk);
+    bk.close();
+    ASSERT_TRUE(bk.is_closed());
     try {
-        f.push(count);
+        bk.push(count);
         FAIL();
     } catch (queue_op_status expected) {
         ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)closed, expected);
     }
-    seq_drain(count, 1, b);
-    ASSERT_TRUE(b.is_closed());
+    seq_drain(count, 1, ft);
+    ASSERT_TRUE(ft.is_closed());
     try {
-        b.value_pop();
+        ft.value_pop();
         FAIL();
     } catch (queue_op_status expected) {
         ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)closed, expected);
@@ -236,54 +236,54 @@ void seq_push_pop_closed(
 }
 
 // Test sequential try operations on a closed queue.
-// The front and back must refer to the same queue.
+// The back and front must refer to the same queue.
 void seq_try_push_pop_closed(
     int count,
-    queue_front<int> f,
-    queue_back<int> b )
+    queue_back<int> bk,
+    queue_front<int> ft )
 {
-    seq_try_fill(count, 1, f);
-    f.close();
-    ASSERT_TRUE(f.is_closed());
-    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)closed, f.try_push(42));
-    seq_try_drain(count, 1, b);
-    ASSERT_TRUE(b.is_closed());
+    seq_try_fill(count, 1, bk);
+    bk.close();
+    ASSERT_TRUE(bk.is_closed());
+    ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)closed, bk.try_push(42));
+    seq_try_drain(count, 1, ft);
+    ASSERT_TRUE(ft.is_closed());
     int popped;
-    queue_op_status result = b.try_pop(popped);
+    queue_op_status result = ft.try_pop(popped);
     ASSERT_EQ(CXX0X_ENUM_QUAL(queue_op_status)closed, result);
 }
 
 // Test queue iteration, which also tests wait_push and wait_pop.
 // Note that this function will wait forever unless the queue is closed.
 void iterate(
-    queue_back<int>::iterator bitr,
-    queue_back<int>::iterator bend,
-    queue_front<int>::iterator fitr,
-    queue_front<int>::iterator fend,
+    queue_front<int>::iterator ft_itr,
+    queue_front<int>::iterator ft_end,
+    queue_back<int>::iterator bk_itr,
+    queue_back<int>::iterator bk_end,
     int (*compute)( int ) )
 {
-    while ( bitr != bend && fitr != fend )
-        *fitr++ = compute(*bitr++);
+    while ( ft_itr != ft_end && bk_itr != bk_end )
+        *bk_itr++ = compute(*ft_itr++);
 }
 
 // Test queue begin and end.
 void filter(
-    queue_back<int> b,
-    queue_front<int> f,
+    queue_front<int> ft,
+    queue_back<int> bk,
     int (*compute)( int ) )
 {
     try {
-        iterate(b.begin(), b.end(), f.begin(), f.end(), compute);
+        iterate(ft.begin(), ft.end(), bk.begin(), bk.end(), compute);
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in filter" << std::endl;
-        b.close();
-        f.close();
+        ft.close();
+        bk.close();
         FAIL();
     } catch (...) {
         mcout << "unexpected exception in filter" << std::endl;
-        b.close();
-        f.close();
+        ft.close();
+        bk.close();
         FAIL();
     }
 }
@@ -293,20 +293,20 @@ void filter(
 void fill(
     int count,
     int multiplier,
-    queue_front<int> f )
+    queue_back<int> bk )
 {
     try {
         for ( int i = 1; i <= count; ++i ) {
-            f.push(i * multiplier);
+            bk.push(i * multiplier);
         }
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in fill " << std::endl;
-        f.close();
+        bk.close();
         FAIL();
     } catch (...) {
         mcout << "unexpected exception in fill " << std::endl;
-        f.close();
+        bk.close();
         FAIL();
     }
 }
@@ -316,23 +316,23 @@ void fill(
 void drain(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     try {
         for ( int i = 1; i <= count; ++i ) {
-            int popped = b.value_pop();
-            CLEANUP_ASSERT_EQ(i * multiplier, popped, b.close(); );
+            int popped = ft.value_pop();
+            CLEANUP_ASSERT_EQ(i * multiplier, popped, ft.close(); );
         }
-        bool empty = b.is_empty();
-        CLEANUP_ASSERT_TRUE(empty, b.close(); );
+        bool empty = ft.is_empty();
+        CLEANUP_ASSERT_TRUE(empty, ft.close(); );
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in drain " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     } catch (...) {
         mcout << "unexpected exception in drain " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }
@@ -343,30 +343,30 @@ void drain(
 void drain_pos_neg(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     try {
         int last_neg = 0;
         int last_pos = 0;
         for ( int i = 1; i <= count; ++i ) {
-            int popped = b.value_pop();
+            int popped = ft.value_pop();
             if ( popped < 0 ) {
-                CLEANUP_ASSERT_LT(popped, last_neg, b.close(); );
+                CLEANUP_ASSERT_LT(popped, last_neg, ft.close(); );
                 last_neg = popped;
             }
             else {
-                CLEANUP_ASSERT_GT(popped, last_pos, b.close(); );
+                CLEANUP_ASSERT_GT(popped, last_pos, ft.close(); );
                 last_pos = popped;
             }
         }
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     } catch (...) {
         mcout << "unexpected exception in drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }
@@ -376,25 +376,25 @@ void drain_pos_neg(
 void drain_any(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     int factor = multiplier < 0 ? -multiplier : multiplier;
     try {
         for ( int i = 1; i <= count; ++i ) {
-            int popped = b.value_pop();
+            int popped = ft.value_pop();
             if ( popped < 0 )
-                CLEANUP_ASSERT_GE(popped, count * -factor, b.close(); );
+                CLEANUP_ASSERT_GE(popped, count * -factor, ft.close(); );
             else
-                CLEANUP_ASSERT_LE(popped, count * factor, b.close(); );
+                CLEANUP_ASSERT_LE(popped, count * factor, ft.close(); );
         }
     } catch (queue_op_status unexpected) {
         mcout << "unexpected queue_op_status::" << unexpected
               << " in drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     } catch (...) {
         mcout << "unexpected exception in drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }
@@ -404,11 +404,11 @@ void drain_any(
 void try_fill(
     int count,
     int multiplier,
-    queue_front<int> f )
+    queue_back<int> bk )
 {
     try {
         for ( int i = 1; i <= count; ) {
-            queue_op_status status = f.try_push(i * multiplier);
+            queue_op_status status = bk.try_push(i * multiplier);
             switch ( status ) {
                 case CXX0X_ENUM_QUAL(queue_op_status)success:
                     ++i;
@@ -418,31 +418,31 @@ void try_fill(
                 default:
                     mcout << "unexpected queue_op_status::" << status
                           << " in try_fill " << std::endl;
-                    f.close();
+                    bk.close();
                     FAIL();
             }
         }
     } catch (...) {
         mcout << "unexpected exception at try_fill " << std::endl;
-        f.close();
+        bk.close();
         FAIL();
     }
 }
 
-// Test the "try" draining of a queue.  Suitable for front/back concurrency.
+// Test the "try" draining of a queue.  Suitable for back/front concurrency.
 // Warning, this uses busy waiting.  Use real threads.
 void try_drain(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     try {
         for ( int i = 1; i <= count; ) {
             int popped;
-            queue_op_status status = b.try_pop(popped);
+            queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
                 case CXX0X_ENUM_QUAL(queue_op_status)success:
-                    CLEANUP_ASSERT_EQ(i * multiplier, popped, b.close(); );
+                    CLEANUP_ASSERT_EQ(i * multiplier, popped, ft.close(); );
                     ++i;
                     break;
                 case CXX0X_ENUM_QUAL(queue_op_status)empty:
@@ -450,13 +450,13 @@ void try_drain(
                 default:
                     mcout << "unexpected queue_op_status::" << status
                           << " in try_drain " << std::endl;
-                    b.close();
+                    ft.close();
                     FAIL();
             }
         }
     } catch (...) {
         mcout << "unexpected exception in try_drain " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }
@@ -467,22 +467,22 @@ void try_drain(
 void try_drain_pos_neg(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     try {
         int last_neg = 0;
         int last_pos = 0;
         for ( int i = 1; i <= count; ) {
             int popped;
-            queue_op_status status = b.try_pop(popped);
+            queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
                 case CXX0X_ENUM_QUAL(queue_op_status)success:
                     if ( popped < 0 ) {
-                        CLEANUP_ASSERT_LT(popped, last_neg, b.close(); );
+                        CLEANUP_ASSERT_LT(popped, last_neg, ft.close(); );
                         last_neg = popped;
                     }
                     else {
-                        CLEANUP_ASSERT_GT(popped, last_pos, b.close(); );
+                        CLEANUP_ASSERT_GT(popped, last_pos, ft.close(); );
                         last_pos = popped;
                     }
                     ++i;
@@ -492,13 +492,13 @@ void try_drain_pos_neg(
                 default:
                     mcout << "unexpected queue_op_status::" << status
                           << "in try_drain_pos_neg " << std::endl;
-                    b.close();
+                    ft.close();
                     FAIL();
             }
         }
     } catch (...) {
         mcout << "unexpected exception in try_drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }
@@ -508,21 +508,21 @@ void try_drain_pos_neg(
 void try_drain_any(
     int count,
     int multiplier,
-    queue_back<int> b )
+    queue_front<int> ft )
 {
     int factor = multiplier < 0 ? -multiplier : multiplier;
     try {
         for ( int i = 1; i <= count; ) {
             int popped;
-            queue_op_status status = b.try_pop(popped);
+            queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
                 case CXX0X_ENUM_QUAL(queue_op_status)success:
                     if ( popped < 0 )
                         CLEANUP_ASSERT_GE(popped, count * -factor,
-                                          b.close(); );
+                                          ft.close(); );
                     else
                         CLEANUP_ASSERT_LE(popped, count * factor,
-                                          b.close(); );
+                                          ft.close(); );
                     ++i;
                     break;
                 case CXX0X_ENUM_QUAL(queue_op_status)empty:
@@ -530,13 +530,13 @@ void try_drain_any(
                 default:
                     mcout << "unexpected queue_op_status::" << status
                           << "in try_drain_pos_neg " << std::endl;
-                    b.close();
+                    ft.close();
                     FAIL();
             }
         }
     } catch (...) {
         mcout << "unexpected exception in try_drain_pos_neg " << std::endl;
-        b.close();
+        ft.close();
         FAIL();
     }
 }

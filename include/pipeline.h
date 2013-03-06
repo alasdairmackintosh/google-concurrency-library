@@ -164,8 +164,8 @@ terminated do_consume(std::function<void (T)> f, T t) {
 
 template<typename IN,
          typename OUT>
-void run_simple_function(queue_back<IN> in_queue,
-                         queue_front<OUT> out_queue,
+void run_simple_function(queue_front<IN> in_queue,
+                         queue_back<OUT> out_queue,
                          function<OUT(IN)> func,
                          __instance* inst) {
   inst->thread_start();
@@ -183,9 +183,9 @@ void run_simple_function(queue_back<IN> in_queue,
 
 template<typename IN,
          typename OUT>
-void run_multi_out_function(queue_back<IN> in_queue,
-                            queue_front<OUT> out_queue,
-                            function<void (IN, queue_front<OUT>)> func,
+void run_multi_out_function(queue_front<IN> in_queue,
+                            queue_back<OUT> out_queue,
+                            function<void (IN, queue_back<OUT>)> func,
                             __instance* inst) {
   inst->thread_start();
   while (1) {
@@ -202,9 +202,9 @@ void run_multi_out_function(queue_back<IN> in_queue,
 
 template<typename IN,
          typename OUT>
-void run_multi_in_function(queue_back<IN> in_queue,
-                           queue_front<OUT> out_queue,
-                           function<OUT(queue_back<IN>)> func,
+void run_multi_in_function(queue_front<IN> in_queue,
+                           queue_back<OUT> out_queue,
+                           function<OUT(queue_front<IN>)> func,
                            __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -216,9 +216,9 @@ void run_multi_in_function(queue_back<IN> in_queue,
 
 template<typename IN,
          typename OUT>
-void run_full_function(queue_back<IN> in_queue,
-                       queue_front<OUT> out_queue,
-                       function<void(queue_back<IN>, queue_front<OUT>)> func,
+void run_full_function(queue_front<IN> in_queue,
+                       queue_back<OUT> out_queue,
+                       function<void(queue_front<IN>, queue_back<OUT>)> func,
                        __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -229,7 +229,7 @@ void run_full_function(queue_back<IN> in_queue,
 }
 
 template<typename IN>
-void run_consumer(queue_back<IN> in_queue,
+void run_consumer(queue_front<IN> in_queue,
                   function<void(IN)> func,
                   __instance* inst) {
   inst->thread_start();
@@ -245,8 +245,8 @@ void run_consumer(queue_back<IN> in_queue,
 }
 
 template<typename IN>
-void run_multi_in_consumer(queue_back<IN> in_queue,
-                           function<void(queue_back<IN>)> func,
+void run_multi_in_consumer(queue_front<IN> in_queue,
+                           function<void(queue_front<IN>)> func,
                            __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -258,7 +258,7 @@ void run_multi_in_consumer(queue_back<IN> in_queue,
 
 template<typename OUT>
 void run_producer(function<OUT (void)> f,
-                  queue_front<OUT> out_queue,
+                  queue_back<OUT> out_queue,
                   __instance* inst) {
   inst->thread_start();
   out_queue.push(f());
@@ -267,8 +267,8 @@ void run_producer(function<OUT (void)> f,
 }
 
 template<typename OUT>
-void run_multi_out_producer(function<void (queue_front<OUT>)> f,
-                            queue_front<OUT> out_queue,
+void run_multi_out_producer(function<void (queue_back<OUT>)> f,
+                            queue_back<OUT> out_queue,
                             __instance* inst) {
   inst->thread_start();
   f(out_queue);
@@ -277,14 +277,14 @@ void run_multi_out_producer(function<void (queue_front<OUT>)> f,
 }
 
 template<typename T>
-void run_queue(queue_back<T> back, queue_front<T> front) {
+void run_queue(queue_front<T> ft, queue_back<T> bk) {
   while (1) {
     T t;
-    queue_op_status status = back.wait_pop(t);
+    queue_op_status status = ft.wait_pop(t);
     if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
       return;  // Queue closed
     }
-    front.push(t);
+    bk.push(t);
   }
 }
 
@@ -295,9 +295,9 @@ template<typename IN,
 class __segment_base {
  public:
   virtual ~__segment_base() {};
-  virtual void run(__instance* inst, queue_front<OUT> out_queue) = 0;
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) = 0;
   virtual __segment_base<IN, OUT>* clone() = 0;
-  virtual queue_front<IN> get_front() = 0;
+  virtual queue_back<IN> get_back() = 0;
  protected:
   __segment_base() {};
 };
@@ -321,11 +321,11 @@ class __segment_chain : public __segment_base<IN, OUT> {
   }
 
  private:
-  virtual void run(__instance* inst, queue_front<OUT> out_queue) {
-    first_->run(inst, second_->get_front());
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) {
+    first_->run(inst, second_->get_back());
     second_->run(inst, out_queue);
   }
-  virtual queue_front<IN> get_front() { return first_->get_front(); }
+  virtual queue_back<IN> get_back() { return first_->get_back(); }
 
   __segment_base<IN, MID>* first_;
   __segment_base<MID, OUT>* second_;
@@ -346,7 +346,7 @@ class __segment_function : public __segment_base<IN, OUT> {
                       f,
                       std::placeholders::_3)) {}
 
-  __segment_function(function<OUT (queue_back<IN>)> f) :
+  __segment_function(function<OUT (queue_front<IN>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       has_function_(true),
       func_(std::bind(run_multi_in_function<IN, OUT>,
@@ -355,7 +355,7 @@ class __segment_function : public __segment_base<IN, OUT> {
                       f,
                       std::placeholders::_3)) {}
 
-  __segment_function(function<void (IN, queue_front<OUT>)> f) :
+  __segment_function(function<void (IN, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       has_function_(true),
       func_(std::bind(run_multi_out_function<IN, OUT>,
@@ -364,7 +364,7 @@ class __segment_function : public __segment_base<IN, OUT> {
                       f,
                       std::placeholders::_3)) {}
 
-  __segment_function(function<void (queue_back<IN>, queue_front<OUT>)> f) :
+  __segment_function(function<void (queue_front<IN>, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       has_function_(true),
       func_(std::bind(run_full_function<IN, OUT>,
@@ -379,22 +379,22 @@ class __segment_function : public __segment_base<IN, OUT> {
       has_function_(f.has_function_),
       func_(f.func_) {}
 
-  virtual void run(__instance* inst, queue_front<OUT> out_queue) {
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) {
     // TODO(aberkan): Check for failures from both functions
-    inst->execute(std::bind(func_, queue_back<IN>(queue_), out_queue, inst));
+    inst->execute(std::bind(func_, queue_front<IN>(queue_), out_queue, inst));
   }
   virtual __segment_function<IN, OUT>* clone() {
     return new __segment_function<IN, OUT>(*this);
   }
 
-  virtual queue_front<IN> get_front() { return queue_front<IN>(queue_); }
+  virtual queue_back<IN> get_back() { return queue_back<IN>(queue_); }
 
   queue_object<buffer_queue<IN> > queue_;
 
   // If false, func_ is a no-op and this can be merged with later functions.
   // TODO(aberkan): Implement merging
   bool has_function_;
-  function<void (queue_back<IN>, queue_front<OUT>, __instance*)> func_;
+  function<void (queue_front<IN>, queue_back<OUT>, __instance*)> func_;
 };
 
 template<typename OUT>
@@ -406,7 +406,7 @@ class __segment_producer : public __segment_base<terminated, OUT> {
                       std::placeholders::_1,
                       std::placeholders::_2)) {}
 
-  __segment_producer(function<void (queue_front<OUT>)> f) :
+  __segment_producer(function<void (queue_back<OUT>)> f) :
       func_(std::bind(run_multi_out_producer<OUT>,
                       f,
                       std::placeholders::_1,
@@ -414,10 +414,10 @@ class __segment_producer : public __segment_base<terminated, OUT> {
 
   virtual ~__segment_producer() {}
 
-  virtual void run(__instance* inst, queue_front<OUT> out_queue) {
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) {
     inst->execute(std::bind(func_, out_queue, inst));
   }
-  virtual queue_front<terminated> get_front() {
+  virtual queue_back<terminated> get_back() {
     // TODO(aberkan): If we want to combine plans, this would need to be
     // implemented.
     throw;  // Unimplemented
@@ -427,13 +427,13 @@ class __segment_producer : public __segment_base<terminated, OUT> {
   }
 
   // TODO(aberkan): should be private to __segment_parallel
-  __segment_producer(function<void (queue_front<OUT>, __instance*)> func) :
+  __segment_producer(function<void (queue_back<OUT>, __instance*)> func) :
       func_(func) {}
  private:
   __segment_producer(const __segment_producer<OUT>& f) :
       func_(f.func_) {}
 
-  function<void (queue_front<OUT>, __instance*)> func_;
+  function<void (queue_back<OUT>, __instance*)> func_;
 };
 
 template<typename IN>
@@ -446,7 +446,7 @@ class __segment_consumer : public __segment_base<IN, terminated> {
                       f,
                       std::placeholders::_2)) {}
 
-  __segment_consumer(function<void (queue_back<IN>)> f) :
+  __segment_consumer(function<void (queue_front<IN>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_multi_in_consumer<IN>,
                       std::placeholders::_1,
@@ -460,36 +460,36 @@ class __segment_consumer : public __segment_base<IN, terminated> {
       queue_(10),  // TODO(aberkan): remove limit
       func_(f.func_) {}
 
-  virtual void run(__instance* inst, queue_front<terminated> out_queue) {
+  virtual void run(__instance* inst, queue_back<terminated> out_queue) {
     // TODO(aberkan): Check for failures from both functions
-    inst->execute(std::bind(func_, queue_back<IN>(queue_), inst));
+    inst->execute(std::bind(func_, queue_front<IN>(queue_), inst));
   }
   virtual __segment_consumer<IN>* clone() {
     return new __segment_consumer<IN>(*this);
   }
 
-  virtual queue_front<IN> get_front() { return queue_front<IN>(queue_); }
+  virtual queue_back<IN> get_back() { return queue_back<IN>(queue_); }
   queue_object<buffer_queue<IN> > queue_;
 
-  function<void (queue_back<IN>, __instance*)> func_;
+  function<void (queue_front<IN>, __instance*)> func_;
 };
 
 template<typename IN>
 class __segment_queue_consumer : public __segment_base<IN, terminated> {
  public:
-  __segment_queue_consumer(queue_front<IN> f) :
-      f_(f) {}
+  __segment_queue_consumer(queue_back<IN> bk) :
+      bk_(bk) {}
   virtual ~__segment_queue_consumer() {}
 
-  virtual void run(__instance* inst, queue_front<terminated> out_queue) {
+  virtual void run(__instance* inst, queue_back<terminated> out_queue) {
     // NO-OP
   }
-  virtual queue_front<IN> get_front() { return f_; }
+  virtual queue_back<IN> get_back() { return bk_; }
   virtual __segment_queue_consumer<IN>* clone() {
-    return new __segment_queue_consumer<IN>(f_);
+    return new __segment_queue_consumer<IN>(bk_);
   }
  private:
-  queue_front<IN> f_;
+  queue_back<IN> bk_;
 };
 
   // Parallel
@@ -499,7 +499,7 @@ class __segment_parallel : public __segment_base<IN, OUT> {
  public:
   __segment_parallel(__segment_base<IN, OUT>* s, size_t n) :
       in_queue_(10), s_(s), bases_(n), out_queues_(n) {
-    function<void (queue_front<IN>, __instance*) > f =
+    function<void (queue_back<IN>, __instance*) > f =
         bind(&__segment_parallel<IN, OUT>::run_parallel_queue,
              this,
              std::placeholders::_1,
@@ -519,21 +519,21 @@ class __segment_parallel : public __segment_base<IN, OUT> {
     }
     delete s_;
   }
-  virtual void run(__instance* inst, queue_front<OUT> out_queue) {
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) {
     for (size_t i = 0; i < bases_.size(); ++i) {
-      bases_[i]->run(inst, out_queues_[i]->front());
+      bases_[i]->run(inst, out_queues_[i]->back());
     }
     inst->execute(std::bind(&__segment_parallel::run_out_queues,
                             this, out_queue, inst));
   }
 
-  virtual queue_front<IN> get_front() { return in_queue_.front(); }
+  virtual queue_back<IN> get_back() { return in_queue_.back(); }
   virtual __segment_parallel<IN, OUT>* clone() {
     return new __segment_parallel<IN, OUT>(s_->clone(), bases_.size());
   }
 
 private:
-  void run_parallel_queue(queue_front<IN> out_queue,
+  void run_parallel_queue(queue_back<IN> out_queue,
                           __instance* inst) {
     inst->thread_start();
     run_queue<IN>(in_queue_, out_queue);
@@ -541,12 +541,12 @@ private:
     inst->thread_done();
   }
 
-  void run_out_queues(queue_front<OUT> out_queue, __instance* inst) {
+  void run_out_queues(queue_back<OUT> out_queue, __instance* inst) {
     // TODO(aberkan):  This is terrible...  Ideally we shouldn't have this step
     // at all, but at least we should check queues in parallel.
     inst->thread_start();
     for (size_t i = 0; i < out_queues_.size(); ++i) {
-      run_queue<OUT>(out_queues_[i]->back(), out_queue);
+      run_queue<OUT>(out_queues_[i]->front(), out_queue);
     }
     out_queue.close();
     inst->thread_done();
@@ -601,7 +601,7 @@ __instance::__instance(simple_thread_pool* pool,
     thread_end_(NULL), pool_(pool),
     dummy_queue_(1),
     plan_(p) {
-  plan_->run(this, queue_front<terminated>(dummy_queue_));
+  plan_->run(this, queue_back<terminated>(dummy_queue_));
   // We can't create the barrier until all of the threads have started running
   // so we know num_threads_.
   thread_end_ = new barrier(num_threads_,
@@ -622,25 +622,25 @@ __instance::~__instance() {
 // Producers
 template<typename OUT>
 segment<terminated, OUT> from(
-    std::function<void (queue_front<OUT>)> f) {
+    std::function<void (queue_back<OUT>)> f) {
   return segment<terminated, OUT>(
       new __segment_producer<OUT>(f));
 }
 template<typename OUT>
-segment<terminated, OUT> from(void f(queue_front<OUT>)) {
-  return from(std::function<void (queue_front<OUT>)>(f));
+segment<terminated, OUT> from(void f(queue_back<OUT>)) {
+  return from(std::function<void (queue_back<OUT>)>(f));
 }
 
 template<typename OUT>
-segment<terminated, OUT> from(queue_back<OUT> b) {
-  function<void (queue_front<OUT>) > f =
+segment<terminated, OUT> from(queue_front<OUT> b) {
+  function<void (queue_back<OUT>) > f =
       bind(run_queue<OUT>, b, std::placeholders::_1);
   return from(f);
 }
 
 template<typename Q>
 segment<terminated, typename Q::value_type> from(Q& q) {
-  return from(q.back());
+  return from(q.front());
 }
 
 // Middle segments
@@ -657,36 +657,36 @@ segment<IN, OUT> make(OUT f(IN)) {
 
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(std::function<OUT (queue_back<IN>)> f) {
+segment<IN, OUT> make(std::function<OUT (queue_front<IN>)> f) {
   return segment<IN, OUT>(new __segment_function<IN, OUT>(f));
 }
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(OUT f(queue_back<IN>)) {
-  return make(std::function<OUT (queue_back<IN>)>(f));
+segment<IN, OUT> make(OUT f(queue_front<IN>)) {
+  return make(std::function<OUT (queue_front<IN>)>(f));
 }
 
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(std::function<void (IN, queue_front<OUT>)> f) {
+segment<IN, OUT> make(std::function<void (IN, queue_back<OUT>)> f) {
   return segment<IN, OUT>(new __segment_function<IN, OUT>(f));
 }
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(void f(IN, queue_front<OUT>)) {
-  return make(std::function<void (IN, queue_front<OUT>)>(f));
+segment<IN, OUT> make(void f(IN, queue_back<OUT>)) {
+  return make(std::function<void (IN, queue_back<OUT>)>(f));
 }
 
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(std::function<void (queue_back<IN>,
-                                          queue_front<OUT>)> f) {
+segment<IN, OUT> make(std::function<void (queue_front<IN>,
+                                          queue_back<OUT>)> f) {
   return segment<IN, OUT>(new __segment_function<IN, OUT>(f));
 }
 template<typename IN,
          typename OUT>
-segment<IN, OUT> make(void f(queue_back<IN>, queue_front<OUT>)) {
-  return make(std::function<void (queue_back<IN>, queue_front<OUT>)>(f));
+segment<IN, OUT> make(void f(queue_front<IN>, queue_back<OUT>)) {
+  return make(std::function<void (queue_front<IN>, queue_back<OUT>)>(f));
 }
 
 // Consumers
@@ -702,14 +702,14 @@ segment<IN, terminated> to(void consumer(IN)) {
 }
 
 template<typename IN>
-segment<IN, terminated> to(queue_front<IN> front) {
+segment<IN, terminated> to(queue_back<IN> bk) {
   return segment<IN, terminated>(
-      new __segment_queue_consumer<IN>(front));
+      new __segment_queue_consumer<IN>(bk));
 }
 
 template<typename Q>
 segment<typename Q::value_type, terminated> to(Q& q) {
-  return to(q.front());
+  return to(q.back());
 }
 
 
@@ -755,7 +755,7 @@ template<typename IN,
          typename MID,
          typename OUT>
 segment<IN, OUT> operator|(const segment<IN, MID>& p1,
-                           std::function<void (MID, queue_front<OUT>)> f) {
+                           std::function<void (MID, queue_back<OUT>)> f) {
   return p1 | make(f);
 }
 
@@ -763,7 +763,7 @@ template<typename IN,
          typename MID,
          typename OUT>
 segment<IN, OUT> operator|(const segment<IN, MID>& p1,
-                           void f(MID, queue_front<OUT>)) {
+                           void f(MID, queue_back<OUT>)) {
   return p1 | make(f);
 }
 
@@ -785,9 +785,9 @@ segment<IN, terminated> operator|(const segment<IN, MID>& p1,
 
 template<typename MID,
          typename OUT>
-segment<MID, terminated> operator|(queue_back<MID> back,
+segment<MID, terminated> operator|(queue_front<MID> ft,
                                    const segment<MID, OUT>& p1) {
-  return from(back) | p1;
+  return from(ft) | p1;
 }
 
 template<typename OUT,
@@ -800,8 +800,8 @@ segment<terminated, OUT> operator|(Q& q,
 template<typename IN,
          typename MID>
 segment<IN, terminated> operator|(const segment<IN, MID>& p1,
-                                  queue_front<MID> front) {
-  return p1 | to(front);
+                                  queue_back<MID> bk) {
+  return p1 | to(bk);
 }
 
 template<typename IN,

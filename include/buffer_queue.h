@@ -41,10 +41,10 @@ class buffer_queue
 
 //TODO(crowl): Do we want this?
 #if 0
-    generic_queue_front<value_type> front()
-        { return generic_queue_front<value_type>(this); }
     generic_queue_back<value_type> back()
         { return generic_queue_back<value_type>(this); }
+    generic_queue_front<value_type> front()
+        { return generic_queue_front<value_type>(this); }
 #endif
 
     void close();

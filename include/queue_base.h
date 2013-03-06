@@ -26,30 +26,30 @@
 namespace gcl {
 
 template <typename Queue>
-class queue_front_iter
+class queue_back_iter
 :
     public std::iterator<std::output_iterator_tag, void, void, void, void>
 {
   public:
     typedef typename Queue::value_type value_type;
 
-    queue_front_iter(Queue& q) : q_(&q) { }
-    queue_front_iter() : q_(static_cast<Queue*>(NULL)) { }
+    queue_back_iter(Queue& q) : q_(&q) { }
+    queue_back_iter() : q_(static_cast<Queue*>(NULL)) { }
 
-    queue_front_iter& operator *() { return *this; }
-    queue_front_iter& operator ++() { return *this; }
-    queue_front_iter& operator ++(int) { return *this; }
-    queue_front_iter& operator =(const value_type& value);
+    queue_back_iter& operator *() { return *this; }
+    queue_back_iter& operator ++() { return *this; }
+    queue_back_iter& operator ++(int) { return *this; }
+    queue_back_iter& operator =(const value_type& value);
 
-    bool operator ==(const queue_front_iter& y) { return q_ == y.q_; }
-    bool operator !=(const queue_front_iter& y) { return q_ != y.q_; }
+    bool operator ==(const queue_back_iter& y) { return q_ == y.q_; }
+    bool operator !=(const queue_back_iter& y) { return q_ != y.q_; }
 
   private:
     Queue* q_;
 };
 
 template <typename Queue>
-class queue_back_iter
+class queue_front_iter
 :
     public std::iterator<std::input_iterator_tag, void, void, void, void>
 {
@@ -65,17 +65,17 @@ class queue_back_iter
         value_type v_;
     };
 
-    queue_back_iter(Queue& q) : q_(&q) { if ( q_ ) next(); }
-    queue_back_iter() : q_(static_cast<Queue*>(NULL)) { }
+    queue_front_iter(Queue& q) : q_(&q) { if ( q_ ) next(); }
+    queue_front_iter() : q_(static_cast<Queue*>(NULL)) { }
 
     const value_type& operator *() const { return v_; }
     const value_type* operator ->() const { return &v_; }
-    queue_back_iter& operator ++() { next(); return *this; }
+    queue_front_iter& operator ++() { next(); return *this; }
     value operator ++(int) { value t = v_; next(); return t; }
 
-    bool operator ==(const queue_back_iter& y)
+    bool operator ==(const queue_front_iter& y)
     { return q_ == y.q_; }
-    bool operator !=(const queue_back_iter& y)
+    bool operator !=(const queue_front_iter& y)
     { return q_ != y.q_; }
 
   private:
@@ -118,22 +118,22 @@ queue_common<Value>::~queue_common() CXX0X_DEFAULTED_EASY
 #endif
 
 template <typename Queue>
-class generic_queue_front
+class generic_queue_back
 {
   public:
     typedef typename Queue::value_type value_type;
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_front_iter<generic_queue_front> iterator;
-    typedef const queue_front_iter<generic_queue_front> const_iterator;
+    typedef queue_back_iter<generic_queue_back> iterator;
+    typedef const queue_back_iter<generic_queue_back> const_iterator;
 
-    //FIX generic_queue_front() CXX0X_DEFAULTED_EASY
-    generic_queue_front(Queue& queue) : queue_(&queue) { }
-    generic_queue_front(Queue* queue) : queue_(queue) { }
-    generic_queue_front(const generic_queue_front& other)
+    //FIX generic_queue_back() CXX0X_DEFAULTED_EASY
+    generic_queue_back(Queue& queue) : queue_(&queue) { }
+    generic_queue_back(Queue* queue) : queue_(queue) { }
+    generic_queue_back(const generic_queue_back& other)
         CXX0X_DEFAULTED_HARD( : queue_(other.queue_) { } )
-    generic_queue_front& operator =(const generic_queue_front& other)
+    generic_queue_back& operator =(const generic_queue_back& other)
         CXX0X_DEFAULTED_HARD( { queue_ = other.queue_; } )
 
     void close() { queue_->close(); }
@@ -170,22 +170,22 @@ class generic_queue_front
 };
 
 template <typename Queue>
-class generic_queue_back
+class generic_queue_front
 {
   public:
     typedef typename Queue::value_type value_type;
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_back_iter<generic_queue_back> iterator;
-    typedef queue_back_iter<generic_queue_back> const_iterator;
+    typedef queue_front_iter<generic_queue_front> iterator;
+    typedef queue_front_iter<generic_queue_front> const_iterator;
 
-    //FIX generic_queue_back() CXX0X_DEFAULTED_EASY
-    generic_queue_back(Queue& queue) : queue_(&queue) { }
-    generic_queue_back(Queue* queue) : queue_(queue) { }
-    generic_queue_back(const generic_queue_back& other)
+    //FIX generic_queue_front() CXX0X_DEFAULTED_EASY
+    generic_queue_front(Queue& queue) : queue_(&queue) { }
+    generic_queue_front(Queue* queue) : queue_(queue) { }
+    generic_queue_front(const generic_queue_front& other)
         CXX0X_DEFAULTED_HARD( : queue_(other.queue_) { } )
-    generic_queue_back& operator =(const generic_queue_back& other)
+    generic_queue_front& operator =(const generic_queue_front& other)
         CXX0X_DEFAULTED_HARD( { queue_ = other.queue_; } )
 
     void close() { queue_->close(); }
@@ -212,8 +212,8 @@ class generic_queue_back
 };
 
 template <typename Queue>
-queue_front_iter<Queue>&
-queue_front_iter<Queue>::operator =(const value_type& value)
+queue_back_iter<Queue>&
+queue_back_iter<Queue>::operator =(const value_type& value)
 {
     queue_op_status s = q_->wait_push(value);
     if ( s != CXX0X_ENUM_QUAL(queue_op_status)success ) {
@@ -225,7 +225,7 @@ queue_front_iter<Queue>::operator =(const value_type& value)
 
 template <typename Queue>
 void
-queue_back_iter<Queue>::next()
+queue_front_iter<Queue>::next()
 {
     queue_op_status s = q_->wait_pop(v_);
     if ( s == CXX0X_ENUM_QUAL(queue_op_status)closed )
@@ -240,15 +240,15 @@ class queue_base
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_back_iter<queue_base> iterator;
-    typedef queue_back_iter<queue_base> const_iterator;
+    typedef queue_front_iter<queue_base> iterator;
+    typedef queue_front_iter<queue_base> const_iterator;
 
     virtual ~queue_base() { }
 
-    iterator begin() { return queue_back_iter<queue_base>(*this); }
-    iterator end() { return queue_back_iter<queue_base>(); }
-    const iterator cbegin() { return queue_back_iter<queue_base>(*this); }
-    const iterator cend() { return queue_back_iter<queue_base>(); }
+    iterator begin() { return queue_front_iter<queue_base>(*this); }
+    iterator end() { return queue_front_iter<queue_base>(); }
+    const iterator cbegin() { return queue_front_iter<queue_base>(*this); }
+    const iterator cend() { return queue_front_iter<queue_base>(); }
 
     virtual void close() = 0;
     virtual bool is_closed() = 0;
@@ -274,21 +274,7 @@ class queue_base
     virtual queue_op_status nonblocking_pop(Value&) = 0;
 };
 
-//TODO(crowl): Use template aliases for queue_front and queue_back?
-
-template <typename Value>
-class queue_front
-: public generic_queue_front< queue_base<Value> >
-{
-  public:
-    queue_front() CXX0X_DEFAULTED_EASY
-    queue_front(queue_base<Value>& queue)
-        : generic_queue_front< queue_base<Value> >(queue) { }
-    queue_front(queue_base<Value>* queue)
-        : generic_queue_front< queue_base<Value> >(queue) { }
-    queue_front(const queue_front<Value>& other)
-        : generic_queue_front< queue_base<Value> >(other.queue_) { }
-};
+//TODO(crowl): Use template aliases for queue_back and queue_front?
 
 template <typename Value>
 class queue_back
@@ -302,6 +288,20 @@ class queue_back
         : generic_queue_back< queue_base<Value> >(queue) { }
     queue_back(const queue_back<Value>& other)
         : generic_queue_back< queue_base<Value> >(other.queue_) { }
+};
+
+template <typename Value>
+class queue_front
+: public generic_queue_front< queue_base<Value> >
+{
+  public:
+    queue_front() CXX0X_DEFAULTED_EASY
+    queue_front(queue_base<Value>& queue)
+        : generic_queue_front< queue_base<Value> >(queue) { }
+    queue_front(queue_base<Value>* queue)
+        : generic_queue_front< queue_base<Value> >(queue) { }
+    queue_front(const queue_front<Value>& other)
+        : generic_queue_front< queue_base<Value> >(other.queue_) { }
 };
 
 template <typename Queue>
@@ -378,11 +378,11 @@ class queue_wrapper
     virtual queue_op_status nonblocking_pop(value_type& x)
     { return ptr->nonblocking_pop(x); }
 
-    queue_front<value_type> front()
-    { return queue_front<value_type>(this); }
-
     queue_back<value_type> back()
     { return queue_back<value_type>(this); }
+
+    queue_front<value_type> front()
+    { return queue_front<value_type>(this); }
 };
 
 template <typename Value>
@@ -391,69 +391,69 @@ class queue_counted
     public queue_base<Value>
 {
   public:
-    queue_counted() : f_(0), r_(0) { }
+    queue_counted() : bk_(0), ft_(0) { }
     virtual ~queue_counted() { }
 
-    void inc_front() { f_++; }
-    void inc_back() { r_++; }
-    bool dec_front() { return --f_ == 0; }
-    bool dec_back() { return --r_ == 0; }
-    bool no_front() { return f_ == 0; }
-    bool no_back() { return r_ == 0; }
+    void inc_back() { bk_++; }
+    void inc_front() { ft_++; }
+    bool dec_back() { return --bk_ == 0; }
+    bool dec_front() { return --ft_ == 0; }
+    bool no_back() { return bk_ == 0; }
+    bool no_front() { return ft_ == 0; }
 
   private:
-    std::atomic<int> f_;
-    std::atomic<int> r_;
+    std::atomic<int> bk_;
+    std::atomic<int> ft_;
 };
 
 template <typename Value>
-class shared_queue_front
+class shared_queue_back
 {
   public:
     typedef Value value_type;
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_front_iter<shared_queue_front> iterator;
-    typedef const queue_front_iter<shared_queue_front> const_iterator;
+    typedef queue_back_iter<shared_queue_back> iterator;
+    typedef const queue_back_iter<shared_queue_back> const_iterator;
 
-    //FIX shared_queue_front()
+    //FIX shared_queue_back()
     //FIX     : queue_(NULL) { }
-    shared_queue_front(queue_counted<value_type>* queue)
-        : queue_(queue) { queue->inc_front(); }
-    shared_queue_front(const shared_queue_front& other)
-        : queue_(other.queue_) { queue_->inc_front(); }
+    shared_queue_back(queue_counted<value_type>* queue)
+        : queue_(queue) { queue->inc_back(); }
+    shared_queue_back(const shared_queue_back& other)
+        : queue_(other.queue_) { queue_->inc_back(); }
 #ifdef HAS_CXX0X_RVREF
-    shared_queue_front(shared_queue_front&& other)
+    shared_queue_back(shared_queue_back&& other)
         : queue_(other.queue_) { other.queue_ = NULL; }
 #endif
 
   private:
     void release()
     {
-        if ( queue_ != NULL && queue_->dec_front() ) {
+        if ( queue_ != NULL && queue_->dec_back() ) {
             queue_->close();
-            if ( queue_->no_back() ) {
+            if ( queue_->no_front() ) {
                 delete queue_;
             }
         }
     }
 
   public:
-    ~shared_queue_front() { release(); }
+    ~shared_queue_back() { release(); }
 
-    shared_queue_front& operator =(const shared_queue_front& other)
+    shared_queue_back& operator =(const shared_queue_back& other)
     {
         if ( this != &other ) {
             release();
             queue_ = other->queue_;
             if ( queue_ != NULL )
-                queue_->inc_front();
+                queue_->inc_back();
         }
         return *this;
     }
 #ifdef HAS_CXX0X_RVREF
-    shared_queue_front& operator =(shared_queue_front&& other)
+    shared_queue_back& operator =(shared_queue_back&& other)
     {
         if ( this != &other ) {
             release();
@@ -498,53 +498,53 @@ class shared_queue_front
 };
 
 template <typename Value>
-class shared_queue_back
+class shared_queue_front
 {
   public:
     typedef Value value_type;
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_back_iter<shared_queue_back> iterator;
-    typedef queue_back_iter<shared_queue_back> const_iterator;
+    typedef queue_front_iter<shared_queue_front> iterator;
+    typedef queue_front_iter<shared_queue_front> const_iterator;
 
-    //FIX shared_queue_back()
+    //FIX shared_queue_front()
     //FIX     : queue_(NULL) { }
-    shared_queue_back(queue_counted<value_type>* queue)
-        : queue_(queue) { queue->inc_back(); }
-    shared_queue_back(const shared_queue_back& other)
-        : queue_(other.queue_) { queue_->inc_back(); }
+    shared_queue_front(queue_counted<value_type>* queue)
+        : queue_(queue) { queue->inc_front(); }
+    shared_queue_front(const shared_queue_front& other)
+        : queue_(other.queue_) { queue_->inc_front(); }
 #ifdef HAS_CXX0X_RVREF
-    shared_queue_back(shared_queue_back&& other)
+    shared_queue_front(shared_queue_front&& other)
         : queue_(other.queue_) { other.queue_ = NULL; }
 #endif
 
   private:
     void release()
     {
-        if ( queue_ != NULL && queue_->dec_back() ) {
+        if ( queue_ != NULL && queue_->dec_front() ) {
             queue_->close();
-            if ( queue_->no_front() ) {
+            if ( queue_->no_back() ) {
                 delete queue_;
             }
         }
     }
 
   public:
-    ~shared_queue_back() { release(); }
+    ~shared_queue_front() { release(); }
 
-    shared_queue_back& operator =(const shared_queue_back& other)
+    shared_queue_front& operator =(const shared_queue_front& other)
     {
         if ( this != &other ) {
             release();
             queue_ = other->queue_;
             if ( queue_ != NULL )
-                queue_->inc_back();
+                queue_->inc_front();
         }
         return *this;
     }
 #ifdef HAS_CXX0X_RVREF
-    shared_queue_back& operator =(shared_queue_back&& other)
+    shared_queue_front& operator =(shared_queue_front&& other)
     {
         if ( this != &other ) {
             release();
@@ -595,10 +595,10 @@ class queue_owner
 
     virtual ~queue_owner() { delete ptr; }
 
-    queue_front<value_type> front()
-        { return queue_front<value_type>(this); }
     queue_back<value_type> back()
         { return queue_back<value_type>(this); }
+    queue_front<value_type> front()
+        { return queue_front<value_type>(this); }
 
     virtual void close() { ptr->close(); }
     virtual bool is_closed() { return ptr->is_closed(); }
@@ -661,12 +661,12 @@ class queue_object
 
     virtual ~queue_object() { }
 
-    operator queue_front<value_type>() //TODO(crowl) Really?
-        { return queue_front<value_type>(this); }
-    queue_front<value_type> front()
-        { return queue_front<value_type>(this); }
+    operator queue_back<value_type>() //TODO(crowl) Really?
+        { return queue_back<value_type>(this); }
     queue_back<value_type> back()
         { return queue_back<value_type>(this); }
+    queue_front<value_type> front()
+        { return queue_front<value_type>(this); }
 
     virtual void close() { obj_.close(); }
     virtual bool is_closed() { return obj_.is_closed(); }
@@ -707,38 +707,38 @@ class queue_object
 #ifdef HAS_CXX0X_VARIADIC_TMPL
 
 template <typename Queue, typename ... Args>
-std::pair< shared_queue_front<typename Queue::value_type>,
-           shared_queue_back<typename Queue::value_type> >
+std::pair< shared_queue_back<typename Queue::value_type>,
+           shared_queue_front<typename Queue::value_type> >
 share_queue_ends(Args ... args)
 {
   typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(args...) );
-  return std::make_pair(shared_queue_front<elemtype>(q),
-                        shared_queue_back<elemtype>(q));
+  return std::make_pair(shared_queue_back<elemtype>(q),
+                        shared_queue_front<elemtype>(q));
 }
 
 #else
 
 template <typename Queue, typename Arg>
-std::pair< shared_queue_front<typename Queue::value_type>,
-           shared_queue_back<typename Queue::value_type> >
+std::pair< shared_queue_back<typename Queue::value_type>,
+           shared_queue_front<typename Queue::value_type> >
 share_queue_ends(Arg arg)
 {
   typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(arg) );
-  return std::make_pair(shared_queue_front<elemtype>(q),
-                        shared_queue_back<elemtype>(q));
+  return std::make_pair(shared_queue_back<elemtype>(q),
+                        shared_queue_front<elemtype>(q));
 }
 
 template <typename Queue, typename Arg1, typename Arg2>
-std::pair< shared_queue_front<typename Queue::value_type>,
-           shared_queue_back<typename Queue::value_type> >
+std::pair< shared_queue_back<typename Queue::value_type>,
+           shared_queue_front<typename Queue::value_type> >
 share_queue_ends(Arg1 arg1, Arg2 arg2)
 {
   typedef typename Queue::value_type elemtype;
   CXX0X_AUTO_VAR( q, new queue_object<Queue>(arg1, arg2) );
-  return std::make_pair(shared_queue_front<elemtype>(q),
-                        shared_queue_back<elemtype>(q));
+  return std::make_pair(shared_queue_back<elemtype>(q),
+                        shared_queue_front<elemtype>(q));
 }
 
 #endif

@@ -29,8 +29,8 @@ using gcl::buffer_queue;
 using gcl::map_reduce_options;
 using gcl::map_reduce;
 using gcl::mapper;
-using gcl::queue_back;
-using gcl::queue_back_iter;
+using gcl::queue_front;
+using gcl::queue_front_iter;
 using gcl::queue_base;
 using gcl::queue_wrapper;
 using gcl::reducer;
@@ -88,7 +88,7 @@ TEST_F(MapReduceTest, TestMR) {
 
   typedef gcl::blocking_map<std::map<int, float> > blocking_output_map;
   typedef gcl::map_output_iter<blocking_output_map> output_iter;
-  typedef queue_back_iter<queue_base<int> > input_iter;
+  typedef queue_front_iter<queue_base<int> > input_iter;
 
   blocking_output_map out_map;
   map_reduce_options<int, int, float, float, output_iter> opts;

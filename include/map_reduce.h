@@ -207,7 +207,7 @@ class map_reduce {
       if (reducer_threads[r]) {
         reducer_threads[r]->execute(
             std::bind(&reducer_helper<
-                          queue_back_iter<queue_base<map_key_task<K, V> > >,
+                          queue_front_iter<queue_base<map_key_task<K, V> > >,
                           OutIter,
                           Reducer,
                           map_key_task_reducer_splitter<K, V> >,

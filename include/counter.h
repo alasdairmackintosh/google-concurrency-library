@@ -76,7 +76,7 @@ but without the cost of atomicity.
 COUNTER BUFFERS
 
 The cost of incrementing the counter is reduced
-by placing a serial_counter_buffer in front of the atomic_counter.
+by using a serial_counter_buffer as a proxy for the atomic_counter.
 
     atomic_counter<int> suspicious_count( 0 );
 
@@ -98,7 +98,7 @@ The destructor does an implicit push.
 An atomic_counter_buffer is available for processor-local buffers,
 which can substantially reduce machine-to-machine communication.
 
-You can also place a serial_counter_buffer in front of an
+You can use a serial_counter_buffer as a proxy for an
 atomic_counter_buffer to further reduce costs.
 
     atomic_counter<int> global_counter( 0 );

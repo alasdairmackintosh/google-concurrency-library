@@ -83,12 +83,12 @@ void print_string(string s) {
   printf("%s", s.c_str());
 }
 
-void repeat(int i, queue_front<int> q) {
+void repeat(int i, queue_back<int> q) {
   q.push(i);
   q.push(i);
 }
 
-int sum_two(queue_back<int> q) {
+int sum_two(queue_front<int> q) {
   int i;
   queue_op_status status = q.wait_pop(i);
   if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
@@ -102,7 +102,7 @@ int sum_two(queue_back<int> q) {
   return i + j;
 }
 
-void produce_strings(queue_front<string> queue) {
+void produce_strings(queue_back<string> queue) {
   printf("Producing strings\n");
   queue.push("Produced String1");
   queue.push("Produced String22");
