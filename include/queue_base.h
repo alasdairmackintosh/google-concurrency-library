@@ -240,15 +240,7 @@ class queue_base
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    typedef queue_front_iter<queue_base> iterator;
-    typedef queue_front_iter<queue_base> const_iterator;
-
     virtual ~queue_base() { }
-
-    iterator begin() { return queue_front_iter<queue_base>(*this); }
-    iterator end() { return queue_front_iter<queue_base>(); }
-    const iterator cbegin() { return queue_front_iter<queue_base>(*this); }
-    const iterator cend() { return queue_front_iter<queue_base>(); }
 
     virtual void close() = 0;
     virtual bool is_closed() = 0;
