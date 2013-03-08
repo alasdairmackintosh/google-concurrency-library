@@ -102,7 +102,7 @@ class buffer_queue
             --waiting_full_;
             not_full_.notify_one();
         }
-        // The change to the queue must happen before after the copy/move
+        // The change to the queue must happen before the copy/move
         // has a chance to fail.
 #ifdef HAS_CXX0X_RVREF
         elem = std::move(buffer_[pdx]);
