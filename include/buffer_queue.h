@@ -95,39 +95,47 @@ class buffer_queue
     queue_op_status try_push_common(Value&& x);
 #endif
 
-    void pop_from(Value& elem, size_t pdx, size_t hdx)
+    queue_op_status pop_from(Value& elem, size_t pdx)
     {
         pop_index_ = next( pdx );
+        if ( waiting_full_ > 0 ) {
+            --waiting_full_;
+            not_full_.notify_one();
+        }
+        // The change to the queue must happen before after the copy/move
+        // has a chance to fail.
 #ifdef HAS_CXX0X_RVREF
         elem = std::move(buffer_[pdx]);
 #else
         elem = buffer_[pdx];
 #endif
-        if ( waiting_full_ > 0 ) {
-            --waiting_full_;
-            not_full_.notify_one();
-        }
+        return CXX0X_ENUM_QUAL(queue_op_status)success;
     }
 
-    void push_at(const Value& elem, size_t hdx, size_t nxt, size_t pdx)
+    void push_reindex( size_t nxt )
     {
-        buffer_[hdx] = elem;
         push_index_ = nxt;
         if ( waiting_empty_ > 0 ) {
             --waiting_empty_;
             not_empty_.notify_one();
         }
+    }
+
+    queue_op_status push_at(const Value& elem, size_t hdx, size_t nxt)
+    {
+        buffer_[hdx] = elem;
+        // The change to the queue must happen only after the copy succeeds.
+        push_reindex( nxt );
+        return CXX0X_ENUM_QUAL(queue_op_status)success;
     }
 
 #ifdef HAS_CXX0X_RVREF
-    void push_at(Value&& elem, size_t hdx, size_t nxt, size_t pdx)
+    queue_op_status push_at(Value&& elem, size_t hdx, size_t nxt)
     {
         buffer_[hdx] = std::move(elem);
-        push_index_ = nxt;
-        if ( waiting_empty_ > 0 ) {
-            --waiting_empty_;
-            not_empty_.notify_one();
-        }
+        // The change to the queue must happen only after the copy succeeds.
+        push_reindex( nxt );
+        return CXX0X_ENUM_QUAL(queue_op_status)success;
     }
 #endif
 
@@ -179,11 +187,10 @@ void buffer_queue<Value>::iter_init(size_t max_elems, Iter first, Iter last)
     for ( Iter cur = first; cur != last; ++cur ) {
         if ( hdx >= max_elems )
             throw std::invalid_argument("too few slots for iterator");
-        size_t nxt = hdx + 1; // more efficient than next(hdx)
-        size_t pdx = pop_index_;
-        push_at( *cur, hdx, nxt, pdx );
-        hdx = nxt;
+        buffer_[hdx] = *cur;
+        hdx += 1; // more efficient than next(hdx)
     }
+    push_reindex( hdx );
 }
 
 template <typename Value>
@@ -254,15 +261,13 @@ template <typename Value>
 queue_op_status buffer_queue<Value>::try_pop_common(Value& elem)
 {
     size_t pdx = pop_index_;
-    size_t hdx = push_index_;
-    if ( pdx == hdx ) {
+    if ( pdx == push_index_ ) {
         if ( closed_ )
             return CXX0X_ENUM_QUAL(queue_op_status)closed;
         else
             return CXX0X_ENUM_QUAL(queue_op_status)empty;
     }
-    pop_from( elem, pdx, hdx );
-    return CXX0X_ENUM_QUAL(queue_op_status)success;
+    return pop_from( elem, pdx );
 }
 
 template <typename Value>
@@ -306,19 +311,16 @@ queue_op_status buffer_queue<Value>::wait_pop(Value& elem)
     try {
         unique_lock<mutex> hold( mtx_ );
         size_t pdx;
-        size_t hdx;
         for (;;) {
             pdx = pop_index_;
-            hdx = push_index_;
-            if ( pdx != hdx )
+            if ( pdx != push_index_ )
                 break;
             if ( closed_ )
                 return CXX0X_ENUM_QUAL(queue_op_status)closed;
             ++waiting_empty_;
             not_empty_.wait( hold );
         }
-        pop_from( elem, pdx, hdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return pop_from( elem, pdx );
     } catch (...) {
         close();
         throw;
@@ -352,12 +354,9 @@ queue_op_status buffer_queue<Value>::try_push_common(const Value& elem)
         return CXX0X_ENUM_QUAL(queue_op_status)closed;
     size_t hdx = push_index_;
     size_t nxt = next( hdx );
-    size_t pdx = pop_index_;
-    if ( nxt == pdx )
+    if ( nxt == pop_index_ )
         return CXX0X_ENUM_QUAL(queue_op_status)full;
-
-    push_at( elem, hdx, nxt, pdx );
-    return CXX0X_ENUM_QUAL(queue_op_status)success;
+    return push_at( elem, hdx, nxt );
 }
 
 template <typename Value>
@@ -402,20 +401,17 @@ queue_op_status buffer_queue<Value>::wait_push(const Value& elem)
         unique_lock<mutex> hold( mtx_ );
         size_t hdx;
         size_t nxt;
-        size_t pdx;
         for (;;) {
             if ( closed_ )
                 return CXX0X_ENUM_QUAL(queue_op_status)closed;
             hdx = push_index_;
             nxt = next( hdx );
-            pdx = pop_index_;
-            if ( nxt != pdx )
+            if ( nxt != pop_index_ )
                 break;
             ++waiting_full_;
             not_full_.wait( hold );
         }
-        push_at( elem, hdx, nxt, pdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return push_at( elem, hdx, nxt );
     } catch (...) {
         close();
         throw;
@@ -443,11 +439,9 @@ queue_op_status buffer_queue<Value>::try_push_common(Value&& elem)
         return CXX0X_ENUM_QUAL(queue_op_status)closed;
     size_t hdx = push_index_;
     size_t nxt = next( hdx );
-    size_t pdx = pop_index_;
-    if ( nxt == pdx )
+    if ( nxt == pop_index_ )
         return CXX0X_ENUM_QUAL(queue_op_status)full;
-    push_at( std::move(elem), hdx, nxt, pdx );
-    return CXX0X_ENUM_QUAL(queue_op_status)success;
+    return push_at( std::move(elem), hdx, nxt );
 }
 
 
@@ -494,20 +488,17 @@ queue_op_status buffer_queue<Value>::wait_push(Value&& elem)
         unique_lock<mutex> hold( mtx_ );
         size_t hdx;
         size_t nxt;
-        size_t pdx;
         for (;;) {
             if ( closed_ )
                 return CXX0X_ENUM_QUAL(queue_op_status)closed;
             hdx = push_index_;
             nxt = next( hdx );
-            pdx = pop_index_;
-            if ( nxt != pdx )
+            if ( nxt != pop_index_ )
                 break;
             ++waiting_full_;
             not_full_.wait( hold );
         }
-        push_at( std::move(elem), hdx, nxt, pdx );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return push_at( std::move(elem), hdx, nxt );
     } catch (...) {
         close();
         throw;
