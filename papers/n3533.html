@@ -1,0 +1,1055 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+
+<meta http-equiv="Content-Type" content="text/html;charset=US-ASCII">
+
+<style type="text/css">
+
+body {
+  color: #000000;
+  background-color: #FFFFFF;
+}
+
+del {
+  text-decoration: line-through;
+  color: #8B0040;
+}
+ins {
+  text-decoration: underline;
+  color: #005100;
+}
+
+p.example {
+  margin: 2em;
+}
+pre.example {
+  margin: 2em;
+}
+div.example {
+  margin: 2em;
+}
+
+code.extract {
+  background-color: #F5F6A2;
+}
+pre.extract {
+  margin: 2em;
+  background-color: #F5F6A2;
+  border: 1px solid #E1E28E;
+}
+
+p.function {
+}
+
+p.attribute {
+  text-indent: 3em;
+}
+
+blockquote.std {
+  color: #000000;
+  background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding: 0.5em;
+}
+
+blockquote.stddel {
+  text-decoration: line-through;
+  color: #000000;
+  background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding: 0.5em;
+}
+
+blockquote.stdins {
+  text-decoration: underline;
+  color: #000000;
+  background-color: #C8FFC8;
+  border: 1px solid #B3EBB3;
+  padding: 0.5em;
+}
+
+table {
+  border: 1px solid black;
+  border-spacing: 0px;
+  margin-left: auto;
+  margin-right: auto;
+}
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+
+</style>
+
+<title>DRAFT C++ Concurrent Queues</title>
+</head>
+<body>
+<h1>DRAFT C++ Concurrent Queues</h1>
+
+<p>
+ISO/IEC JTC1 SC22 WG21 DRAFT N3533 - 2013-03-10
+</p>
+
+<p>
+Lawrence Crowl, crowl@google.com, Lawrence@Crowl.org
+<br>
+Chris Mysen, mysen@google.com, ccmysen@gmail.com
+</p>
+
+<p>
+<a href="#Introduction">Introduction</a><br>
+<a href="#Conceptual">Conceptual Interface</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#basic_operations">Basic Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#non_waiting">Non-Waiting Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#non_block">Non-Blocking Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#push_front">Push Front Operations</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#closed_queues">Closed Queues</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#empty_full">Empty and Full Queues</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#queue_names">Queue Names</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#element_requirements">Element Type Requirements</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#exception_handling">Exception Handling</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#queue_order">Queue Ordering</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#lock_free">Lock-Free Implementations</a><br>
+<a href="#Concrete">Concrete Queues</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#buffer_queue">Locking Buffer Queue</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#lock_free_buffer_queue">Lock-Free Buffer Queue</a><br>
+<a href="#Tools">Additional Conceptual Tools</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#front_back">Fronts and Backs</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#streaming_iterators">Streaming Iterators</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#storage_iterators">Storage Iterators</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Binary">Binary Interfaces</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Managed">Managed Indirection</a><br>
+<a href="#Implementation">Implementation</a><br>
+<a href="#Revision">Revision History</a><br>
+</p>
+
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>
+Queues provide a mechanism
+for communicating data between components of a system.
+</p>
+
+<p>
+The existing <code>deque</code> in the standard library
+is an inherently sequential data structure.
+Its reference-returning element access operations
+cannot synchronize access to those elements
+with other queue operations.
+So, concurrent pushes and pops on queues
+require a different interface to the queue structure.
+</p>
+
+<p>
+Moreover,
+concurrency adds a new dimension for performance and semantics.
+Different queue implementation must trade off
+uncontended operation cost, contended operation cost,
+and element order guarantees.
+Some of these trade-offs will necessarily result
+in semantics weaker than a serial queue.
+</p>
+
+
+<h2><a name="Conceptual">Conceptual Interface</a></h2>
+
+<p>
+We provide basic queue operations,
+and then extend those operations to cover other important issues.
+</p>
+
+
+<h3><a name="basic_operations">Basic Operations</a></h3>
+
+<p>
+The essential solution to the problem of concurrent queuing
+is to shift to value-based operations, 
+rather than reference-based operations.
+</p>
+
+<p>
+The basic operations are:
+</p>
+
+<dl>
+
+<dt><code>void
+<var>queue</var>::push(const <var>Element</var>&amp;);</code></dt>
+<dt><code>void
+<var>queue</var>::push(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+Push the <code><var>Element</var></code> onto the queue.
+</p>
+</dd>
+
+<dt><code><var>Element</var> <var>queue</var>::value_pop();</code></dt>
+<dd>
+<p>
+Pop an <code><var>Element</var></code> from the queue.
+The element will be moved out of the queue in preference to being copied.
+</p>
+
+</dd>
+
+</dl>
+
+<p>
+These operations will wait when the queue is full or empty.
+(Not all queue implementations can actually be full.)
+These operations may block for mutual exclusion as well.
+</p>
+
+
+<h3><a name="non_waiting">Non-Waiting Operations</a></h3>
+
+<p>
+Waiting on a full or empty queue can take a while,
+which has an opportunity cost.
+Avoiding that wait enables algorithms
+to avoid queuing speculative work when a queue is full,
+to do other work rather than wait for a push on a full queue, and
+to do other work rather than wait for a pop on an empty queue.
+</p>
+
+<dl>
+
+<dt><code>queue_op_status
+<var>queue</var>::try_push(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::try_push(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the queue is full, return <code>queue_op_status::full</code>.
+Otherwise, push the <code><var>Element</var></code> onto the queue.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::try_pop(<var>Element</var>&amp;);</code></dt>
+<dd>
+<p>
+If the queue is empty, return <code>queue_op_status::empty</code>.
+Otherwise, pop the <code><var>Element</var></code> from the queue.
+The element will be moved out of the queue in preference to being copied.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+</dl>
+
+<p>
+These operations will not wait when the queue is full or empty.
+They may block for mutual exclusion.
+</p>
+
+
+<h3><a name="non_block">Non-Blocking Operations</a></h3>
+
+<p>
+For cases when blocking for mutual exclusion is undesirable,
+we have non-blocking operations.
+The interface is the same as the try operations
+but is allowed to also return <code>queue_op_status::busy</code>
+in case the operation is unable to complete without blocking.
+</p>
+
+<dl>
+<dt><code>queue_op_status
+<var>queue</var>::nonblocking_push(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::nonblocking_push(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the operation would block, return <code>queue_op_status::busy</code>. 
+Otherwise, if the queue is full, return <code>queue_op_status::full</code>.
+Otherwise, push the <code><var>Element</var></code> onto the queue.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::nonblocking_pop(<var>Element</var>&amp;);</code></dt>
+<dd>
+<p>
+If the operation would block, return <code>queue_op_status::busy</code>. 
+Otherwise, if the queue is empty, return <code>queue_op_status::empty</code>.
+Otherwise, pop the <code><var>Element</var></code> from the queue.
+The element will be moved out of the queue in preference to being copied.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+</dl>
+
+<p>
+These operations will neither wait nor block.
+They may, however, not do anything.
+</p>
+
+<p>
+The non-blocking operations highlight a terminology problem.
+In terms of synchronization effects,
+<code>nonwaiting_push</code> on queues
+is equivalent to <code>try_lock</code> on mutexes.
+And so one could conclude that
+the existing <code>try_push</code>
+should be renamed <code>nonwaiting_push</code>
+and <code>nonblocking_push</code>
+should be renamed <code>try_push</code>.
+However, at least Thread Building Blocks uses the existing terminology.
+Perhaps better is to not use <code>try_push</code>
+and instead use <code>nonwaiting_push</code> and <code>nonblocking_push</code>.
+</p>
+
+
+<h3><a name="push_front">Push Front Operations</a></h3>
+
+<p>
+Occasionally, one may wish to return a popped item to the queue.
+We can provide for this with <code>push_front</code> operations.
+</p>
+
+<dl>
+
+<dt><code>void
+<var>queue</var>::push_front(const <var>Element</var>&amp;);</code></dt>
+<dt><code>void
+<var>queue</var>::push_front(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+Push the <code><var>Element</var></code> onto the back of the queue,
+i.e. in at the end of the queue that is normally popped.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::try_push_front(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::try_push_front(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the queue was full, return <code>queue_op_status::full</code>.
+Otherwise, push the <code><var>Element</var></code> onto the front of the queue,
+i.e. in at the end of the queue that is normally popped.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::nonblocking_push_front(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::nonblocking_push_front(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the operation would block, return <code>queue_op_status::busy</code>. 
+Otherwise, if the queue is full, return <code>queue_op_status::full</code>.
+Otherwise, push the <code><var>Element</var></code> onto the front queue.
+i.e. in at the end of the queue that is normally popped.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+</dl>
+
+<p>
+This feature was requested at the Spring 2012 meeting.
+However, we do not think the feature works.
+</p>
+
+<ul>
+
+<li><p>
+The name <code>push_front</code> is inconsistent
+with existing "push back" nomenclature.
+</p></li>
+
+<li><p>
+The effects of <code>push_front</code>
+are only distinguishable from a regular push
+when there is a strong ordering of elements.
+Highly concurrent queues will likely have no strong ordering.
+</p></li>
+
+<li><p>
+The <code>push_front</code> call may fail
+due to full queues, closed queues, etc.
+In which case the operation will suffer contention,
+and may succeed only after interposing push and pop operations.
+The consequence is that
+the original push order is not preserved in the final pop order.
+So, <code>push_front</code> cannot be directly used as an 'undo'.
+</p></li>
+
+<li><p>
+The operation implies an ability
+to reverse internal changes at the front of the queue.
+This ability implies a loss efficiency in some implementations.
+</p></li>
+
+</ul>
+
+<p>
+In short, we do not think that in a concurrent environment
+<code>push_front</code> provides sufficient semantic value
+to justify its cost.
+</p>
+
+
+<h3><a name="closed_queues">Closed Queues</a></h3>
+
+<p>
+Threads using a queue for communication
+need some mechanism to signal when the queue is no longer needed.
+The usual approach is add an additional out-of-band signal.
+However, this approach suffers from the flaw that
+threads waiting on either full or empty queues
+need to be woken up when the queue is no longer needed.
+To do that, you need access to the condition variable,
+which considerably increases the complexity and fragility of the interface.
+Rather than require an out-of-band signal,
+we chose to directly support such a signal in the queue itself,
+which considerably simplifies coding.
+</p>
+
+<p>
+To achieve this signal, a thread may <dfn>close</dfn> a queue.
+Once closed, no new elements may be pushed onto the queue.
+Push operations on a closed queue
+will either return <code>queue_op_status::closed</code>
+(when they have a status return)
+or throw <code>queue_op_status::closed</code>
+(when they do not).
+Elements already on the queue may be popped off.
+When a queue is empty and closed,
+pop operations will either
+return <code>queue_op_status::closed</code>
+(when they have a status return)
+or throw <code>queue_op_status::closed</code>
+(when they do not).
+</p>
+
+<p>
+The additional operations are as follows.
+They are essentially equivalent to the basic operations
+except that they return a status,
+avoiding an exception when queues are closed.
+</p>
+
+<dl>
+
+<dt><code>void <var>queue</var>::close();</code></dt>
+<dd>
+<p>
+Close the queue.
+</p>
+</dd>
+
+<dt><code>bool <var>queue</var>::is_closed();</code></dt>
+<dd>
+<p>
+Return true iff the queue is closed.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::wait_push(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::wait_push(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the queue was closed, return <code>queue_op_status::closed</code>.
+Otherwise, push the <code><var>Element</var></code> onto the queue.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::wait_push_front(const <var>Element</var>&amp;);</code></dt>
+<dt><code>queue_op_status
+<var>queue</var>::wait_push_front(<var>Element</var>&amp;&amp;);</code></dt>
+<dd>
+<p>
+If the queue was closed, return <code>queue_op_status::closed</code>.
+Otherwise, push the <code><var>Element</var></code> onto the front of the queue,
+i.e. in at the end of the queue that is normally popped.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+<dt><code>queue_op_status
+<var>queue</var>::wait_pop(<var>Element</var>&amp;);</code></dt>
+<dd>
+<p>
+If the queue is empty and closed, return <code>queue_op_status::closed</code>.
+Otherwise, if the queue is empty, return <code>queue_op_status::empty</code>.
+Otherwise, pop the <code><var>Element</var></code> from the queue.
+The element will be moved out of the queue in preference to being copied.
+Return <code>queue_op_status::success</code>.
+</p>
+</dd>
+
+</dl>
+
+<p>
+The push and pop operations will wait when the queue is full or empty.
+All these operations may block for mutual exclusion as well.
+</p>
+
+<p>
+There are use cases for opening a queue that is closed.
+While we are not aware of an implementation
+in which the ability to reopen a queue would be a hardship,
+we also imagine that such an implementation could exist.
+</p>
+
+<dl>
+
+<dt><code>void <var>queue</var>::open();</code></dt>
+<dd>
+<p>
+Open the queue.
+</p>
+</dd>
+
+</dl>
+
+<p>
+Note that when <code>is_closed()</code> returns false,
+there is no assurance that
+any subsequent operation finds the queue closed
+because some other thread may close it concurrently.
+</p>
+
+<p>
+If an open operation is not available,
+there is an assurance that once closed, a queue stays closed.
+So, unless the programmer takes care
+to ensure that all other threads will not close the queue,
+only a return value of true has any meaning.
+</p>
+
+
+<h3><a name="empty_full">Empty and Full Queues</a></h3>
+
+<p>
+It is sometimes desirable to know if a queue is empty.
+</p>
+
+<dl>
+<dt><code>bool <var>queue</var>::is_empty();</code></dt>
+<dd>
+<p>
+Return true iff the queue is empty.
+</p>
+</dd>
+</dl>
+
+<p>
+This operation is useful only during intervals when
+the queue is known to not be subject to pushes and pops
+from other threads.
+Its primary use case is assertions on the state of the queue
+at the end if its lifetime,
+or when the system is in quiescent state (where there no outstanding pushes).
+</p>
+
+<p>
+We can imagine occasional use for knowing when a queue is full,
+for instance in system performance polling.
+The motivation is significantly weaker though.
+</p>
+
+<dl>
+<dt><code>bool <var>queue</var>::is_full();</code></dt>
+<dd>
+<p>
+Return true iff the queue is full.
+</p>
+</dd>
+</dl>
+
+<p>
+Not all queues will have a full state,
+and these would always return false.
+</p>
+
+
+<h3><a name="queue_names">Queue Names</a></h3>
+
+<p>
+It is sometimes desirable for queues to be able to identify themselves.
+This feature is particularly helpful for run-time diagnotics,
+particularly when 'ends' become dynamically passed around between threads.
+See <a href="#Managed">Managed Indirection</a> below.
+There is some debate on this facility,
+but we see no way to effectively replicate the facility.
+</p>
+
+<dl>
+<dt><code>const char* <var>queue</var>::name();</code></dt>
+<dd>
+<p>
+Return the name string provided as a parameter to queue construction.
+</p>
+</dd>
+</dl>
+
+
+<h3><a name="element_requirements">Element Type Requirements</a></h3>
+
+<p>
+The above operations require element types
+with a default constructor, copy/move constructors,
+copy/move assignment operators,
+and destructor.
+These operations may be trivial.
+The default constructor and destructor shall not throw.
+The copy/move constructors and copy/move assignment operators may throw,
+but must must leave the objects in a valid state
+for subsequent operations.
+</p>
+
+
+<h3><a name="exception_handling">Exception Handling</a></h3>
+
+<p>
+Concurrent queues cannot completely hide the effect of exceptions,
+in part because changes cannot be transparently undone
+when other threads are observing the queue.
+</p>
+
+<p>
+Queues may rethrow exceptions
+from storage allocation, mutexes, or condition variables.
+</p>
+
+<p>
+If the <a href="#element_requirements">element type operations required</a>
+do not throw exceptions,
+then only the exceptions above are rethrown.
+</p>
+
+<p>
+When an element copy/move may throw,
+some queue operations have additional behavior.
+</p>
+
+<ul>
+
+<li><p>
+Construction shall rethrow,
+destroying any elements allocated.
+</p></li>
+
+<li><p>
+A push operation shall rethrow and the state of the queue is unaffected.
+</p></li>
+
+<li><p>
+A pop operation shall rethrow and the element is popped from the queue.
+The value popped is effectively lost.
+(Doing otherwise would likely clog the queue with a bad element.)
+</p></li>
+
+</ul>
+
+
+<h3><a name="queue_order">Queue Ordering</a></h3>
+
+<p>
+The conceptual queue interface makes minimal guarantees.
+</p>
+
+<ul>
+
+<li><p>
+The queue is not empty if there is an element
+that has been pushed but not popped.
+</p></li>
+
+<li><p>
+A push operation <em>synchronizes with</em>
+the pop operation that obtains that element.
+</p></li>
+
+<li><p>
+A close operation <em>synchronizes with</em>
+an operation that observes that the queue is closed.
+</p></li>
+
+<li><p>
+There is a sequentially consistent order of operations.
+</p></li>
+
+</ul>
+
+<p>
+In particular, the conceptual interface does not guarantee
+that the sequentially consistent order of element pushes
+matches the sequentially consistent order of pops.
+Concrete queues could specify more specific ordering guarantees.
+</p>
+
+
+<h3><a name="lock_free">Lock-Free Implementations</a></h3>
+
+<p>
+Lock-free queues will have some trouble
+waiting for the queue to be non-empty or non-full queues.
+Therefore, we propose a two closely-related concepts.
+A full concurrent queue concept as described above,
+and a non-waiting concurrent queue concept
+that has all the operations except
+<code>push</code>, <code>push_front</code>,
+<code>wait_push</code>, <code>wait_push_front</code>,
+<code>value_pop</code> and <code>wait_pop</code>.
+That is, it has blocking operations (presumably emulated with busy wait)
+but not waiting operations.
+We propose naming these <code>WaitingConcurrentQueue</code>
+and <code>NonWaitingConcurrentQueue</code>,
+respectively.
+</p>
+
+<p>
+Note: Adopting this conceptual split
+requires splitting some of the facilities defined later.
+</p>
+
+<p>
+It may be helpful to know if a concurrent queue
+has a lock free implementation.
+
+<dl>
+<dt><code>bool <var>queue</var>::is_lock_free();</code></dt>
+<dd>
+<p>
+Return true iff the has a lock-free implementation.
+</p>
+</dd>
+</dl>
+
+
+<h2><a name="Concrete">Concrete Queues</a></h2>
+
+<p>
+In addition to the concept,
+the standard needs at least one concrete queue.
+We describe two concrete queues.
+</p>
+
+
+<h3><a name="buffer_queue">Locking Buffer Queue</a></h3>
+
+<p>
+We provide a concrete concurrent queue
+in the form of a fixed-size <code>buffer_queue</code>.
+It meets the <code>WaitingConcurrentQueue</code> concept.
+It provides for construction of an empty queue,
+and construction of a queue from a pair of iterators.
+Constructors take a parameter
+specifying the maximum number of elements in the buffer.
+Constructors may also take a parameter
+specifying the name of the queue.
+If the name is not present, it defaults to the empty string.
+</p>
+
+<p>
+The <code>buffer_queue</code>
+deletes the default constructor, the copy constructor,
+and the copy assignment operator.
+We feel that their benefit might not justify their potential confusion.
+</p>
+
+
+<h3><a name="lock_free_buffer_queue">Lock-Free Buffer Queue</a></h3>
+
+<p>
+We provide a concrete concurrent queue
+in the form of a fixed-size <code>lock_free_buffer_queue</code>.
+It meets the <code>NonWaitingConcurrentQueue</code> concept.
+The queue is still under development,
+so details may change.
+</p>
+
+
+<h2><a name="Tools">Additional Conceptual Tools</a></h2>
+
+<p>
+There are a number of tools that support use of the conceptual interface.
+These tools are not part of the queue interface,
+but provide restricted views or adapters on top of the queue
+useful in implementing concurrent algorithms.
+</p>
+
+
+<h3><a name="front_back">Fronts and Backs</a></h3>
+
+<p>
+Restricting an interface to one side of a queue
+is a valuable code structuring tool.
+This restriction is accomplished with
+the classes <code>generic_queue_front</code>
+and <code>generic_queue_back</code>
+parameterized on the concrete queue implementation.
+These act as pointers
+with access to only the front or the back of a queue.
+The front of the queue is where elements are popped.
+The back of the queue is where elements are pushed.
+</p>
+
+<pre class="example">
+<code>void send( int number, generic_queue_back&lt;buffer_queue&lt;int&gt;&gt; arv );</code>
+</pre>
+
+<p>
+These fronts and backs
+are also able to provide <code>begin</code> and <code>end</code> operations
+that unambiguously stream data into or out of a queue.
+</p>
+
+
+<h3><a name="streaming_iterators">Streaming Iterators</a></h3>
+
+<p>
+In order to enable the use of existing algorithms
+streaming through concurrent queues,
+they need to support iterators.
+Output iterators will push to a queue
+and input iterators will pop from a queue.
+Stronger forms of iterators
+are in general not possible with concurrent queues.
+</p>
+
+<p>
+Iterators implicitly require waiting for the advance,
+so iterators are only supportable
+with the <code>WaitingConcurrentQueue</code> concept.
+</p>
+
+<pre class="example">
+<code>void iterate(
+    generic_queue_back&lt;buffer_queue&lt;int&gt;&gt;::iterator bitr,
+    generic_queue_back&lt;buffer_queue&lt;int&gt;&gt;::iterator bend,
+    generic_queue_front&lt;buffer_queue&lt;int&gt;&gt;::iterator fitr,
+    generic_queue_front&lt;buffer_queue&lt;int&gt;&gt;::iterator fend,
+    int (*compute)( int ) )
+{
+    while ( fitr != fend &amp;&amp; bitr != bend )
+        *bitr++ = compute(*fitr++);
+}</code>
+</pre>
+
+<p>
+Note that contrary to existing iterator algorithms,
+we check both iterators for reaching their end,
+as either may be closed at any time.
+</p>
+
+<p>
+Note that with suitable renaming,
+the existing standard front insert and back insert iterators could work as is.
+However, there is nothing like a pop iterator adapter.
+</p>
+
+
+<h3><a name="storage_iterators">Storage Iterators</a></h3>
+
+<p>
+In addition to iterators that stream data into and out of a queue,
+we could provide an iterator over the storage contents of a queue.
+Such and iterator, even when implementable,
+would mostly likely be valid only when the queue is otherwise quiecent.
+We believe such an iterator would be most useful for debugging,
+which may well require knowledge of the concrete class.
+</p>
+
+
+<h3><a name="Binary">Binary Interfaces</a></h3>
+
+<p>
+The standard library is template based,
+but it is often desirable to have a binary interface
+that shields client from the concrete implementations.
+For example, <code>std::function</code> is a binary interface
+to callable object (of a given signature).
+We achieve this capability in queues with type erasure.
+</p>
+
+<p>
+We provide a <code>queue_base</code> class template
+parameterized by the value type.
+Its operations are virtual.
+This class provides the essential independence
+from the queue representation.
+</p>
+
+<p>
+We also provide <code>queue_front</code> and <code>queue_back</code>
+class templates parameterized by the value types.
+These are essentially
+<code>generic_queue_front&lt;queue_base&lt;Value&gt;&gt;</code> and
+<code>generic_queue_front&lt;queue_base&lt;Value&gt;&gt;</code>,
+respectively.
+Indeed, they probably could be template aliases.
+</p>
+
+<p>
+To obtain a pointer to <code>queue_base</code>
+from an non-virtual concurrent queue,
+construct an instance the <code>queue_wrapper</code> class template,
+which is parameterized on the queue
+and derived from <code>queue_base</code>.
+Upcasting a pointer to the <code>queue_wrapper</code> instance
+to a <code>queue_base</code> instance
+thus erases the concrete queue type.
+</p>
+
+<pre class="example">
+<code>extern void seq_fill( int count, queue_back&lt;int&gt; b );
+
+buffer_queue&lt;int&gt; body( 10 /*elements*/, /*named*/ "body" );
+queue_wrapper&lt;buffer_queue&lt;int&gt;&gt; wrap( body );
+seq_fill( 10, wrap.back() );</code>
+</pre>
+
+
+<h3><a name="Managed">Managed Indirection</a></h3>
+
+<p>
+Long running servers may have the need to
+reconfigure the relationship between queues and threads.
+The ability to pass 'ends' of queues between threads
+with automatic memory management eases programming.
+</p>
+
+<p>
+To this end, we provide
+<code>shared_queue_front</code> and
+<code>shared_queue_back</code> template classes.
+These act as reference-counted versions
+of the <code>queue_front</code> and
+<code>queue_back</code> template classes.
+These shared versions
+act on a <code>queue_counted</code> class template,
+which is a counted version of <code>queue_base</code>.
+</p>
+
+<p>
+The concrete counted queues are
+the <code>queue_owner</code> class template,
+which takes ownership of a raw pointer to a queue,
+and the <code>queue_object</code> class template,
+which constructs and instance of the implementation queue within itself.
+Both class templates are derived from <code>queue_counted</code>.
+</p>
+
+<pre class="example">
+<code>queue_owner&lt;buffer_queue&lt;int&gt;&gt; own( new buffer_queue&lt;int&gt;(10, "own") );
+seq_fill( 10, own.back() );</code>
+<code>queue_object&lt;buffer_queue&lt;int&gt;&gt; obj( 10, "own" );
+seq_fill( 10, obj.back() );</code>
+</pre>
+
+<p>
+The <code>share_queue_ends(Args ... args)</code> template function
+will provide a pair of
+<code>shared_queue_front</code> and <code>shared_queue_back</code>
+to a dynamically allocated <code>queue_object</code> instance
+containing an instance of the specified implementation queue.
+When the last of these fronts and backs are deleted,
+the queue itself will be deleted.
+Also, when the last of the fronts or the last of the backs is deleted,
+the queue will be closed.
+</p>
+
+<pre class="example">
+<code>auto x = share_queue_ends&lt;buffer_queue&lt;int&gt;&gt;( 10, "shared" );
+shared_queue_front&lt;int&gt; f(x.first);
+shared_queue_back&lt;int&gt; b(x.second);
+f.push(3);
+assert(3 == b.value_pop());</code>
+</pre>
+
+
+<h2><a name="Implementation">Implementation</a></h2>
+
+<p>
+A free, open-source implementation of these interfaces
+is avaliable at the Google Concurrency Library project
+at 
+<a href="http://code.google.com/p/google-concurrency-library/">
+http://code.google.com/p/google-concurrency-library/</a>.
+The concrete <code>buffer_queue</code> is in
+<a href="http://code.google.com/p/google-concurrency-library/source/browse/include/buffer_queue.h">
+..../source/browse/include/buffer_queue.h</a>.
+The concrete <code>lock_free_buffer_queue</code> is in
+<a href="http://code.google.com/p/google-concurrency-library/source/browse/include/lock_free_buffer_queue.h">
+..../source/browse/include/lock_free_buffer_queue.h</a>.
+The corresponding implementation of the conceptual tools is in
+<a href="http://code.google.com/p/google-concurrency-library/source/browse/include/queue_base.h">
+..../source/browse/include/queue_base.h</a>.
+</p>
+
+
+<h2><a name="Revision">Revision History</a></h2>
+
+<p>
+This paper revises N3434 = 12-0043 - 2012-01-14 as follows.
+</p>
+
+<ul>
+<li><p>Add more exposition.</p></li>
+<li><p>Provide separate non-blocking operations.</p></li>
+<li><p>Add a section on the lock-free queues.</p></li>
+<li><p>Argue against push-back operations.</p></li>
+<li><p>Add a cautionary note
+on the usefulness of <code>is_closed()</code>.</p></li>
+<li><p>Expand the cautionary note
+on the usefulness of <code>is_empty()</code>.
+Add <code>is_full()</code>.</p></li>
+<li><p>Add a subsection on element type requirements.</p></li>
+<li><p>Add a subsection on exception handling.</p></li>
+<li><p>Clarify ordering constraints on the interface.</p></li>
+<li><p>Add a subsection on a lock-free concrete queue.</p></li>
+<li><p>Add a section on content iterators,
+distinct from the existing streaming iterators section.</p></li>
+<li><p>Swap front and back names, as requested.</p></li>
+<li><p>General expository cleanup.</p></li>
+<li><p>Add an 'Revision History' section.</p></li>
+</ul>
+
+<p>
+N3434 revised N3353 = 12-0043 - 2012-01-14 as follows.
+</p>
+
+<ul>
+<li><p>Change the inheritance-based interface
+to a pure conceptual interface.</p></li>
+<li><p>Put 'try' operations into a separate subsection.</p></li>
+<li><p>Add a subsection on non-blocking operations.</p></li>
+<li><p>Add a subsection on push-back operations.</p></li>
+<li><p>Add a subsection on queue ordering.</p></li>
+<li><p>Merge the 'Binary Interface' and 'Managed Indirection' sections
+into a new 'Conceptual Tools' section.
+Expand on the topics and their rationale.</p></li>
+<li><p>Add a subsection to 'Conceptual Tools'
+that provides for type erasure.</p></li>
+<li><p>Remove the 'Synopsis' section.</p></li>
+<li><p>Add an 'Implementation' section.</p></li>
+</ul>
+
+</body>
+</html>
