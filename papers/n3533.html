@@ -97,7 +97,7 @@ td {
 <h1>DRAFT C++ Concurrent Queues</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 DRAFT N3533 - 2013-03-10
+ISO/IEC JTC1 SC22 WG21 DRAFT N3533 - 2013-03-12
 </p>
 
 <p>
@@ -417,10 +417,11 @@ The usual approach is add an additional out-of-band signal.
 However, this approach suffers from the flaw that
 threads waiting on either full or empty queues
 need to be woken up when the queue is no longer needed.
-To do that, you need access to the condition variable used for full/empty
-blocking, which considerably increases the complexity and fragility of the
-interface (as well as leading to some performance implications with additional
-mutexes or atomics).  Rather than require an out-of-band signal,
+To do that, you need access to the condition variables
+used for full/empty blocking,
+which considerably increases the complexity and fragility of the interface.
+It also leads to performance implications with additional mutexes or atomics.
+Rather than require an out-of-band signal,
 we chose to directly support such a signal in the queue itself,
 which considerably simplifies coding.
 </p>
@@ -513,12 +514,14 @@ All these operations may block for mutual exclusion as well.
 There are use cases for opening a queue that is closed.
 While we are not aware of an implementation
 in which the ability to reopen a queue would be a hardship,
-we also imagine that such an implementation could exist. Open should generally
-only be called if the queue is closed and empty, providing a clean
-synchronization point, though it is possible to call open on a non-empty queue.
-As such open operation following a close operation is guaranteed to be visible
-after the close operation and the queue is guaranteed to be open upon
-completion of the open call unless another close call occurs simultaneously.
+we also imagine that such an implementation could exist.
+Open should generally only be called if the queue is closed and empty,
+providing a clean synchronization point,
+though it is possible to call open on a non-empty queue.
+An open operation following a close operation
+is guaranteed to be visible after the close operation
+and the queue is guaranteed to be open upon completion of the open call.
+(But of course, another close call could occur immediately thereafter.)
 </p>
 
 <dl>
