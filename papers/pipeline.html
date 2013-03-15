@@ -160,7 +160,7 @@ isolated from each other, and may be run in parallel. We use a pipe
 syntax that should be familiar to users of Unix or Microsoft shells.
 <br>
 <pre class="example"><code>
-pipeline::from(input_queue) |
+(pipeline::from(input_queue) |
   bind(grep, "^Error") |
   bind(vgrep, "test@example.com") |
   bind(sed, "'s/^Error:.*Message: //") |
@@ -185,7 +185,7 @@ that reads a sequence of strings and&nbsp;outputs those values that
 match a filter. If we wrote the 'grep' function explicitly, using
 input and output queues, it would be of the form:</p>
 <pre class="example"><code>
-void grep_error(queue_back<string> in, queue_front<string> out) {
+void grep_error(queue_back&lt;string&gt; in, queue_front&lt;string&gt; out) {
   string item;
   while (in.wait_pop(item) == queue_op_status::success) {
     if (re::match("^Error", item)) {
@@ -198,7 +198,7 @@ void grep_error(queue_back<string> in, queue_front<string> out) {
 The 'vgrep' function would be similar, while the 'sed' function would apply a transform to each input.
 </p>
 <pre class="example"><code>
-void sed_message(queue_back<string> in, queue_front<string> out) {
+void sed_message(queue_back&lt;string&gt; in, queue_front&lt;string&gt; out) {
   string item;
   while (in.wait_pop(item) == queue_op_status::success) {
     re::apply("s/^Error:.*Message: //", item);
@@ -208,7 +208,7 @@ void sed_message(queue_back<string> in, queue_front<string> out) {
 </code></pre>
 Given these functions, we can then run the pipeline as follows:<br>
 <pre class="example"><code>
-pipeline::from(input_queue) | grep_error |
+(pipeline::from(input_queue) | grep_error |
   vgrep_test |  sed_message | output_queue).run(&thread_pool);</code></pre>
 <pre class="example"><code>
 </code></pre>
@@ -216,7 +216,8 @@ pipeline::from(input_queue) | grep_error |
 
 <p>We would then invoke the pipeline with specific values:</p>
 <pre class="example"><code>
-void grep(const string& re, queue_back<string> in, queue_front<string> out) {
+void grep(const string& re, queue_back&lt;string&gt; in,
+queue_front&lt;string&gt; out) {
   string item;
   while (in.wait_pop(item) == queue_op_status::success) {
     if (re::match(re, item)) {
@@ -224,10 +225,12 @@ void grep(const string& re, queue_back<string> in, queue_front<string> out) {
     }
   }
 }
-void vgrep(const string& re, queue_back<string> in, queue_front<string> out) {
+void vgrep(const string& re, queue_back&lt;string&gt; in,
+queue_front&lt;string&gt; out) {
   ...
 }
-void sed(const string& re, queue_back<string> in, queue_front<string> out) {
+void sed(const string& re, queue_back&lt;string&gt; in,
+queue_front&lt;string&gt; out) {
   string item;
   while (in.wait_pop(item) == queue_op_status::success) {
     re::apply(re, item);
@@ -244,7 +247,7 @@ string sed(const string& re, string item) {
 </code></pre>
 <p>A more common case is to have one input that maps to a variable number of outputs. In that case we will have a single input argument, still use an output queue.</p>
 <pre class="example"><code>
-void grep(const string& re, string item, queue_front<string> out) {
+void grep(const string& re, string item, queue_front&lt;string&gt; out) {
   if (re::match(re, item)) {
     out.push(item);
   }
@@ -266,7 +269,7 @@ reading from multiple files? We can add an extra stage to the
 pipeline:
 
 <pre class="example"><code>
-void read_file(const string& filename, queue_front<string> out) {
+void read_file(const string& filename, queue_front&lt;string&gt; out) {
   File file(filename);
   for (string line : file.readLines()) {
     out.push(line);
@@ -323,7 +326,7 @@ function f1() {
 The C++ equivalent would be:
 
 <pre class="example"><code>
-pipeline::segment<string, string> s1 = pipeline::from(grep_fn) | vgrep_fn | sed_fn;
+pipeline::segment&lt;string, string&gt; s1 = pipeline::from(grep_fn) | vgrep_fn | sed_fn;
 </pre></code>
 
 Segments can themselves be joined together to create longer segments. In a shell:
@@ -336,8 +339,8 @@ function f3() {
 
 <p>In C++:</p>
 <pre class="example"><code>
-pipeline::segment<string, int> s2 = ...
-pipeline::segment<string, int> s3 = s1 | s2;
+pipeline::segment&lt;string, int&gt; s2 = ...
+pipeline::segment&lt;string, int&gt; s3 = s1 | s2;
 </pre></code>
 
 <h3><a name="plan">Pipeline Plans</a></h3>
@@ -357,7 +360,7 @@ pipeline::plan plan = pipeline::from(input_queue) | s1 | output_queue;
 </pre></code>
 In addition to queues, we can also use producer and consumer functions as input and output:
 <pre class="example"><code>
-void read_file(const string& filename, queue_front<string> out) {
+void read_file(const string& filename, queue_front&lt;string&gt; out) {
   File file(filename);
   for (string line : file.readLines()) {
     out.push(line);
@@ -392,7 +395,7 @@ Creating a pipeline execution will cause the pipeline plan to start running in t
 <h3><a name="segmentimpl">Pipeline Segments</a></h3>
 <p>
 A segment is created with <code>pipeline::make()</code>. The base function must
-convert an input to an output type, either directly or via a queue. Input queues and funcitons that are producers can be made into pipelines with&nbsp;<code style="line-height:1.6;font-size:10pt">pipeline::from()&nbsp;</code>and consumers and output queues use&nbsp;pipeline::to(). &nbsp;The following functions all convert integer input to string output:</p>
+convert an input to an output type, either directly or via a queue. Input queues and functions that are producers can be made into pipelines with&nbsp;<code style="line-height:1.6;font-size:10pt">pipeline::from()&nbsp;</code>and consumers and output queues use&nbsp;pipeline::to(). &nbsp;The following functions all convert integer input to string output:</p>
 <pre class="example"><code>
 string direct_fn(int input);
 string queue_in_fn(queue_back&lt;int&gt; input_queue);
@@ -524,8 +527,8 @@ pipeline::from(input.begin(), input.end()) | grep_fn | ...<br>
 <h4>Iterators as parameters to functions</h4>
 Similarly, we could support iterators as argument to pipeline functions:
 <pre class="example"><code>
-typedef iterator<input_iterator_tag, string> Input;
-typedef iterator<output_iterator_tag, string> Input;
+typedef iterator&lt;input_iterator_tag, string&gt; Input;
+typedef iterator&lt;output_iterator_tag, string&gt; Output;
 void grep(const string& re, Input first, Input last, Output out)
 {
   while (first != last) {
