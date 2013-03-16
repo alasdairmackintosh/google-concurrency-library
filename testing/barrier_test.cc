@@ -15,9 +15,7 @@
 // This file is a test of the barrier class
 
 #include <algorithm>
-#include <iterator>
 #include <string>
-#include <vector>
 
 #include "atomic.h"
 #include "thread.h"
@@ -27,8 +25,6 @@
 #include "barrier.h"
 
 using testing::_;
-using testing::Invoke;
-using testing::InSequence;
 
 using std::atomic;
 using gcl::barrier;

@@ -29,6 +29,11 @@ void latch::wait() {
   }
 }
 
+bool latch::try_wait() {
+  unique_lock<mutex> lock(condition_mutex_);
+  return count_ == 0;
+}
+
 void latch::count_down() {
   lock_guard<mutex> lock(condition_mutex_);
   if (count_ == 0) {

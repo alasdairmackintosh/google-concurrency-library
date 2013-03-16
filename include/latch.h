@@ -47,8 +47,12 @@ public:
   // is a no-op.
   void wait();
 
+  // Returns true if the count has been decremented to 0, and false
+  // otherwise. Does not block.
+  bool try_wait();
+
   // Decrements the count, and waits until it reaches 0. When it does, this
-  // thread, as well as any oher threads blocked in wait() will be released.
+  // thread, as well as any other threads blocked in wait() will be released.
   //
   // Throws std::logic_error if the internal count is already 0.
   void count_down_and_wait();
