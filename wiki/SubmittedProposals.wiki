@@ -1,6 +1,6 @@
 #summary List of Proposals that have been sent to the C++ Committee.
 
-WG21 proposals:
+Current WG21 proposals:
 
 [http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3533.html N3533	C++ Concurrent Queues]
 
@@ -12,7 +12,8 @@ WG21 proposals:
 
 [http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3600.html N3600	C++ Latches and Barriers]
 
-WG20 proposals:
+
+Earlier proposals:
 
 [http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3353.html]
 
