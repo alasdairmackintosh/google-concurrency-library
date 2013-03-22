@@ -420,4 +420,4 @@ TEST_F(PriorityQueueTest, Pop) {
 // multiple threads.
 
 // TODO(alasdair): Add additional tests for the methods currently
-// commented out because of C++0x incompatibility.
+// commented out because of C++11 incompatibility.

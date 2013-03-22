@@ -25,7 +25,7 @@
 namespace std {
 
 // System error support [syserr]
-// std::errc is a "class" enum in C++0x. This class emulates that for C++98.
+// std::errc is a "class" enum in C++11. This class emulates that for C++98.
 class errc {
  public:
   enum errc_enum {

@@ -70,7 +70,7 @@ void test_enq(function<queue_op_status(const unsigned int&)> enq_fn,
     while (i < total_enq) {
         do_work(size, arr);
         // Will always retry and not count the enq until success
-        if (enq_fn(i) == CXX0X_ENUM_QUAL(queue_op_status)success) {
+        if (enq_fn(i) == CXX11_ENUM_QUAL(queue_op_status)success) {
             ++i;
             total_val += i;
         } else {
@@ -95,7 +95,7 @@ void test_deq(function<queue_op_status(unsigned int&)> deq_fn,
     while (i < total_deq) {
         // Will always retry and not count the enq until success
         unsigned int val;
-        if (deq_fn(val) == CXX0X_ENUM_QUAL(queue_op_status)success) {
+        if (deq_fn(val) == CXX11_ENUM_QUAL(queue_op_status)success) {
             ++i;
             total_val += val;
             //res = acos(sin(res));

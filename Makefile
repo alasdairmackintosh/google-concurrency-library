@@ -17,7 +17,7 @@
 MAKE_JOBS := $(shell sh util/makejobs.sh)
 FLAGS_MAKE = $(MAKE_JOBS) -f ../util/Makefile
 FLAGS_98 = CXXFLAGS="-std=c++98 -Wno-c++0x-compat"
-FLAGS_0x = CC=gcc CXX=g++ CXXFLAGS=-std=c++0x
+FLAGS_11 = CC=gcc CXX=g++ CXXFLAGS=-std=c++0x
 FLAGS_DBG = BFLAGS=-g3
 FLAGS_OPT = BFLAGS=-O3
 
@@ -25,11 +25,11 @@ FLAGS_OPT = BFLAGS=-O3
 
 default : debug
 
-build : build_opt98 build_opt0x
+build : build_opt98 build_opt11
 
 debug : test_dbg98
 
-test : test_dbg98 test_opt98 test_dbg0x test_opt0x
+test : test_dbg98 test_opt98 test_dbg11 test_opt11
 
 ######## Build Directories
 
@@ -39,14 +39,14 @@ dbg98 :
 opt98 :
 	mkdir opt98
 
-dbg0x :
-	mkdir dbg0x
+dbg11 :
+	mkdir dbg11
 
-opt0x :
-	mkdir opt0x
+opt11 :
+	mkdir opt11
 
 clean :
-	rm -rf dbg98 opt98 dbg0x opt0x
+	rm -rf dbg98 opt98 dbg11 opt11
 
 ######## C++98
 
@@ -65,20 +65,20 @@ test_dbg98 : generate_dbg98
 test_opt98 : generate_opt98
 	cd opt98 ; make $(FLAGS_MAKE) test $(FLAGS_OPT) $(FLAGS_98)
 
-######## C++0x
+######## C++11
 
-generate_dbg0x : dbg0x
-	cd dbg0x ; make $(FLAGS_MAKE) generate $(FLAGS_DBG) $(FLAGS_0x)
-generate_opt0x : opt0x
-	cd opt0x ; make $(FLAGS_MAKE) generate $(FLAGS_OPT) $(FLAGS_0x)
+generate_dbg11 : dbg11
+	cd dbg11 ; make $(FLAGS_MAKE) generate $(FLAGS_DBG) $(FLAGS_11)
+generate_opt11 : opt11
+	cd opt11 ; make $(FLAGS_MAKE) generate $(FLAGS_OPT) $(FLAGS_11)
 
-build_dbg0x : generate_dbg0x
-	cd dbg0x ; make $(FLAGS_MAKE) build $(FLAGS_DBG) $(FLAGS_0x)
-build_opt0x : generate_opt0x
-	cd opt0x ; make $(FLAGS_MAKE) build $(FLAGS_OPT) $(FLAGS_0x)
+build_dbg11 : generate_dbg11
+	cd dbg11 ; make $(FLAGS_MAKE) build $(FLAGS_DBG) $(FLAGS_11)
+build_opt11 : generate_opt11
+	cd opt11 ; make $(FLAGS_MAKE) build $(FLAGS_OPT) $(FLAGS_11)
 
-test_dbg0x : generate_dbg0x
-	cd dbg0x ; make $(FLAGS_MAKE) test $(FLAGS_DBG) $(FLAGS_0x)
-test_opt0x : generate_opt0x
-	cd opt0x ; make $(FLAGS_MAKE) test $(FLAGS_OPT) $(FLAGS_0x)
+test_dbg11 : generate_dbg11
+	cd dbg11 ; make $(FLAGS_MAKE) test $(FLAGS_DBG) $(FLAGS_11)
+test_opt11 : generate_opt11
+	cd opt11 ; make $(FLAGS_MAKE) test $(FLAGS_OPT) $(FLAGS_11)
 

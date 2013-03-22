@@ -274,7 +274,7 @@ template <class T, class U>
 class Stage {
  public:
   // Builder functions for the next operation in the pipeline
-  // What's the right 0x way to handle owned vs. unowned function pointers?
+  // What's the right C++11 way to handle owned vs. unowned function pointers?
   Stage* exec(std::function<T (U)>* func);
   Stage* exec(std::function<T (queue<U>*)>* func);
 

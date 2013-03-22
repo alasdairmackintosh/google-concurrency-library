@@ -16,8 +16,8 @@
 
 cat <<EOF
 
-#ifndef CXX0X_ATOMIC_H
-#define CXX0X_ATOMIC_H
+#ifndef CXX11_ATOMIC_H
+#define CXX11_ATOMIC_H
 
 EOF
 
@@ -27,7 +27,7 @@ cat <<EOF
 
 /*
 This header implements as much as is currently feasible of
-the C++0x atomics,
+the C++11 atomics,
 which is chapter 29 of
 http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2010/n3092.pdf,
 and the C1x atomics.
@@ -35,7 +35,7 @@ and the C1x atomics.
 
 #ifdef __cplusplus
 #include <cstddef>
-#include "cxx0x.h"
+#include "cxx11.h"
 namespace std {
 #else
 #include <stddef.h>
@@ -185,11 +185,11 @@ cat <<EOF
 struct atomic_flag
 {
     #ifdef __cplusplus
-    CXX0X_AGGR_INIT(
-    atomic_flag() CXX0X_DEFAULTED_EASY
-    CXX0X_CONSTEXPR_CTOR atomic_flag( bool __v__ ) : __f__( __v__ ) { }
-    atomic_flag( const atomic_flag& ) CXX0X_DELETED
-    atomic_flag& operator =( const atomic_flag& ) CXX0X_DELETED
+    CXX11_AGGR_INIT(
+    atomic_flag() CXX11_DEFAULTED_EASY
+    CXX11_CONSTEXPR_CTOR atomic_flag( bool __v__ ) : __f__( __v__ ) { }
+    atomic_flag( const atomic_flag& ) CXX11_DELETED
+    atomic_flag& operator =( const atomic_flag& ) CXX11_DELETED
     )
 
 EOF
@@ -211,7 +211,7 @@ done
 
 cat <<EOF
 
-    CXX0X_TRIVIAL_PRIVATE
+    CXX11_TRIVIAL_PRIVATE
     #endif
     bool __f__;
 };
@@ -361,7 +361,7 @@ NAME=$2
 
 cat <<EOF
 
-    CXX0X_TRIVIAL_PRIVATE
+    CXX11_TRIVIAL_PRIVATE
     #endif
     ${NAME} __f__;
 } atomic${KEY};
@@ -378,11 +378,11 @@ NAME=$2
 cat <<EOF
 
     #ifdef __cplusplus
-    CXX0X_AGGR_INIT(
-    atomic${KEY}() CXX0X_DEFAULTED_EASY
-    CXX0X_CONSTEXPR_CTOR atomic${KEY}( ${NAME} __v__ )
+    CXX11_AGGR_INIT(
+    atomic${KEY}() CXX11_DEFAULTED_EASY
+    CXX11_CONSTEXPR_CTOR atomic${KEY}( ${NAME} __v__ )
     : __f__( __v__) { }
-    atomic${KEY}( const atomic${KEY}& ) CXX0X_DELETED
+    atomic${KEY}( const atomic${KEY}& ) CXX11_DELETED
     )
 
 EOF
@@ -450,9 +450,9 @@ do
 
 cat <<EOF
 
-    CXX0X_AGGR_INIT(
+    CXX11_AGGR_INIT(
     atomic${KEY}& operator =
-    ( const atomic${KEY}& ) ${VOLATILE} CXX0X_DELETED
+    ( const atomic${KEY}& ) ${VOLATILE} CXX11_DELETED
     )
 
     ${NAME} operator =( ${NAME} __v__ ) ${VOLATILE}
@@ -847,11 +847,11 @@ INIT=$3
 
 cat <<EOF
 
-    atomic() CXX0X_DEFAULTED_EASY
-    CXX0X_CONSTEXPR_CTOR atomic( ${NAME} __v__ )
-    CXX0X_AGGR_INIT( : ${INIT}( __v__ ) )
-    { CXX0X_NO_AGGR_INIT( __f__ = __v__; ) }
-    atomic( const atomic& ) CXX0X_DELETED
+    atomic() CXX11_DEFAULTED_EASY
+    CXX11_CONSTEXPR_CTOR atomic( ${NAME} __v__ )
+    CXX11_AGGR_INIT( : ${INIT}( __v__ ) )
+    { CXX11_NO_AGGR_INIT( __f__ = __v__; ) }
+    atomic( const atomic& ) CXX11_DELETED
 
 EOF
 
@@ -873,7 +873,7 @@ gen_primary_operators "" "T"
 
 cat <<EOF
 
-    CXX0X_TRIVIAL_PRIVATE
+    CXX11_TRIVIAL_PRIVATE
     T __f__;
 };
 
@@ -1023,6 +1023,6 @@ EOF
 
 cat <<EOF
 
-#endif // CXX0X_ATOMIC_H
+#endif // CXX11_ATOMIC_H
 
 EOF

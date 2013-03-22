@@ -18,7 +18,7 @@
 #include "unordered_map.h"
 #include "mutex.h"
 
-#include "cxx0x.h"
+#include "cxx11.h"
 
 extern recursive_mutex* get_stream_mutex_map( void *stm_ptr );
 

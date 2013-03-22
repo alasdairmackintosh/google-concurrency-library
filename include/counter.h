@@ -161,10 +161,10 @@ Use this counter when you do not intend to extract values.
 template< typename Integral > class serial_counter
 {
 public:
-    CXX0X_CONSTEXPR_CTOR serial_counter() : value_( 0 ) {}
-    CXX0X_CONSTEXPR_CTOR serial_counter( Integral in ) : value_( in ) {}
-    serial_counter( const serial_counter& ) CXX0X_DELETED
-    serial_counter& operator=( const serial_counter& ) CXX0X_DELETED
+    CXX11_CONSTEXPR_CTOR serial_counter() : value_( 0 ) {}
+    CXX11_CONSTEXPR_CTOR serial_counter( Integral in ) : value_( in ) {}
+    serial_counter( const serial_counter& ) CXX11_DELETED
+    serial_counter& operator=( const serial_counter& ) CXX11_DELETED
     void operator +=( Integral by ) { value_ += by; }
     void operator -=( Integral by ) { value_ -= by; }
     void operator ++() { *this += 1; }
@@ -181,9 +181,9 @@ private:
 template< typename Integral > class counter_bumper
 {
 public:
-    CXX0X_CONSTEXPR_CTOR counter_bumper( Integral in ) : value_( in ) {}
-    counter_bumper( const counter_bumper& ) CXX0X_DELETED
-    counter_bumper& operator=( const counter_bumper& ) CXX0X_DELETED
+    CXX11_CONSTEXPR_CTOR counter_bumper( Integral in ) : value_( in ) {}
+    counter_bumper( const counter_bumper& ) CXX11_DELETED
+    counter_bumper& operator=( const counter_bumper& ) CXX11_DELETED
     void operator +=( Integral by )
         { value_.fetch_add( by, std::memory_order_relaxed ); }
     void operator -=( Integral by )
@@ -201,11 +201,11 @@ template< typename Integral > class atomic_counter
 : public counter_bumper< Integral >
 {
 public:
-    CXX0X_CONSTEXPR_CTOR atomic_counter() : counter_bumper< Integral >( 0 ) {}
-    CXX0X_CONSTEXPR_CTOR atomic_counter( Integral in )
+    CXX11_CONSTEXPR_CTOR atomic_counter() : counter_bumper< Integral >( 0 ) {}
+    CXX11_CONSTEXPR_CTOR atomic_counter( Integral in )
         : counter_bumper< Integral >( in ) {}
-    atomic_counter( const atomic_counter& ) CXX0X_DELETED
-    atomic_counter& operator=( const atomic_counter& ) CXX0X_DELETED
+    atomic_counter( const atomic_counter& ) CXX11_DELETED
+    atomic_counter& operator=( const atomic_counter& ) CXX11_DELETED
     Integral load() { return value_.load( std::memory_order_relaxed ); }
     Integral exchange( Integral to )
         { return value_.exchange( to, std::memory_order_relaxed ); }
@@ -227,10 +227,10 @@ template< typename Integral > class serial_counter_buffer
 public:
     serial_counter_buffer( atomic_counter< Integral >& p )
         : value_( 0 ), prime_( p ) {}
-    serial_counter_buffer() CXX0X_DELETED
-    serial_counter_buffer( const serial_counter_buffer& ) CXX0X_DELETED
+    serial_counter_buffer() CXX11_DELETED
+    serial_counter_buffer( const serial_counter_buffer& ) CXX11_DELETED
     serial_counter_buffer& operator=( const serial_counter_buffer& )
-        CXX0X_DELETED
+        CXX11_DELETED
     void operator +=( Integral by ) { value_ += by; }
     void operator -=( Integral by ) { value_ -= by; }
     void operator ++() { *this += 1; }
@@ -250,10 +250,10 @@ template< typename Integral > class atomic_counter_buffer
 public:
     atomic_counter_buffer( counter_bumper< Integral >& p )
         : counter_bumper< Integral >( 0 ), prime_( p ) {}
-    atomic_counter_buffer() CXX0X_DELETED
-    atomic_counter_buffer( const atomic_counter_buffer& ) CXX0X_DELETED
+    atomic_counter_buffer() CXX11_DELETED
+    atomic_counter_buffer( const atomic_counter_buffer& ) CXX11_DELETED
     atomic_counter_buffer& operator=( const atomic_counter_buffer& )
-        CXX0X_DELETED
+        CXX11_DELETED
 
     void push()
         { prime_ += value_.exchange( 0, std::memory_order_relaxed ); }
@@ -307,9 +307,9 @@ class weak_counter_buffer
 {
 public:
     weak_counter_buffer( weak_counter< Integral >& p );
-    weak_counter_buffer() CXX0X_DELETED
-    weak_counter_buffer( const weak_counter_buffer& ) CXX0X_DELETED
-    weak_counter_buffer& operator=( const weak_counter_buffer& ) CXX0X_DELETED
+    weak_counter_buffer() CXX11_DELETED
+    weak_counter_buffer( const weak_counter_buffer& ) CXX11_DELETED
+    weak_counter_buffer& operator=( const weak_counter_buffer& ) CXX11_DELETED
     void operator +=( Integral by ) {
         value_.store( value_.load( std::memory_order_relaxed ) + by,
                       std::memory_order_relaxed ); }
@@ -355,10 +355,10 @@ class duplex_counter_buffer
 {
 public:
     duplex_counter_buffer( duplex_counter< Integral >& p );
-    duplex_counter_buffer() CXX0X_DELETED
-    duplex_counter_buffer( const duplex_counter_buffer& ) CXX0X_DELETED
+    duplex_counter_buffer() CXX11_DELETED
+    duplex_counter_buffer( const duplex_counter_buffer& ) CXX11_DELETED
     duplex_counter_buffer& operator=( const duplex_counter_buffer& )
-        CXX0X_DELETED
+        CXX11_DELETED
     ~duplex_counter_buffer();
 private:
     friend class duplex_counter<Integral>;

@@ -15,7 +15,7 @@
 #ifndef GCL_LATCH_
 #define GCL_LATCH_
 
-#include "cxx0x.h"
+#include "cxx11.h"
 #include "condition_variable.h"
 #include "mutex.h"
 
@@ -66,8 +66,8 @@ private:
   mutex condition_mutex_;
 
  // Disallow copy and assign
-  latch(const latch&) CXX0X_DELETED
-  latch& operator=(const latch&) CXX0X_DELETED
+  latch(const latch&) CXX11_DELETED
+  latch& operator=(const latch&) CXX11_DELETED
 };
 
 }  // End namespace gcl

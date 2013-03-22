@@ -28,15 +28,15 @@ class buffer_queue
   public:
     typedef Value value_type;
 
-    buffer_queue() CXX0X_DELETED
-    buffer_queue(const buffer_queue&) CXX0X_DELETED
+    buffer_queue() CXX11_DELETED
+    buffer_queue(const buffer_queue&) CXX11_DELETED
     buffer_queue(size_t max_elems, const char* name);
     explicit buffer_queue(size_t max_elems);
     template <typename Iter>
     buffer_queue(size_t max_elems, Iter first, Iter last, const char* name);
     template <typename Iter>
     buffer_queue(size_t max_elems, Iter first, Iter last);
-    buffer_queue& operator =(const buffer_queue&) CXX0X_DELETED
+    buffer_queue& operator =(const buffer_queue&) CXX11_DELETED
     ~buffer_queue();
 
 //TODO(crowl): Do we want this?
@@ -60,7 +60,7 @@ class buffer_queue
     queue_op_status wait_push(const Value& x);
     queue_op_status try_push(const Value& x);
     queue_op_status nonblocking_push(const Value& x);
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
     void push(Value&& x);
     queue_op_status wait_push(Value&& x);
     queue_op_status try_push(Value&& x);
@@ -91,7 +91,7 @@ class buffer_queue
 
     queue_op_status try_pop_common(Value& x);
     queue_op_status try_push_common(const Value& x);
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
     queue_op_status try_push_common(Value&& x);
 #endif
 
@@ -104,12 +104,12 @@ class buffer_queue
         }
         // The change to the queue must happen before the copy/move
         // has a chance to fail.
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
         elem = std::move(buffer_[pdx]);
 #else
         elem = buffer_[pdx];
 #endif
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return CXX11_ENUM_QUAL(queue_op_status)success;
     }
 
     void push_reindex( size_t nxt )
@@ -126,16 +126,16 @@ class buffer_queue
         buffer_[hdx] = elem;
         // The change to the queue must happen only after the copy succeeds.
         push_reindex( nxt );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return CXX11_ENUM_QUAL(queue_op_status)success;
     }
 
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
     queue_op_status push_at(Value&& elem, size_t hdx, size_t nxt)
     {
         buffer_[hdx] = std::move(elem);
         // The change to the queue must happen only after the copy succeeds.
         push_reindex( nxt );
-        return CXX0X_ENUM_QUAL(queue_op_status)success;
+        return CXX11_ENUM_QUAL(queue_op_status)success;
     }
 #endif
 
@@ -263,9 +263,9 @@ queue_op_status buffer_queue<Value>::try_pop_common(Value& elem)
     size_t pdx = pop_index_;
     if ( pdx == push_index_ ) {
         if ( closed_ )
-            return CXX0X_ENUM_QUAL(queue_op_status)closed;
+            return CXX11_ENUM_QUAL(queue_op_status)closed;
         else
-            return CXX0X_ENUM_QUAL(queue_op_status)empty;
+            return CXX11_ENUM_QUAL(queue_op_status)empty;
     }
     return pop_from( elem, pdx );
 }
@@ -294,7 +294,7 @@ queue_op_status buffer_queue<Value>::nonblocking_pop(Value& elem)
     try {
         unique_lock<mutex> hold( mtx_, try_to_lock );
         if ( !hold.owns_lock() ) {
-            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+            return CXX11_ENUM_QUAL(queue_op_status)busy;
         }
         return try_pop_common(elem);
     } catch (...) {
@@ -316,7 +316,7 @@ queue_op_status buffer_queue<Value>::wait_pop(Value& elem)
             if ( pdx != push_index_ )
                 break;
             if ( closed_ )
-                return CXX0X_ENUM_QUAL(queue_op_status)closed;
+                return CXX11_ENUM_QUAL(queue_op_status)closed;
             ++waiting_empty_;
             not_empty_.wait( hold );
         }
@@ -334,9 +334,9 @@ Value buffer_queue<Value>::value_pop()
        user-defined copy assignment operator. */
     try {
         Value elem;
-        if ( wait_pop( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed )
-            throw CXX0X_ENUM_QUAL(queue_op_status)closed;
-#ifdef HAS_CXX0X_RVREF
+        if ( wait_pop( elem ) == CXX11_ENUM_QUAL(queue_op_status)closed )
+            throw CXX11_ENUM_QUAL(queue_op_status)closed;
+#ifdef HAS_CXX11_RVREF
         return std::move(elem);
 #else
         return elem;
@@ -351,11 +351,11 @@ template <typename Value>
 queue_op_status buffer_queue<Value>::try_push_common(const Value& elem)
 {
     if ( closed_ )
-        return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        return CXX11_ENUM_QUAL(queue_op_status)closed;
     size_t hdx = push_index_;
     size_t nxt = next( hdx );
     if ( nxt == pop_index_ )
-        return CXX0X_ENUM_QUAL(queue_op_status)full;
+        return CXX11_ENUM_QUAL(queue_op_status)full;
     return push_at( elem, hdx, nxt );
 }
 
@@ -383,7 +383,7 @@ queue_op_status buffer_queue<Value>::nonblocking_push(const Value& elem)
     try {
         unique_lock<mutex> hold( mtx_, try_to_lock );
         if ( !hold.owns_lock() )
-            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+            return CXX11_ENUM_QUAL(queue_op_status)busy;
         return try_push_common(elem);
     } catch (...) {
         close();
@@ -403,7 +403,7 @@ queue_op_status buffer_queue<Value>::wait_push(const Value& elem)
         size_t nxt;
         for (;;) {
             if ( closed_ )
-                return CXX0X_ENUM_QUAL(queue_op_status)closed;
+                return CXX11_ENUM_QUAL(queue_op_status)closed;
             hdx = push_index_;
             nxt = next( hdx );
             if ( nxt != pop_index_ )
@@ -423,12 +423,12 @@ void buffer_queue<Value>::push(const Value& elem)
 {
     /* Only wait_push can throw, and it protects itself, so there
        is no need to try/catch here. */
-    if ( wait_push( elem ) == CXX0X_ENUM_QUAL(queue_op_status)closed ) {
-        throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+    if ( wait_push( elem ) == CXX11_ENUM_QUAL(queue_op_status)closed ) {
+        throw CXX11_ENUM_QUAL(queue_op_status)closed;
     }
 }
 
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
 
 //TODO(crowl) Refactor with non-move versions.
 
@@ -436,11 +436,11 @@ template <typename Value>
 queue_op_status buffer_queue<Value>::try_push_common(Value&& elem)
 {
     if ( closed_ )
-        return CXX0X_ENUM_QUAL(queue_op_status)closed;
+        return CXX11_ENUM_QUAL(queue_op_status)closed;
     size_t hdx = push_index_;
     size_t nxt = next( hdx );
     if ( nxt == pop_index_ )
-        return CXX0X_ENUM_QUAL(queue_op_status)full;
+        return CXX11_ENUM_QUAL(queue_op_status)full;
     return push_at( std::move(elem), hdx, nxt );
 }
 
@@ -469,7 +469,7 @@ queue_op_status buffer_queue<Value>::nonblocking_push(Value&& elem)
     try {
         unique_lock<mutex> hold( mtx_, try_to_lock );
         if (!hold.owns_lock()) {
-            return CXX0X_ENUM_QUAL(queue_op_status)busy;
+            return CXX11_ENUM_QUAL(queue_op_status)busy;
         }
         return try_push_common(elem);
     } catch (...) {
@@ -490,7 +490,7 @@ queue_op_status buffer_queue<Value>::wait_push(Value&& elem)
         size_t nxt;
         for (;;) {
             if ( closed_ )
-                return CXX0X_ENUM_QUAL(queue_op_status)closed;
+                return CXX11_ENUM_QUAL(queue_op_status)closed;
             hdx = push_index_;
             nxt = next( hdx );
             if ( nxt != pop_index_ )
@@ -511,8 +511,8 @@ void buffer_queue<Value>::push(Value&& elem)
     /* Only wait_push can throw, and it protects itself, so there
        is no need to try/catch here. */
     if ( wait_push( std::move(elem) )
-         == CXX0X_ENUM_QUAL(queue_op_status)closed )
-        throw CXX0X_ENUM_QUAL(queue_op_status)closed;
+         == CXX11_ENUM_QUAL(queue_op_status)closed )
+        throw CXX11_ENUM_QUAL(queue_op_status)closed;
 }
 
 #endif

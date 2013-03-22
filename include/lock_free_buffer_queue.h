@@ -34,9 +34,9 @@ class lock_free_buffer_queue
     typedef Value value_type;
 
     // Deleted constructors
-    lock_free_buffer_queue() CXX0X_DELETED
-    lock_free_buffer_queue(const lock_free_buffer_queue&) CXX0X_DELETED
-    lock_free_buffer_queue& operator =(const lock_free_buffer_queue&) CXX0X_DELETED
+    lock_free_buffer_queue() CXX11_DELETED
+    lock_free_buffer_queue(const lock_free_buffer_queue&) CXX11_DELETED
+    lock_free_buffer_queue& operator =(const lock_free_buffer_queue&) CXX11_DELETED
 
     explicit lock_free_buffer_queue(size_t max_elems);
     lock_free_buffer_queue(size_t max_elems, const char* name);
@@ -53,7 +53,7 @@ class lock_free_buffer_queue
     queue_op_status nonblocking_pop(Value&);
     queue_op_status try_push(const Value& x);
     queue_op_status nonblocking_push(const Value& x);
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
     queue_op_status try_push(Value&& x);
     queue_op_status nonblocking_push(Value&& x);
 #endif
@@ -86,7 +86,7 @@ void lock_free_buffer_queue<Value>::init()
     values_ = new atomic<Value*>[MAX_SIZE];    
     for (unsigned int i = 0; i < MAX_SIZE; ++i) {
         // Reset the value.
-        values_[i] = CXX0X_NULLPTR;
+        values_[i] = CXX11_NULLPTR;
     }
 }
 
@@ -106,7 +106,7 @@ void lock_free_buffer_queue<Value>::iter_init(Iter first, Iter last)
         // Could technically do this in a more efficient way since this will
         // only get called from the constructor so synchronization could be
         // cheaper.
-        while(try_push(*cur) != CXX0X_ENUM_QUAL(queue_op_status)success) {
+        while(try_push(*cur) != CXX11_ENUM_QUAL(queue_op_status)success) {
             // keep trying until we can try no longer.
         }
     }
@@ -148,7 +148,7 @@ lock_free_buffer_queue<Value>::lock_free_buffer_queue(
 template <typename Value>
 lock_free_buffer_queue<Value>::~lock_free_buffer_queue() {
     for (unsigned int i = 0; i < MAX_SIZE; ++i) {
-        Value* old_value = values_[i].exchange(CXX0X_NULLPTR);
+        Value* old_value = values_[i].exchange(CXX11_NULLPTR);
         delete old_value;
     }
 }
@@ -188,12 +188,12 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_pop(Value& elem)
             //DBG << "Head loaded" << std::endl;
             if (head == tail_.load()) {
                 //DBG << "Queue empty" << std::endl;
-                return CXX0X_ENUM_QUAL(queue_op_status)empty;
+                return CXX11_ENUM_QUAL(queue_op_status)empty;
             }
 
             // Check that there is a value and head didn't move.
             unsigned long long pos = head % MAX_SIZE;
-            if (values_[pos].load(std::memory_order_relaxed) != CXX0X_NULLPTR) {
+            if (values_[pos].load(std::memory_order_relaxed) != CXX11_NULLPTR) {
                 //DBG << "Found a value at head" << std::endl;
                 // Found a value, now see if we can keep it.
                 if (head_.compare_exchange_strong(head, head + 1)) {
@@ -202,15 +202,15 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_pop(Value& elem)
                     // here, between the head update and the swap of the pointer to
                     // NULL.
                     Value* old_value = values_[pos].exchange(
-                        CXX0X_NULLPTR, std::memory_order_relaxed);
+                        CXX11_NULLPTR, std::memory_order_relaxed);
                     elem = *old_value;
                     //DBG << "Exchange complete (done)" << std::endl;
-                    return CXX0X_ENUM_QUAL(queue_op_status)success;
+                    return CXX11_ENUM_QUAL(queue_op_status)success;
                 }
             } else if (head == head_.load()) {
                 //DBG << "Empty value, waiting on push" << std::endl;
                 // Null but head is still the same, so waiting on a value.
-                return CXX0X_ENUM_QUAL(queue_op_status)busy;
+                return CXX11_ENUM_QUAL(queue_op_status)busy;
             }
 
             // Other active dequeue threads could cause this one to stall
@@ -238,16 +238,16 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(const Value& ele
             //DBG << "Load tail" << std::endl;
             if (tail == (head_.load() + MAX_SIZE)) {
                 //DBG << "Full" << std::endl;
-                return CXX0X_ENUM_QUAL(queue_op_status)full;
+                return CXX11_ENUM_QUAL(queue_op_status)full;
             }
 
             // Write into the current tail position.
             unsigned long long pos = tail % MAX_SIZE;
-            if (values_[pos].load(std::memory_order_relaxed) != CXX0X_NULLPTR) {
+            if (values_[pos].load(std::memory_order_relaxed) != CXX11_NULLPTR) {
                 //DBG << "Non null at current tail" << std::endl;
                 // Pop from same position is still pending. We can't do much to
                 // help him along unfortunately.
-                return CXX0X_ENUM_QUAL(queue_op_status)busy;
+                return CXX11_ENUM_QUAL(queue_op_status)busy;
             }
             // Try to reserve the tail.
             if (tail_.compare_exchange_strong(tail, tail + 1)) {
@@ -258,7 +258,7 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(const Value& ele
                 values_[pos].exchange(new Value(elem),
                                       std::memory_order_relaxed);
                 //DBG << "Exchange complete" << std::endl;
-                return CXX0X_ENUM_QUAL(queue_op_status)success;
+                return CXX11_ENUM_QUAL(queue_op_status)success;
             }
         } while (true);
     } catch (...) {
@@ -266,7 +266,7 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(const Value& ele
     }
 }
 
-#ifdef HAS_CXX0X_RVREF
+#ifdef HAS_CXX11_RVREF
 
 template <typename Value>
 queue_op_status lock_free_buffer_queue<Value>::try_push(Value&& elem)
@@ -284,15 +284,15 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
         do {
             unsigned long long tail = tail_.load();
             if (tail == (head_.load() + MAX_SIZE)) {
-                return CXX0X_ENUM_QUAL(queue_op_status)full;
+                return CXX11_ENUM_QUAL(queue_op_status)full;
             }
 
             // Write into the current tail position.
             unsigned long long pos = tail % MAX_SIZE;
-            if (values_[pos].load(std::memory_order_relaxed) == CXX0X_NULLPTR) {
+            if (values_[pos].load(std::memory_order_relaxed) == CXX11_NULLPTR) {
                 // Pop from same position is still pending. We can't do much to
                 // help him along unfortunately.
-                return CXX0X_ENUM_QUAL(queue_op_status)busy;
+                return CXX11_ENUM_QUAL(queue_op_status)busy;
             }
             // Try to reserve the tail.
             if (tail_.compare_exchange_strong(tail, tail + 1)) {
@@ -301,7 +301,7 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
                 // the atomic pointer.
                 values_[pos].exchange(new Value(elem),
                                       std::memory_order_relaxed);
-                return CXX0X_ENUM_QUAL(queue_op_status)success;
+                return CXX11_ENUM_QUAL(queue_op_status)success;
             }
         } while (true);
     } catch (...) {
@@ -309,7 +309,7 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
     }
 }
 
-// HAS_CXX0X_RVREF
+// HAS_CXX11_RVREF
 #endif
 
 template <typename Value>

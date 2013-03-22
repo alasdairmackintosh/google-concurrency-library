@@ -18,7 +18,7 @@
 #ifndef GCL_STRING_
 #define GCL_STRING_
 
-// Implementation of some of the string utilities from C++0x.
+// Implementation of some of the string utilities from C++11.
 template<typename T>
 std::string to_string(const T& t) {
   std::stringstream ss;

@@ -21,7 +21,7 @@
 
 #include "functional.h"
 
-// This is a really simple subset of C++0X's std::thread (defined in
+// This is a really simple subset of C++11's std::thread (defined in
 // 30.3.1), that we'll use just for testing until we import or write a
 // more complete version.
 class thread {

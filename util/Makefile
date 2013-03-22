@@ -72,7 +72,7 @@ lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
 
 ######## Testing
 
-test : cxx0x_test.o atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
+test : cxx11_test.o atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
 	stdfake_test.pass lower_test.pass mutex_test.pass higher_test.pass \
 	pipeline_test.pass queue_perf_test.exe lock_free_buffer_queue_test.pass
 

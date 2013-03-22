@@ -91,12 +91,12 @@ void repeat(int i, queue_back<int> q) {
 int sum_two(queue_front<int> q) {
   int i;
   queue_op_status status = q.wait_pop(i);
-  if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
+  if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
     return -1;
   }
   int j;
   status = q.wait_pop(j);
-  if (status != CXX0X_ENUM_QUAL(queue_op_status)success) {
+  if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
     return i;
   }
   return i + j;
@@ -146,9 +146,9 @@ TEST_F(PipelineTest, Example) {
   queue_object< buffer_queue<string> > queue(10, "test-queue");
   queue.push("Queued Hello");
 
-  CXX0X_AUTO_VAR(p1, pipeline::make(find_uid));
-  CXX0X_AUTO_VAR(p2, p1 | repeat);
-  CXX0X_AUTO_VAR(p3, queue | p2 | get_user );
+  CXX11_AUTO_VAR(p1, pipeline::make(find_uid));
+  CXX11_AUTO_VAR(p2, p1 | repeat);
+  CXX11_AUTO_VAR(p3, queue | p2 | get_user );
 
   queue_object< buffer_queue<User> > out(10);
   pipeline::plan p4 = p3 | out;
@@ -200,9 +200,9 @@ TEST_F(PipelineTest, ParallelExample) {
   queue.push("queued 333");
   queue.push("queued 4444");
 
-  CXX0X_AUTO_VAR(p3, pipeline::parallel(p2, 2));
-  CXX0X_AUTO_VAR(s, pipeline::from(queue));
-  CXX0X_AUTO_VAR(px, s | p3);
+  CXX11_AUTO_VAR(p3, pipeline::parallel(p2, 2));
+  CXX11_AUTO_VAR(s, pipeline::from(queue));
+  CXX11_AUTO_VAR(px, s | p3);
 
   pipeline::plan p4 = px | consume_user;
 

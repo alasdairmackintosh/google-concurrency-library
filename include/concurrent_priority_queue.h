@@ -146,7 +146,7 @@ class concurrent_priority_queue {
   }
 
 #if 0
-  // TODO(alasdair): Implement when we have C++0x compatibility mode.
+  // TODO(alasdair): Implement when we have C++11 compatibility mode.
   void push(value_type&& x) {
     cont_.push_back(x);
     push_heap(cont_.begin(), cont_.end(), less_);

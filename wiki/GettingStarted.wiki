@@ -3,7 +3,7 @@
 == Dependencies ==
   * svn This should be available on most machines/distributions
   * The standard make utility
-  * A C++ compiler, ideally one like [http://gcc.gnu.org/gcc-4.4/cxx0x_status.html gcc-4.4] that can be configured to conform to either the C++98 standard or the draft C++0X standard.
+  * A C++ compiler, ideally one like [http://gcc.gnu.org/gcc-4.6/cxx0x_status.html gcc-4.6] that can be configured to conform to either the C++98 standard or the C++11 standard.
   * [http://codereview.appspot.com/static/upload.py Reitveld's upload.py]: For getting patches code reviewed. Put this in your path.
 
 == How to build ==
