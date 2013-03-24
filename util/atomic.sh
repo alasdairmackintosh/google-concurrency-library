@@ -417,22 +417,22 @@ cat <<EOF
     bool compare_exchange_weak
     ( ${NAME}& __e__, ${NAME} __m__,
       memory_order __x__, memory_order __y__ ) ${VOLATILE}
-    { return (${NAME})_ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
+    { return _ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
 
     bool compare_exchange_weak
     ( ${NAME}& __e__, ${NAME} __m__,
       memory_order __x__ = memory_order_seq_cst ) ${VOLATILE}
-    { return (${NAME})_ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
+    { return _ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
 
     bool compare_exchange_strong
     ( ${NAME}& __e__, ${NAME} __m__,
       memory_order __x__, memory_order __y__ ) ${VOLATILE}
-    { return (${NAME})_ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
+    { return _ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
 
     bool compare_exchange_strong
     ( ${NAME}& __e__, ${NAME} __m__,
       memory_order __x__ = memory_order_seq_cst ) ${VOLATILE}
-    { return (${NAME})_ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
+    { return _ATOMIC_CMPSWP_( this, &__e__, __m__, __x__ ); }
 
 EOF
 

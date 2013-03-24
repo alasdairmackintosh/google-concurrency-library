@@ -60,7 +60,7 @@ void test_enq(function<queue_op_status(const unsigned int&)> enq_fn,
 
     // Create work.
     srandom(time(NULL));
-    const int size = 50;
+    const int size = 100;
     double arr[size];
     for (int j = 0; j < size; ++j) {
         arr[j] = (double)random() / (double)((2 << 31) - 1);
@@ -150,13 +150,13 @@ void test_harness(std::string test_name,
     gettimeofday(&end, NULL);
     unsigned long long diff_usec = (end.tv_sec - start.tv_sec) * 1000000;
     diff_usec += end.tv_usec - start.tv_usec;
-    int total_ops = ops_per_thread * num_threads;
+    int real_total_ops = ops_per_thread * num_threads;
     double elapsed_secs = (double)diff_usec / 1000000.0;
-    double time_per_op = elapsed_secs / total_ops;
+    double time_per_op = elapsed_secs / real_total_ops;
 
 
     // Done Test! Report the time.
-    DBG << "Test " << test_name << " done " << total_ops << " total ops "
+    DBG << "Test " << test_name << " done " << real_total_ops << " total ops "
         << std::setprecision(4) << elapsed_secs << " elapsed secs "
         << time_per_op << " time per op. "
         << " Totals " << total_enq.load() << " " << total_deq.load()
@@ -206,11 +206,15 @@ struct lock_free_buffer_queue_nonblock_func {
 }  // namespace gcl
 
 int main(int argc, char** argv) {
-    buffer_queue<unsigned int> q(100000);
-    const size_t MAX_THREADS = 64;
+    const size_t MAX_THREADS = 16;
+    const size_t TOTAL_OPS = 1000000;
+    const size_t QUEUE_SIZE = 1000;
+
+    buffer_queue<unsigned int> q(QUEUE_SIZE);
     gcl::buffer_queue_wait_func f(&q);
-    for (size_t n_threads = 1; n_threads <= MAX_THREADS; n_threads *= 2) {
-        size_t ops_per_thread = 1000000 / n_threads;
+    for (size_t n_threads = 1; n_threads <= MAX_THREADS;
+         n_threads = (n_threads + 2) & 0xfffe) {
+        size_t ops_per_thread = TOTAL_OPS / n_threads;
         stringstream ss;
         ss << "buffer_queue wait_" << n_threads;
         gcl::test_harness(ss.str(),
@@ -222,8 +226,9 @@ int main(int argc, char** argv) {
     cout << endl;
 
     gcl::buffer_queue_try_func tf(&q);
-    for (size_t n_threads = 1; n_threads <= MAX_THREADS; n_threads *= 2) {
-        size_t ops_per_thread = 1000000 / n_threads;
+    for (size_t n_threads = 1; n_threads <= MAX_THREADS;
+         n_threads = (n_threads + 2) & 0xfffe) {
+        size_t ops_per_thread = TOTAL_OPS / n_threads;
         stringstream ss;
         ss << "buffer_queue try_" << n_threads;
         gcl::test_harness(ss.str(),
@@ -235,8 +240,9 @@ int main(int argc, char** argv) {
     cout << endl;
 
     gcl::buffer_queue_nonblock_func nf(&q);
-    for (size_t n_threads = 1; n_threads <= MAX_THREADS; n_threads *= 2) {
-        size_t ops_per_thread = 1000000 / n_threads;
+    for (size_t n_threads = 1; n_threads <= MAX_THREADS;
+         n_threads = (n_threads + 2) & 0xfffe) {
+        size_t ops_per_thread = TOTAL_OPS / n_threads;
         stringstream ss;
         ss << "buffer_queue nonblocking_" << n_threads;
         gcl::test_harness(
@@ -249,10 +255,11 @@ int main(int argc, char** argv) {
     }
     cout << endl;
 
-    gcl::lock_free_buffer_queue<unsigned int> q2(100000);
+    gcl::lock_free_buffer_queue<unsigned int> q2(QUEUE_SIZE);
     gcl::lock_free_buffer_queue_nonblock_func nf2(&q2);
-    for (size_t n_threads = 1; n_threads <= MAX_THREADS; n_threads *= 2) {
-        size_t ops_per_thread = 1000000 / n_threads;
+    for (size_t n_threads = 1; n_threads <= MAX_THREADS;
+         n_threads = (n_threads + 2) & 0xfffe) {
+        size_t ops_per_thread = TOTAL_OPS / n_threads;
         stringstream ss;
         ss << "lock_free_buffer_queue nonblocking_" << n_threads;
         gcl::test_harness(
