@@ -277,7 +277,7 @@ void run_multi_out_producer(function<void (queue_back<OUT>)> f,
 }
 
 template<typename T>
-void run_queue(queue_front<T> ft, queue_back<T> bk) {
+void run_queue_internal(queue_front<T> ft, queue_back<T> bk) {
   while (1) {
     T t;
     queue_op_status status = ft.wait_pop(t);
@@ -286,6 +286,14 @@ void run_queue(queue_front<T> ft, queue_back<T> bk) {
     }
     bk.push(t);
   }
+}
+
+template<typename T>
+void run_queue(queue_front<T> ft, queue_back<T> bk, __instance* inst) {
+  inst->thread_start();
+  run_queue_internal(ft, bk);
+  bk.close();
+  inst->thread_done();
 }
 
 // END WORKER THREADS
@@ -298,6 +306,14 @@ class __segment_base {
   virtual void run(__instance* inst, queue_back<OUT> out_queue) = 0;
   virtual __segment_base<IN, OUT>* clone() = 0;
   virtual queue_back<IN> get_back() = 0;
+  virtual bool can_merge_on_front() { return false; }
+  virtual bool can_merge_on_back() { return false; }
+  virtual void merge_on_front(queue_front<IN> in_queue) {
+    throw;
+  }
+  virtual queue_front<OUT> merge_back() {
+    throw;
+  }
  protected:
   __segment_base() {};
 };
@@ -309,7 +325,11 @@ class __segment_chain : public __segment_base<IN, OUT> {
  public:
   __segment_chain(__segment_base<IN, MID>* first,
                   __segment_base<MID, OUT>* second) :
-      first_(first), second_(second) {}
+      first_(first), second_(second) {
+        if (first_->can_merge_on_back() && second_->can_merge_on_front()) {
+          second_->merge_on_front(first_->merge_back());
+        }
+      }
 
   __segment_chain<IN, MID, OUT>* clone() {
     return new __segment_chain(first_->clone(), second_->clone());
@@ -319,6 +339,16 @@ class __segment_chain : public __segment_base<IN, OUT> {
     delete first_;
     delete second_;
   }
+
+  virtual bool can_merge_on_front() { return first_->can_merge_on_front();}
+  virtual void merge_on_front(queue_front<IN> ft) {
+    first_->merge_on_front(ft);
+  }
+  virtual bool can_merge_on_back() { return second_->can_merge_on_back(); }
+  virtual queue_front<OUT> merge_back() {
+    return second_->merge_back();
+  }
+
 
  private:
   virtual void run(__instance* inst, queue_back<OUT> out_queue) {
@@ -339,62 +369,78 @@ class __segment_function : public __segment_base<IN, OUT> {
 
   __segment_function(function<OUT (IN)> f) :
       queue_(10),  // TODO(aberkan): remove limit
-      has_function_(true),
       func_(std::bind(run_simple_function<IN, OUT>,
                       std::placeholders::_1,
                       std::placeholders::_2,
                       f,
-                      std::placeholders::_3)) {}
+                      std::placeholders::_3)),
+      has_merged_in_queue_(false),
+      merged_in_queue_(NULL) {}
 
   __segment_function(function<OUT (queue_front<IN>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
-      has_function_(true),
       func_(std::bind(run_multi_in_function<IN, OUT>,
                       std::placeholders::_1,
                       std::placeholders::_2,
                       f,
-                      std::placeholders::_3)) {}
+                      std::placeholders::_3)),
+      has_merged_in_queue_(false),
+      merged_in_queue_(NULL) {}
 
   __segment_function(function<void (IN, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
-      has_function_(true),
       func_(std::bind(run_multi_out_function<IN, OUT>,
                       std::placeholders::_1,
                       std::placeholders::_2,
                       f,
-                      std::placeholders::_3)) {}
+                      std::placeholders::_3)),
+      has_merged_in_queue_(false),
+      merged_in_queue_(NULL) {}
 
   __segment_function(function<void (queue_front<IN>, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
-      has_function_(true),
       func_(std::bind(run_full_function<IN, OUT>,
                       std::placeholders::_1,
                       std::placeholders::_2,
                       f,
-                      std::placeholders::_3)) {}
+                      std::placeholders::_3)),
+      has_merged_in_queue_(false),
+      merged_in_queue_(NULL) {}
+
+  virtual bool can_merge_on_front() { return !has_merged_in_queue_;}
+  virtual void merge_on_front(queue_front<IN> ft) {
+    merged_in_queue_ = ft;
+    has_merged_in_queue_ = true;
+  }
 
  private:
   __segment_function(const __segment_function<IN, OUT>& f) :
       queue_(10),  // TODO(aberkan): remove limit
-      has_function_(f.has_function_),
-      func_(f.func_) {}
+      func_(f.func_),
+      has_merged_in_queue_(f.has_merged_in_queue_),
+      merged_in_queue_(f.merged_in_queue_) {}
 
   virtual void run(__instance* inst, queue_back<OUT> out_queue) {
     // TODO(aberkan): Check for failures from both functions
-    inst->execute(std::bind(func_, queue_front<IN>(queue_), out_queue, inst));
+    inst->execute(std::bind(
+        func_,
+        has_merged_in_queue_ ? merged_in_queue_ : queue_front<IN>(queue_),
+        out_queue,
+        inst));
   }
   virtual __segment_function<IN, OUT>* clone() {
     return new __segment_function<IN, OUT>(*this);
   }
 
-  virtual queue_back<IN> get_back() { return queue_back<IN>(queue_); }
+  virtual queue_back<IN> get_back() {
+    return (has_merged_in_queue_ ? NULL : queue_back<IN>(queue_));
+  }
 
   queue_object<buffer_queue<IN> > queue_;
-
-  // If false, func_ is a no-op and this can be merged with later functions.
-  // TODO(aberkan): Implement merging
-  bool has_function_;
   function<void (queue_front<IN>, queue_back<OUT>, __instance*)> func_;
+
+  bool has_merged_in_queue_;
+  queue_front<IN> merged_in_queue_;
 };
 
 template<typename OUT>
@@ -434,6 +480,49 @@ class __segment_producer : public __segment_base<terminated, OUT> {
       func_(f.func_) {}
 
   function<void (queue_back<OUT>, __instance*)> func_;
+};
+
+template<typename OUT>
+class __segment_queue_producer : public __segment_base<terminated, OUT> {
+ public:
+  __segment_queue_producer(queue_front<OUT> ft) :
+      ft_(ft),
+      has_been_merged_(false) {}
+
+  virtual ~__segment_queue_producer() {}
+
+  virtual void run(__instance* inst, queue_back<OUT> out_queue) {
+    if(!has_been_merged_) {
+      inst->execute(std::bind(run_queue<OUT>, ft_, out_queue, inst));
+    } else {
+      // If this has been merged, the mergee will pull directly from our queue and
+      // we have nothing to do.
+      assert(!out_queue.has_queue());
+    }
+  }
+  virtual queue_back<terminated> get_back() {
+    // TODO(aberkan): If we want to combine plans, this would need to be
+    // implemented.
+    throw;  // Unimplemented
+  }
+  virtual __segment_queue_producer<OUT>* clone() {
+    return new __segment_queue_producer<OUT>(*this);
+  }
+
+  virtual bool can_merge_on_back() { return !has_been_merged_; }
+  virtual queue_front<OUT> merge_back() {
+    queue_front<OUT> ret = ft_;
+    ft_ = NULL;
+    has_been_merged_ = true;
+    return ret;
+  }
+
+ private:
+  __segment_queue_producer(const __segment_queue_producer<OUT>& f) :
+      ft_(f.ft_), has_been_merged_(f.has_been_merged_) {}
+
+  queue_front<OUT> ft_;
+  bool has_been_merged_;
 };
 
 template<typename IN>
@@ -499,12 +588,7 @@ class __segment_parallel : public __segment_base<IN, OUT> {
  public:
   __segment_parallel(__segment_base<IN, OUT>* s, size_t n) :
       in_queue_(10), s_(s), bases_(n), out_queues_(n) {
-    function<void (queue_back<IN>, __instance*) > f =
-        bind(&__segment_parallel<IN, OUT>::run_parallel_queue,
-             this,
-             std::placeholders::_1,
-             std::placeholders::_2);
-    __segment_producer<IN> p(f);
+    __segment_queue_producer<IN> p(in_queue_);
     for (size_t i = 0; i < n; ++i) {
       bases_[i] = new __segment_chain<terminated, IN, OUT>(p.clone() ,s->clone());
       out_queues_[i] = new queue_object<buffer_queue<OUT> >(10);
@@ -533,20 +617,12 @@ class __segment_parallel : public __segment_base<IN, OUT> {
   }
 
 private:
-  void run_parallel_queue(queue_back<IN> out_queue,
-                          __instance* inst) {
-    inst->thread_start();
-    run_queue<IN>(in_queue_, out_queue);
-    out_queue.close();
-    inst->thread_done();
-  }
-
   void run_out_queues(queue_back<OUT> out_queue, __instance* inst) {
     // TODO(aberkan):  This is terrible...  Ideally we shouldn't have this step
     // at all, but at least we should check queues in parallel.
     inst->thread_start();
     for (size_t i = 0; i < out_queues_.size(); ++i) {
-      run_queue<OUT>(out_queues_[i]->front(), out_queue);
+      run_queue_internal<OUT>(out_queues_[i]->front(), out_queue);
     }
     out_queue.close();
     inst->thread_done();
@@ -632,10 +708,9 @@ segment<terminated, OUT> from(void f(queue_back<OUT>)) {
 }
 
 template<typename OUT>
-segment<terminated, OUT> from(queue_front<OUT> b) {
-  function<void (queue_back<OUT>) > f =
-      bind(run_queue<OUT>, b, std::placeholders::_1);
-  return from(f);
+segment<terminated, OUT> from(queue_front<OUT> ft) {
+  return segment<terminated, OUT>(
+      new __segment_queue_producer<OUT>(ft));
 }
 
 template<typename Q>

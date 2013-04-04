@@ -134,7 +134,7 @@ class generic_queue_back
     generic_queue_back(const generic_queue_back& other)
         CXX11_DEFAULTED_HARD( : queue_(other.queue_) { } )
     generic_queue_back& operator =(const generic_queue_back& other)
-        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; } )
+        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; return *this; } )
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -165,6 +165,8 @@ class generic_queue_back
         { return queue_->nonblocking_push( std::move(x) ); }
 #endif
 
+    bool has_queue() { return queue_ != NULL; }
+
   protected:
     Queue* queue_;
 };
@@ -186,7 +188,7 @@ class generic_queue_front
     generic_queue_front(const generic_queue_front& other)
         CXX11_DEFAULTED_HARD( : queue_(other.queue_) { } )
     generic_queue_front& operator =(const generic_queue_front& other)
-        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; } )
+        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; return *this; } )
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -206,6 +208,8 @@ class generic_queue_front
         { return queue_->try_pop(x); }
     queue_op_status nonblocking_pop(value_type& x)
         { return queue_->nonblocking_pop(x); }
+
+    bool has_queue() { return queue_ != NULL; }
 
   protected:
     Queue* queue_;
