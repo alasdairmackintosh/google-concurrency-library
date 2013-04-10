@@ -289,7 +289,7 @@ In this case, the read_file function will process each file sequentially. Howeve
 <pre class="example"><code>
 pipeline::execution task(
   pipeline::from(filenames) |
-  pipeline::parallel(read_file | grep_fn | vgrep_fn | sed_fn, 8) |
+  pipeline::parallel(pipeline::make(read_file) | grep_fn | vgrep_fn | sed_fn, 8) |
   output_queue).run(&thread_pool);
 </code></pre>
 
@@ -299,7 +299,7 @@ This will run 8 separate pipelines in parallel. Each pipeline will read the next
 <pre class="example"><code>
 pipeline::execution task(
   pipeline::from(filenames) |
-  pipeline::parallel(read_file | grep_fn, 8) | vgrep_fn | sed_fn |
+  pipeline::parallel(pipeline::make(read_file) | grep_fn, 8) | vgrep_fn | sed_fn |
   output_queue).run(&thread_pool);
 </code></pre>
 This will run 8 parallel segments that read input files and perform the initial 'grep' filtering, but will then write into a single thread running the vgrep function.
