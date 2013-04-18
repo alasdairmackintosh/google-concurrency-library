@@ -49,19 +49,20 @@ class barrier {
   explicit barrier(size_t num_threads) throw (std::invalid_argument);
 
   // Creates a new barrier that will block until num_threads threads are waiting
-  // on it. When the barrier is released, completion will be invoked. If the
-  // completion is NULL, no function will be invoked upon completion.
+  // on it. When the barrier is released, completion will be invoked, and the
+  // barrier will be reset. If the completion is NULL, no function will be
+  // invoked upon completion.
   // Throws invalid_argument if num_threads == 0.
-  template <typename C>
-  barrier(size_t num_threads, C completion) throw (std::invalid_argument)
-      : thread_count_(num_threads),
-        num_waiting_(0),
-        num_to_leave_(0),
-        completion_fn_(completion) {
-    if (num_threads == 0) {
-      throw std::invalid_argument("num_threads is 0");
-    }
-  }
+  barrier(size_t num_threads, function<void()> completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, void (*completion)()) throw (std::invalid_argument);
+
+  // Creates a new barrier that will block until num_threads threads are waiting
+  // on it. When the barrier is released, completion will be invoked, and the
+  // barrier will be reset to the number of threads returned by completion. If
+  // the completion is NULL, no function will be invoked upon completion.
+  // Throws invalid_argument if num_threads == 0.
+  barrier(size_t num_threads, function<size_t()> completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, size_t (*completion)()) throw (std::invalid_argument);
 
   ~barrier();
 
@@ -75,27 +76,9 @@ class barrier {
   // count_down_and_wait() in Y.
   void count_down_and_wait() throw (std::logic_error);
 
-  // Resets the barrier with the specified number of threads. This method should
-  // only be invoked when there are no other threads currently inside the
-  // count_down_and_wait() method. It is also safe to invoke this method from
-  // within the registered completion.
-  // TODO(alasdair): Using this typically involves a static cast. Maybe call it
-  // reset_count() ?
-  void reset(size_t num_threads);
-
-  // Resets the barrier with the specified completion.  This method should only
-  // be invoked when there are no other threads currently inside the
-  // count_down_and_wait() method. It is also safe to invoke this method from
-  // within the registered completion.
-  //
-  // If completion is NULL, then the barrier behaves as if no completion
-  // were registered in the constructor.
-  template <typename C>
-  void reset(C completion) {
-    completion_fn_ = completion;
-  }
-
  private:
+  size_t completion_wrapper(function<void()> completion);
+  void reset(size_t num_threads);
   bool all_threads_exited();
   bool all_threads_waiting();
   void on_countdown();
@@ -109,7 +92,7 @@ class barrier {
   size_t num_waiting_;
   size_t num_to_leave_;
 
-  function<void()> completion_fn_;
+  function<size_t()> completion_fn_;
 };
 }
 #endif // GCL_BARRIER_

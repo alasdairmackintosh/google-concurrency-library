@@ -35,6 +35,52 @@ barrier::barrier(size_t num_threads) throw (std::invalid_argument)
   }
 }
 
+barrier::barrier(size_t num_threads,
+                 void (*completion)()) throw (std::invalid_argument)
+      : thread_count_(num_threads),
+        num_waiting_(0),
+        num_to_leave_(0),
+        completion_fn_(bind(&barrier::completion_wrapper, this, completion)) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+}
+
+barrier::barrier(size_t num_threads,
+                 function<void()> completion) throw (std::invalid_argument)
+      : thread_count_(num_threads),
+        num_waiting_(0),
+        num_to_leave_(0),
+        completion_fn_(bind(&barrier::completion_wrapper, this, completion)) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+}
+
+barrier::barrier(
+    size_t num_threads,
+    function<size_t()> completion) throw (std::invalid_argument)
+      : thread_count_(num_threads),
+        num_waiting_(0),
+        num_to_leave_(0),
+        completion_fn_(completion) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+}
+
+barrier::barrier(
+    size_t num_threads,
+    size_t (*completion)()) throw (std::invalid_argument)
+      : thread_count_(num_threads),
+        num_waiting_(0),
+        num_to_leave_(0),
+        completion_fn_(completion) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
+}
+
 barrier::~barrier() {
   // TODO(alasdair): The current documentation does not define the destruct
   // behaviour, and this assertion may be too strict. Keeping it for now as it
@@ -72,9 +118,14 @@ void barrier::count_down_and_wait()  throw (std::logic_error) {
   }
 }
 
+size_t barrier::completion_wrapper(function<void()> completion) {
+  completion();
+  return thread_count_;
+}
+
 void barrier::on_countdown() {
   if (completion_fn_) {
-    completion_fn_();
+    reset(completion_fn_());
   }
 }
 

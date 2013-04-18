@@ -103,17 +103,18 @@ class __instance {
     pool_->try_get_unused_thread()->execute(func);
   }
 
-  void all_threads_done() {
+  size_t all_threads_done() {
     // This method is invoked after all threads have called
     // count_down_and_wait(), but not before they have all exited. To ensure
     // that a caller cannot return from wait() until all threads have exited
     // count_down_and_wait(), we reset the barrier, and re-use it for a final
-    // test in __instance::wait(). We clear the callback method for the
-    // barrier so that this doesn't get called again.
+    // test in __instance::wait().
+    bool do_count_down = done_ ? false : true;
     done_ = true;
-    thread_end_->reset(static_cast<size_t>(1));
-    thread_end_->reset(static_cast<std::function<void ()> >(NULL));
-    end_.count_down();
+    if (do_count_down) {
+      end_.count_down();
+    }
+    return 1;
   }
 
  private:
@@ -680,9 +681,9 @@ __instance::__instance(simple_thread_pool* pool,
   plan_->run(this, queue_back<terminated>(dummy_queue_));
   // We can't create the barrier until all of the threads have started running
   // so we know num_threads_.
-  thread_end_ = new barrier(num_threads_,
-                            std::bind(&__instance::all_threads_done,
-                                      this));
+  function<size_t()> done_fn = std::bind(&__instance::all_threads_done,
+                                         this);
+  thread_end_ = new barrier(num_threads_, done_fn);
   start_.count_down();  // Start the threads
 }
 
