@@ -69,8 +69,8 @@ TEST_F(BarrierTest, InvalidConstructorArg) {
   }
 }
 
-// Invokes count_down_and_wait() on a barrier, and counts the number of exceptions
-// thrown. If progress_count is non-null, it is incremented before
+// Invokes count_down_and_wait() on a barrier, and counts the number of
+// exceptions thrown. If progress_count is non-null, it is incremented before
 // calling count_down_and_wait(), and again afterwards.
 static void WaitForBarrierCountExceptions(barrier* b,
                                           atomic<int> *progress_count,

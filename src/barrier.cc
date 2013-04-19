@@ -130,6 +130,9 @@ void barrier::on_countdown() {
 }
 
 void barrier::reset(size_t num_threads) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
+  }
   // TODO(alasdair): Consider adding a check that we are either in the
   // completion function, or have not yet called wait()
   new_thread_count_ = num_threads;
