@@ -349,16 +349,16 @@ class queue_wrapper
 
 #ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
-    { ptr->push(x); }
+    { ptr->push(std::move(x)); }
 
     virtual queue_op_status wait_push(value_type&& x)
-    { return ptr->wait_push(x); }
+    { return ptr->wait_push(std::move(x)); }
 
     virtual queue_op_status try_push(value_type&& x)
-    { return ptr->try_push(x); }
+    { return ptr->try_push(std::move(x)); }
 
     virtual queue_op_status nonblocking_push(value_type&& x)
-    { return ptr->nonblocking_push(x); }
+    { return ptr->nonblocking_push(std::move(x)); }
 
 #endif
 
@@ -612,13 +612,13 @@ class queue_owner
 
 #ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
-        { ptr->push(x); }
+        { ptr->push(std::move(x)); }
     virtual queue_op_status wait_push(value_type&& x)
-        { return ptr->wait_push(x); }
+        { return ptr->wait_push(std::move(x)); }
     virtual queue_op_status try_push(value_type&& x)
-        { return ptr->try_push(x); }
+        { return ptr->try_push(std::move(x)); }
     virtual queue_op_status nonblocking_push(value_type&& x)
-        { return ptr->nonblocking_push(x); }
+        { return ptr->nonblocking_push(std::move(x)); }
 #endif
 
     virtual value_type value_pop()
@@ -680,13 +680,13 @@ class queue_object
 
 #ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
-        { obj_.push(x); }
+        { obj_.push(std::move(x)); }
     virtual queue_op_status wait_push(value_type&& x)
-        { return obj_.wait_push(x); }
+        { return obj_.wait_push(std::move(x)); }
     virtual queue_op_status try_push(value_type&& x)
-        { return obj_.try_push(x); }
+        { return obj_.try_push(std::move(x)); }
     virtual queue_op_status nonblocking_push(value_type&& x)
-        { return obj_.nonblocking_push(x); }
+        { return obj_.nonblocking_push(std::move(x)); }
 #endif
 
     virtual value_type value_pop()

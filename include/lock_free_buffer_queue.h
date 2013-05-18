@@ -357,7 +357,7 @@ queue_op_status lock_free_buffer_queue<Value>::try_push(Value&& elem)
 {
     queue_op_status status;
     do {
-        status = nonblocking_push(elem);
+        status = nonblocking_push(std::move(elem));
     } while (status == CXX11_ENUM_QUAL(queue_op_status)busy);
     return status;
 }
@@ -396,7 +396,7 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
         // blocking time is between the inc() and the completion of writing
         // the new value_state_ bit.
         try {
-            values_[pos] = elem;
+            values_[pos] = std::move(elem);
             // Force the values_ update to be visible before setting state valid.
         } catch (...) {
             // Set the value invalid since the copy threw an exception.

@@ -453,7 +453,7 @@ queue_op_status buffer_queue<Value>::try_push(Value&& elem)
        operator in push_at. */
     try {
         lock_guard<mutex> hold( mtx_ );
-        return try_push_common(elem);
+        return try_push_common(std::move(elem));
     } catch (...) {
         close();
         throw;
@@ -471,7 +471,7 @@ queue_op_status buffer_queue<Value>::nonblocking_push(Value&& elem)
         if (!hold.owns_lock()) {
             return CXX11_ENUM_QUAL(queue_op_status)busy;
         }
-        return try_push_common(elem);
+        return try_push_common(std::move(elem));
     } catch (...) {
         close();
         throw;
