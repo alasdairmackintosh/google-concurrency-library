@@ -158,8 +158,16 @@ static size_t WaitFnAndReset(int* num_calls,
                              atomic<int>* counters) {
   (*num_calls)++;
   std::cerr << "num_calls = " << *num_calls << "\n";
-  for (size_t i = 0; i < kNumThreads; i++) {
-    EXPECT_EQ(*num_calls, counters[i].load());
+
+  // only the first barrier is guaranteed to restrict all
+  // kNumThreads threads
+  if (*num_calls == 1) {
+    for (size_t i = 0; i < kNumThreads; i++) {
+      EXPECT_EQ(*num_calls, counters[i].load());
+    }
+  }
+  else {
+    EXPECT_EQ(*num_calls, counters[0].load());
   }
   return 1;
 }
@@ -169,18 +177,14 @@ static void WaitForBarrierCountExceptionsRetry(bool try_again,
                                                atomic<int> *progress_count,
                                                atomic<int> *exception_count) {
   try {
-    if (progress_count != NULL) {
-      (*progress_count)++;
-    }
+    (*progress_count)++;
     b->count_down_and_wait();
-    if (progress_count != NULL) {
-      (*progress_count)++;
-    }
+    (*progress_count)++;
     if (try_again) {
       b->count_down_and_wait();
-      if (progress_count != NULL) {
-        (*progress_count)++;
-      }
+      // progress count of other threads may not have incremented since first
+      // barrier, since only one thread needs to pass through this one.
+      (*progress_count)++;
     }
   } catch (std::logic_error e) {
     (*exception_count)++;
@@ -197,13 +201,19 @@ TEST_F(BarrierTest, FunctionInvocationAndReset) {
     counters[i] = 0;
   }
   int num_calls = 0;
-  std::function<size_t()> wait_fn = std::bind(WaitFnAndReset, &num_calls, counters + 0);
+  std::function<size_t()> wait_fn =
+      std::bind(WaitFnAndReset, &num_calls, counters + 0);
+  // this barrier first holds back kNumThreads, then only one
+  // on subsequent tries
   barrier b(kNumThreads, wait_fn);
 
   thread* threads[kNumThreads];
   for (size_t i = 0; i < kNumThreads; i++) {
     threads[i] = new thread(std::bind(WaitForBarrierCountExceptionsRetry,
-                                      i == 0, &b, counters + i, &num_exceptions));
+                                      i == 0,
+                                      &b,
+                                      counters + i,
+                                      &num_exceptions));
   }
   for (size_t i = 0; i < kNumThreads; i++) {
     threads[i]->join();
