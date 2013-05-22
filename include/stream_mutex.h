@@ -72,7 +72,8 @@ inline Stream& stream_guard<Stream>::bypass() const
 { return mtx_.bypass(); }
 
 template <typename Stream, typename T>
-const stream_guard<Stream>& operator<<(const stream_guard<Stream>& lck, T arg)
+const stream_guard<Stream>& operator<<(const stream_guard<Stream>& lck,
+                                       const T& arg)
 {
     lck.bypass() << arg;
     return lck;
@@ -94,7 +95,7 @@ const stream_guard<Stream>& operator>>(const stream_guard<Stream>& lck, T& arg)
 }
 
 template <typename Stream, typename T>
-stream_guard<Stream> operator<<(stream_mutex<Stream>& mtx, T arg)
+stream_guard<Stream> operator<<(stream_mutex<Stream>& mtx, const T& arg)
 {
     mtx.lock();
     mtx.bypass() << arg;

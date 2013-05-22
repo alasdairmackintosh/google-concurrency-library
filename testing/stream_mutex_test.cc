@@ -21,6 +21,26 @@
 
 #include "gmock/gmock.h"
 
+// Compilation test for the streaming of non-copyable objects.
+
+class non_copyable
+{
+    non_copyable(const non_copyable&) CXX11_DELETED
+public:
+    non_copyable() { }
+};
+
+std::ostream& operator <<(std::ostream& os, const non_copyable& )
+{
+    return os << "non-copyable";
+}
+
+void verify_non_copyable_locked_streaming(stream_mutex<std::ostream>& mstream)
+{
+    non_copyable var;
+    mstream << var;
+}
+
 // Test implicit expression locking.
 void implicit(stream_mutex<std::ostream>& mstream)
 {
