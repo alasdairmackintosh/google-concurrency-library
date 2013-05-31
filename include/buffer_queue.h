@@ -30,10 +30,7 @@ class buffer_queue
 
     buffer_queue() CXX11_DELETED
     buffer_queue(const buffer_queue&) CXX11_DELETED
-    buffer_queue(size_t max_elems, const char* name);
     explicit buffer_queue(size_t max_elems);
-    template <typename Iter>
-    buffer_queue(size_t max_elems, Iter first, Iter last, const char* name);
     template <typename Iter>
     buffer_queue(size_t max_elems, Iter first, Iter last);
     buffer_queue& operator =(const buffer_queue&) CXX11_DELETED
@@ -67,8 +64,6 @@ class buffer_queue
     queue_op_status nonblocking_push(Value&& x);
 #endif
 
-    const char* name();
-
   private:
     mutex mtx_;
     condition_variable not_empty_;
@@ -80,7 +75,6 @@ class buffer_queue
     size_t pop_index_;
     size_t num_slots_;
     bool closed_;
-    const char* name_;
 
     void init(size_t max_elems);
 
@@ -149,21 +143,6 @@ void buffer_queue<Value>::init(size_t max_elems)
 }
 
 template <typename Value>
-buffer_queue<Value>::buffer_queue(size_t max_elems, const char* name)
-:
-    waiting_full_( 0 ),
-    waiting_empty_( 0 ),
-    buffer_( new Value[max_elems+1] ),
-    push_index_( 0 ),
-    pop_index_( 0 ),
-    num_slots_( max_elems+1 ),
-    closed_( false ),
-    name_( name )
-{
-    init(max_elems);
-}
-
-template <typename Value>
 buffer_queue<Value>::buffer_queue(size_t max_elems)
 :
     // would rather do buffer_queue(max_elems, "")
@@ -173,8 +152,7 @@ buffer_queue<Value>::buffer_queue(size_t max_elems)
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
-    closed_( false ),
-    name_( "" )
+    closed_( false )
 {
     init(max_elems);
 }
@@ -195,24 +173,6 @@ void buffer_queue<Value>::iter_init(size_t max_elems, Iter first, Iter last)
 
 template <typename Value>
 template <typename Iter>
-buffer_queue<Value>::buffer_queue(size_t max_elems, Iter first, Iter last,
-                                    const char* name)
-:
-    // would rather do buffer_queue(max_elems, name)
-    waiting_full_( 0 ),
-    waiting_empty_( 0 ),
-    buffer_( new Value[max_elems+1] ),
-    push_index_( 0 ),
-    pop_index_( 0 ),
-    num_slots_( max_elems+1 ),
-    closed_( false ),
-    name_( name )
-{
-    iter_init(max_elems, first, last);
-}
-
-template <typename Value>
-template <typename Iter>
 buffer_queue<Value>::buffer_queue(size_t max_elems, Iter first, Iter last)
 :
     // would rather do buffer_queue(max_elems, first, last, "")
@@ -222,8 +182,7 @@ buffer_queue<Value>::buffer_queue(size_t max_elems, Iter first, Iter last)
     push_index_( 0 ),
     pop_index_( 0 ),
     num_slots_( max_elems+1 ),
-    closed_( false ),
-    name_( "" )
+    closed_( false )
 {
     iter_init(max_elems, first, last);
 }
@@ -516,12 +475,6 @@ void buffer_queue<Value>::push(Value&& elem)
 }
 
 #endif
-
-template <typename Value>
-const char* buffer_queue<Value>::name()
-{
-    return name_;
-}
 
 } // namespace gcl
 

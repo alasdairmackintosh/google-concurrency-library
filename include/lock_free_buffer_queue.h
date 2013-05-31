@@ -40,14 +40,9 @@ class lock_free_buffer_queue
     lock_free_buffer_queue& operator =(const lock_free_buffer_queue&) CXX11_DELETED
 
     explicit lock_free_buffer_queue(size_t max_elems);
-    lock_free_buffer_queue(size_t max_elems, const char* name);
-    template <typename Iter>
-    lock_free_buffer_queue(size_t max_elems, Iter first, Iter last, const char* name);
     template <typename Iter>
     lock_free_buffer_queue(size_t max_elems, Iter first, Iter last);
     ~lock_free_buffer_queue();
-
-    const char* name();
 
     // Note  that these two functions may be approximate as there may have been
     // exceptions thrown and the state is not fully correct (all values could
@@ -73,7 +68,6 @@ class lock_free_buffer_queue
     };
 
 
-    const char* name_;
     const size_t cardinality_;
     // Head and tail will always be increasing (hence the 64bit value so we
     // don't have to deal with overflow for now). Note, we could handle
@@ -143,33 +137,16 @@ void lock_free_buffer_queue<Value>::iter_init(Iter first, Iter last)
 
 template <typename Value>
 lock_free_buffer_queue<Value>::lock_free_buffer_queue(size_t max_elems)
-  : name_( "" ), cardinality_(max_elems)
+  : cardinality_(max_elems)
 {
     init();
-}
-
-template <typename Value>
-lock_free_buffer_queue<Value>::lock_free_buffer_queue(
-    size_t max_elems, const char* name)
-  : name_( name ), cardinality_(max_elems)
-{
-    init();
-}
-
-template <typename Value>
-template <typename Iter>
-lock_free_buffer_queue<Value>::lock_free_buffer_queue(
-    size_t max_elems, Iter first, Iter last, const char* name)
-  : name_( name ), cardinality_(max_elems)
-{
-    iter_init(first, last);
 }
 
 template <typename Value>
 template <typename Iter>
 lock_free_buffer_queue<Value>::lock_free_buffer_queue(
     size_t max_elems, Iter first, Iter last)
-  : name_( "" ), cardinality_(max_elems)
+  : cardinality_(max_elems)
 {
     iter_init(first, last);
 }
@@ -415,12 +392,6 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
 
 // HAS_CXX11_RVREF
 #endif
-
-template <typename Value>
-const char* lock_free_buffer_queue<Value>::name()
-{
-    return name_;
-}
 
 } // namespace gcl
 

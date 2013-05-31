@@ -115,7 +115,7 @@ class PipelineTest : public testing::Test {
 
 TEST_F(PipelineTest, ManualBuild) {
   simple_thread_pool pool;
-  queue_object< buffer_queue<int> > queue(10, "test-queue");
+  queue_object< buffer_queue<int> > queue(10);
 
   pipeline::segment<pipeline::terminated, int> p1 = pipeline::from(queue);
 
@@ -143,7 +143,7 @@ TEST_F(PipelineTest, Example) {
 
 
   // A Runnable Pipeline that reads from a queue and write to a sink
-  queue_object< buffer_queue<string> > queue(10, "test-queue");
+  queue_object< buffer_queue<string> > queue(10);
   queue.push("Queued Hello");
 
   CXX11_AUTO_VAR(p1, pipeline::make(find_uid));

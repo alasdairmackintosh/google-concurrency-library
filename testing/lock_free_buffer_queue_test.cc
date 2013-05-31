@@ -39,14 +39,14 @@ TEST_F(LockFreeBufferQueueTest, InvalidArg0) {
 
 // Verify single try push/pop operations.
 TEST_F(LockFreeBufferQueueTest, SingleTry) {
-  lock_free_buffer_queue<int> q(1, "body");
+  lock_free_buffer_queue<int> q(1);
   seq_try_fill(1, 1, &q);
   seq_try_drain(1, 1, &q);
 }
 
 // Verify multiple try push/pop operations.
 TEST_F(LockFreeBufferQueueTest, MultipleTry) {
-  lock_free_buffer_queue<int> q(kSmall, "body");
+  lock_free_buffer_queue<int> q(kSmall);
   seq_try_fill(kSmall, 1, &q);
   seq_try_drain(kSmall, 1, &q);
 }
@@ -57,8 +57,7 @@ TEST_F(LockFreeBufferQueueTest, CreateFromIterators) {
   for ( int i = 1; i <= kSmall; ++i )
     values.push_back(i);
   ASSERT_EQ(static_cast<size_t>(kSmall), values.size());
-  lock_free_buffer_queue<int> q(values.size(), values.begin(), values.end(),
-                                "body");
+  lock_free_buffer_queue<int> q(values.size(), values.begin(), values.end());
   seq_try_drain(kSmall, 1, &q);
 }
 
@@ -70,7 +69,7 @@ TEST_F(LockFreeBufferQueueTest, InvalidIterators) {
   values.push_back(2);
   values.push_back(3);
   try {
-    lock_free_buffer_queue<int> q(2, values.begin(), values.end(), "body");
+    lock_free_buffer_queue<int> q(2, values.begin(), values.end());
     FAIL();
   } catch (std::invalid_argument expected) {
   } catch (...) {
@@ -80,12 +79,12 @@ TEST_F(LockFreeBufferQueueTest, InvalidIterators) {
 // Verify that try_pop fails when the queue is empty, but succeeds when a new
 // element is added.
 TEST_F(LockFreeBufferQueueTest, TryPopEmpty) {
-  lock_free_buffer_queue<int> q(kSmall, "body");
+  lock_free_buffer_queue<int> q(kSmall);
   seq_try_empty(&q);
 }
 
 // Verify that try_push succeeds until we exceed the size limit
 TEST_F(LockFreeBufferQueueTest, TryPushFull) {
-  lock_free_buffer_queue<int> q(kSmall, "body");
+  lock_free_buffer_queue<int> q(kSmall);
   seq_try_full(kSmall, &q);
 }

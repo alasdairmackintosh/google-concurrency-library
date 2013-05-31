@@ -107,8 +107,6 @@ class queue_common
     virtual bool is_closed() = 0;
     virtual bool is_empty() = 0;
 
-    virtual const char* name() = 0;
-
   protected:
     virtual ~queue_common();
 };
@@ -139,7 +137,6 @@ class generic_queue_back
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
     bool is_empty() { return queue_->is_empty(); }
-    const char* name() { return queue_->name(); }
 
     iterator begin() { return iterator(*this); }
     iterator end() { return iterator(); }
@@ -193,7 +190,6 @@ class generic_queue_front
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
     bool is_empty() { return queue_->is_empty(); }
-    const char* name() { return queue_->name(); }
 
     iterator begin() { return iterator(*this); }
     iterator end() { return iterator(); }
@@ -249,8 +245,6 @@ class queue_base
     virtual void close() = 0;
     virtual bool is_closed() = 0;
     virtual bool is_empty() = 0;
-
-    virtual const char* name() = 0;
 
     virtual void push(const Value& x) = 0;
     virtual queue_op_status wait_push(const Value& x) = 0;
@@ -331,9 +325,6 @@ class queue_wrapper
 
     virtual bool is_empty()
     { return ptr->is_empty(); }
-
-    virtual const char* name()
-    { return ptr->name(); }
 
     virtual void push(const value_type& x)
     { ptr->push(x); }
@@ -463,7 +454,6 @@ class shared_queue_back
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
     bool is_empty() { return queue_->is_empty(); }
-    const char* name() { return queue_->name(); }
 
     iterator begin() { return iterator(*this); }
     iterator end() { return iterator(); }
@@ -554,7 +544,6 @@ class shared_queue_front
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
     bool is_empty() { return queue_->is_empty(); }
-    const char* name() { return queue_->name(); }
 
     iterator begin() { return iterator(*this); }
     iterator end() { return iterator(); }
@@ -599,7 +588,6 @@ class queue_owner
     virtual void close() { ptr->close(); }
     virtual bool is_closed() { return ptr->is_closed(); }
     virtual bool is_empty() { return ptr->is_empty(); }
-    virtual const char* name() { return ptr->name(); }
 
     virtual void push(const value_type& x)
         { ptr->push(x); }
@@ -667,7 +655,6 @@ class queue_object
     virtual void close() { obj_.close(); }
     virtual bool is_closed() { return obj_.is_closed(); }
     virtual bool is_empty() { return obj_.is_empty(); }
-    virtual const char* name() { return obj_.name(); }
 
     virtual void push(const value_type& x)
         { obj_.push(x); }
