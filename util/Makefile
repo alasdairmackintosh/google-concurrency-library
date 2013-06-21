@@ -72,11 +72,15 @@ lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
 
 ######## Testing
 
-test : cxx11_test.o atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
+test : cxx11_test.o dynarray_test.pass \
+        atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
 	stdfake_test.pass lower_test.pass mutex_test.pass higher_test.pass \
 	pipeline_test.pass queue_perf_test.exe lock_free_buffer_queue_test.pass
 
 #### Simple Tests
+
+dynarray_test.exe : dynarray_test.o stdfake.a
+dynarray_test.pass : dynarray_test.exe
 
 atomic_c_test.exe : atomic_c_test.o stdfake.a
 atomic_c_test.pass : atomic_c_test.exe
