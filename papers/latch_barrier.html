@@ -97,7 +97,7 @@ td {
 <h1>C++ Latches and Barriers</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 N3600 - 2013-03-16
+ISO/IEC JTC1 SC22 WG21 N3666 - 2013-04-18
 </p>
 
 <p>
@@ -111,6 +111,7 @@ Alasdair Mackintosh, alasdair@google.com, alasdair.mackintosh@gmail.com
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#barrier_operations">Barrier Operations</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#example">Sample Usage</a><br>
 <a href="#synopsis">Synopsis</a><br>
+<a href="#wording">Wording</a><br>
 </p>
 
 
@@ -257,6 +258,18 @@ Throws <code>std::invalid_argument</code> if the specified count is 0.
 </p>
 </dd>
 
+<dt><code>constructor( size_t, std::function&lt;size_t()&gt; );</code></dt>
+<dd>
+<p>
+The parameters are the initial value of the internal thread counter, and a
+function that will be invoked when the counter reaches 0. The return value
+from the function will be used to reset the internal thread counter.
+</p>
+<p>
+Throws <code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</dd>
+
 <dt><code>destructor( );</code></dt>
 <dd>
 <p>
@@ -277,41 +290,16 @@ Before any threads are released, the completion function registered in the
 constructor will be invoked (if specified and non-NULL). Note that the
 completion function may be invoked in the context of one of the blocked
 threads.  When the completion function returns, the internal thread count will
-be reset to its initial value, and all blocked threads will be unblocked.
+be reset, and all blocked threads will be unblocked. If the barrier was created
+with a void function, then the internal thread count will be reset to the
+initial thread count specified in the contructor. If the barrier was created
+with a function returning size_t, then the thread count will be reset to the
+function's return value. It is illegal to return 0.
 <p>
 Note that it is safe for a thread to re-enter <code>count_down_and_wait()</code>
 immediately. It is not necessary to ensure that all blocked threads have exited
 <code>count_down_and_wait()</code> before one thread re-enters it.
 </dd>
-<dt><code>reset( size_t );</code></dt>
-<dd>
-<p>
-Resets the barrier with a new value for the initial thread count. This method may
-only be invoked when there are no other threads currently inside the
-<code>count_down_and_wait()</code> method. It may also be invoked from within
-the registered completion function.
-</p>
-<p>
-Once <code>reset()</code> is called, the barrier will automatically reset
-itself to the new thread count as soon as the internal count reaches 0 and all
-blocked threads are released.
-</p>
-</dd>
-
-<dt><code>reset( std::function&lt;void()&gt; );</code></dt>
-<dd>
-<p>
-Resets the barrier with the new completion function. The next time the internal
-thread count reaches 0, this function will be invoked. This method may only be
-invoked when there are no other threads currently inside the
-<code>count_down_and_wait()</code> method. It may also be invoked from within
-the registered completion function.
-</p>
-<p>
-If NULL is passed in, no function will be invoked when the count reaches 0.
-</p>
-</dd>
-
 </dl>
 <p>
 There are no copy or assignment operations.
@@ -391,7 +379,7 @@ requirements.
 </p>
 <p>
 In the example below, a number of threads are performing a multi-stage
-task. Some tasks may require fewer steps thanothers, meaning that some threads
+task. Some tasks may require fewer steps than others, meaning that some threads
 may finish before others. We reduce the number of threads waiting on the
 barrier when this happens.
 </p>
@@ -408,10 +396,8 @@ barrier when this happens.
     // Create a barrier, and set a lambda that will be invoked every time the
     // barrier counts down. If one or more active threads have completed,
     // reduce the number of threads.
-    barrier task_barrier(n_threads);
-    task_barrier.reset([&] {
-      task_barrier.reset(current_threads);
-    });
+    std::function rf = [&] { return current_threads;};
+    barrier task_barrier(n_threads, rf);
 
     for (int i = 0; i &lt; n_threads; ++i) {
       workers.push_back(new thread([&] {
@@ -461,16 +447,348 @@ class latch {
 class barrier {
  public:
   explicit barrier(size_t num_threads) throw (std::invalid_argument);
-  explicit barrier(size_t num_threads, std::function&lt;void()&gt; f) throw (std::invalid_argument);
+  barrier(size_t num_threads, std::function&lt;void()&gt; completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, void (*completion)()) throw (std::invalid_argument);
+
+  barrier(size_t num_threads, std::function&lt;size_t()&gt; completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, size_t (*completion)()) throw (std::invalid_argument);
   ~barrier();
 
   void count_down_and_wait();
 
-  void reset(size_t num_threads);
-  void reset(function f);
 };
 </code>
 </pre>
 
+<h2><a name="wording">Wording</a></h2>
+The wording in this section is relative to N3242.
+
+<h3>30.7 Thread coordination [thread.coordination]</h3>
+<p>
+This section provides mechanisms for thread coordination: latches and
+barriers.
+These mechanisms allow multiple threads to block until a given operation
+has completed.
+</p>
+<h3>30.7.1 Latches [thread.latch]</h3>
+A latch is a thread co-ordination mechanism that allow one or more threads to
+block until an operation is completed.
+An individual latch is a single-use object; once the operation has been
+completed, it cannot be re-used.
+<h4>30.7.1.1 Class latch [thread.latch]</h4>
+<pre>
+<code>
+namespace std {
+  class latch {
+  public:
+    explicit latch(size_t count);
+    ~latch();
+
+    void count_down();
+
+    void wait();
+
+    bool try_wait();
+
+    void count_down_and_wait();
+  };
+}
+</pre>
+</code> 
+<p>
+The class <code>latch</code> provides a single-use thread coordination mechanism.
+An individual latch instance maintains an internal counter that is initialized
+when the latch is created.
+One or more threads may block waiting until the counter is decremented to 0.
+</p>
+<p>
+<code>latch(size_t count);</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type latch.
+The parameter is the initial value of the internal counter.
+</p>
+<p>
+<i>Throws:</i>
+Nothing.
+</p>
+</blockquote>
+
+<code>~latch();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Destroys the latch.
+</p>
+<p>
+<i>Requires:</i>
+There are no threads currently
+calling <code>wait()</code>, <code>count_down()</code>
+or <code>count_down_and_wait()</code>.
+If there are, the behaviour is undefined.
+</p>
+<p>
+<i>Throws:</i>
+Nothing.
+</p>
+</blockquote>
+
+<code>void count_down();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Decrements the internal count by 1, and returns. If the count reaches 0, any
+threads blocked in <code>wait()</code> will be released.
+<p>
+<i>Synchronization:</i>
+All calls to <code>count_down()</code> synchronize with any thread
+returning from <code>wait()</code>.
+All calls to <code>count_down()</code> synchronize with any thread 
+that obtains a true return value from <code>try_wait()</code>.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::logic_error</code> if the internal count is already 0.
+<code>system_error</code> when an exception is required.
+</p>
+</blockquote>
+</p>
+
+<code>void wait();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Blocks the calling thread until the internal count is decremented to 0 by one
+or more other threads calling <code>count_down()</code>.
+If the count is already 0, returns immediately.
+</p>
+<p>
+<i>Synchronization:</i>
+See <code>count_down()</code>.
+</p>
+<p>
+<i>Throws:</i>
+ <code>system_error</code> when an exception is required.
+</p>
+</blockquote>
+
+<code>bool try_wait();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Returns true if the internal count has been decremented to 0 by one
+or more other threads calling <code>count_down()</code>, and false otherwise.
+Does not block the calling thread.
+</p>
+<p>
+<i>Synchronization:</i>
+See <code>count_down()</code>.
+</p>
+<p>
+<i>Throws:</i>
+Nothing.
+</p>
+</blockquote>
+
+<code>void count_down_and_wait();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Decrements the internal count by 1.
+If the resulting internal count is not 0, blocks the
+calling thread until the internal count is decremented to 0 by one or more
+other threads calling <code>count_down()</code> or <code>count_down_and_wait</code>.
+</p>
+<p>
+<i>Synchronization:</i>
+All calls to <code>count_down_and_wait()</code> synchronize with any thread
+returning from <code>wait()</code>.
+All calls to <code>count_down_and_wait()</code> synchronize with any thread 
+that obtains a true return value from <code>try_wait()</code>.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::logic_error</code> if the internal count is already 0.
+<code>system_error</code> when an exception is required.
+</p>
+</blockquote>
+<h3>30.7.2 Barriers [thread.barrier]</h3>
+A barrier is a thread co-ordination mechanism that allows one or more threads to
+block until an operation is completed. A barrier is re-usable; once the operation
+has been completed, it can be used again to block until a subsequent set of
+operations has completed.
+
+<h4>30.7.2.1 Class barrier [thread.barrier]</h4>
+<pre>
+<code>
+class barrier {
+ public:
+  explicit barrier(size_t num_threads) throw (std::invalid_argument);
+  barrier(size_t num_threads, std::function&lt;void()&gt; completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, void (*completion)()) throw (std::invalid_argument);
+
+  barrier(size_t num_threads, std::function&lt;size_t()&gt; completion) throw (std::invalid_argument);
+  barrier(size_t num_threads, size_t (*completion)()) throw (std::invalid_argument);
+
+  ~barrier();
+
+  void count_down_and_wait();
+
+};
+</pre>
+</code> 
+<p>
+The class <code>barrier</code> provides a re-usable coordination mechanism.
+An individual barrier maintains an internal thread counter that is
+initialized when the barrier is created.
+One or more threads may decrement the counter and then block waiting
+until the specified number of threads are similarly blocked.
+All threads will then be unblocked, and the barrier will reset.
+While resetting the barrier, there is a mechanism to
+change the internal thread count value.
+</p>
+<p>
+<code>barrier(size_t count);</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type barrier.
+The parameter is the initial value of the internal counter.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</blockquote>
+<p>
+
+<code>barrier(size_t num_threads, std::function&lt;void()&gt; completion);</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type barrier.
+The parameters are the initial value of the internal counter, and a 
+<code>std::function</code> completion that will be invoked when the 
+internal count reaches 0.
+If the function argument is NULL, it will be ignored.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</blockquote>
+
+<code>barrier(size_t num_threads, void (*completion)()));</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type barrier.
+The parameters are the initial value of the internal counter, and a 
+completion function that will be invoked when the internal count reaches 0.
+If the function argument is NULL, it will be ignored.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</blockquote>
+
+<code>barrier(size_t num_threads, std::function&lt;size_t()&gt; completion);</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type barrier.
+The parameters are the initial value of the internal counter, and a 
+<code>std::function</code> completion function that will be invoked
+when the internal count reaches 0.
+If the function argument is NULL, it will be ignored.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</blockquote>
+
+<code>barrier(size_t num_threads, size_t (*completion)()));</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Constructs an object of type barrier.
+The parameters are the initial value of the internal counter, and a 
+completion function that will be invoked when the internal count reaches 0.
+If the function argument is NULL, it will be ignored.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::invalid_argument</code> if the specified count is 0.
+</p>
+</blockquote>
+
+
+<code>~barrier();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Destroys the barrier.
+</p>
+<p>
+<i>Requires:</i>
+There are no threads currently
+calling <code>count_down_and_wait()</code>.
+If there are, the behaviour is undefined.
+</p>
+<p>
+<i>Throws:</i>
+Nothing.
+</p>
+</blockquote>
+
+<code>void count_down_and_wait();</code>
+<blockquote>
+<p>
+<i>Effects:</i>
+Decrements the internal thread count by 1.
+If the resulting count is not 0, blocks the calling thread until the 
+internal count is decremented to 0 by one or more other threads calling
+<code>count_down_and_wait()</code>. 
+Before any threads are unblocked, the completion function parameter passed to the 
+constructor (if specified and non-NULL) will be invoked.
+When the completion function returns, the internal thread count will
+be reset, and all blocked threads will be unblocked.
+If the barrier was created with a void completion function, then the internal
+thread count will be reset to the initial thread count specified in the
+contructor.
+If the barrier was created with a completion function returning size_t, then
+the thread count will be reset to the function's return value. It is illegal to
+return 0, and a <code>std::logic_error</code> will be thrown in the completion
+function's thread if this occurs.
+</p>
+<p>
+<i>Note:</i>
+It is safe for a thread to re-enter <code>count_down_and_wait()</code>
+immediately.
+It is not necessary to ensure that all blocked threads have exited
+<code>count_down_and_wait()</code> before one thread re-enters it.
+</p>
+<p>
+<i>Note:</i>The thread that the completion function is invoked in is
+implementation dependent.
+It may be invoked in one of the threads that has called <code>count_down_and_wait()</code>.
+</p>
+<p>
+<i>Synchronization:</i>
+All calls to <code>count_down_and_wait()</code> synchronize with any thread
+returning from <code>count_down_and_wait()</code>.
+The invocation of the completion function synchronizes with any thread that has
+called <code>count_down_and_wait()</code>.
+</p>
+<p>
+<i>Throws:</i>
+<code>std::logic_error</code> in the thread of the completion function if the
+completion function returns 0.
+<code>system_error</code> when an exception is required.
+</p>
+</blockquote>
 </body>
 </html>
