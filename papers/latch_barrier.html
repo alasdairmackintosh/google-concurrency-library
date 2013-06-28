@@ -97,7 +97,7 @@ td {
 <h1>C++ Latches and Barriers</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 N3666 - 2013-04-18
+ISO/IEC JTC1 SC22 WG21 N3666 (revised) - 2013-06-27
 </p>
 
 <p>
@@ -369,7 +369,11 @@ parallel, throughput can be increased.
     ...
     // Threads can now start processing
     start_latch.count_down();
-    }
+
+    // Wait for threads to finish, delete allocated objects.
+    ...
+  }
+
 </code>
 </pre>
 <p>
@@ -494,7 +498,7 @@ namespace std {
   };
 }
 </pre>
-</code> 
+</code>
 <p>
 The class <code>latch</code> provides a single-use thread coordination mechanism.
 An individual latch instance maintains an internal counter that is initialized
