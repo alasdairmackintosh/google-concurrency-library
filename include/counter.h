@@ -567,7 +567,7 @@ void strong_duplex< Integral >::insert( broker_type* child )
 template< typename Integral >
 void strong_duplex< Integral >::erase( broker_type* child, Integral by )
 {
-    operator +=( by );
+    this->operator +=( by );
     lock_guard< mutex > _( serializer_ );
     assert( children_.erase( child ) == 1 );
 }
@@ -673,7 +673,7 @@ template< typename Integral >
 void weak_duplex< Integral >::erase( broker_type* child, Integral by )
 {
     lock_guard< mutex > _( serializer_ );
-    operator +=( by );
+    this->operator +=( by );
     assert( children_.erase( child ) == 1 );
 }
 
@@ -789,7 +789,7 @@ private:
 
 template< typename Integral,
           atomicity BufferAtomicity, atomicity PrimeAtomicity >
-void 
+void
 buffer_array< Integral, BufferAtomicity, PrimeAtomicity >::push()
 {
     int size = base_type::size();
