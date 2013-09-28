@@ -42,6 +42,7 @@ using std::tr1::bind;
 // common point.
 class barrier {
  public:
+
   // Creates a new barrier that will block until num_threads threads are waiting
   // on it. When the barrier is released, it will be reset, so that it can be
   // used again.
@@ -90,7 +91,7 @@ class barrier {
   condition_variable idle_;
   condition_variable ready_;
   size_t num_waiting_;
-  size_t num_to_leave_;
+  std::atomic_size_t num_to_leave_;
 
   function<size_t()> completion_fn_;
 };

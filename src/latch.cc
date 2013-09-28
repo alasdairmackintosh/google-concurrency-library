@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <iostream>
+
 
 #include "latch.h"
 
@@ -20,18 +22,39 @@
 namespace gcl {
 latch::latch(size_t count)
     : count_(count) {
+  std::atomic_init(&waiting_, 0);
 }
 
-void latch::wait() {
-  unique_lock<mutex> lock(condition_mutex_);
-  while(count_ > 0) {
-    condition_.wait(lock);
+latch::~latch() {
+  while (waiting_ > 0) {
+    // Don't destroy this object if threads have not yet exited wait(). This can
+    // occur when a thread calls count_down() followed by the destructor - the
+    // waiting threads may be scheduled to wake up, but have not yet have exited.
+    //
+    // NOTE - on pthread systems, could add a yield call here
   }
 }
 
+void latch::wait() {
+  ++waiting_;
+  {
+    unique_lock<mutex> lock(condition_mutex_);
+    while(count_ > 0) {
+      condition_.wait(lock);
+    }
+  }
+  --waiting_;
+}
+
 bool latch::try_wait() {
-  unique_lock<mutex> lock(condition_mutex_);
-  return count_ == 0;
+  ++waiting_;
+  bool success;
+  {
+    unique_lock<mutex> lock(condition_mutex_);
+    success = (count_ == 0);
+  }
+  --waiting_;
+  return success;
 }
 
 void latch::count_down() {
@@ -45,17 +68,21 @@ void latch::count_down() {
 }
 
 void latch::count_down_and_wait() {
-  unique_lock<mutex> lock(condition_mutex_);
-  if (count_ == 0) {
-    throw std::logic_error("internal count == 0");
-  }
-  if (--count_ == 0) {
-    condition_.notify_all();
-  } else {
-    while(count_ > 0) {
-      condition_.wait(lock);
+  ++waiting_;
+  {
+    unique_lock<mutex> lock(condition_mutex_);
+    if (count_ == 0) {
+      throw std::logic_error("internal count == 0");
+    }
+    if (--count_ == 0) {
+      condition_.notify_all();
+    } else {
+      while(count_ > 0) {
+        condition_.wait(lock);
+      }
     }
   }
+  --waiting_;
 }
 
 }  // End namespace gcl

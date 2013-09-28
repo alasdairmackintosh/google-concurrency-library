@@ -16,6 +16,7 @@
 #define GCL_LATCH_
 
 #include "cxx11.h"
+#include "atomic.h"
 #include "condition_variable.h"
 #include "mutex.h"
 
@@ -34,8 +35,7 @@ public:
 
   // Destroys the latch. If the latch is destroyed while other threads are in
   // wait(), or are invoking count_down(), the behaviour is undefined.
-  ~latch() {
-  }
+  ~latch();
 
   // Decrements the count, and returns. If the count reaches 0, any threads
   // blocked in wait() will be released.
@@ -60,6 +60,9 @@ public:
 private:
   // The counter for this latch.
   size_t count_;
+
+  // Counts the number of threads that are currently waiting
+  std::atomic_size_t waiting_;
 
   // The condition that blocks until the count reaches 0
   condition_variable condition_;

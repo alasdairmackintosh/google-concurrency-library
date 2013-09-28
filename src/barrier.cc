@@ -28,33 +28,33 @@ using std::tr1::bind;
 barrier::barrier(size_t num_threads) throw (std::invalid_argument)
     : thread_count_(num_threads),
       new_thread_count_(num_threads),
-      num_waiting_(0),
-      num_to_leave_(0) {
+      num_waiting_(0) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
+  std::atomic_init(&num_to_leave_, 0);
 }
 
 barrier::barrier(size_t num_threads,
                  void (*completion)()) throw (std::invalid_argument)
       : thread_count_(num_threads),
         num_waiting_(0),
-        num_to_leave_(0),
         completion_fn_(bind(&barrier::completion_wrapper, this, completion)) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
+  std::atomic_init(&num_to_leave_, 0);
 }
 
 barrier::barrier(size_t num_threads,
                  function<void()> completion) throw (std::invalid_argument)
       : thread_count_(num_threads),
         num_waiting_(0),
-        num_to_leave_(0),
         completion_fn_(bind(&barrier::completion_wrapper, this, completion)) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
+  std::atomic_init(&num_to_leave_, 0);
 }
 
 barrier::barrier(
@@ -62,11 +62,11 @@ barrier::barrier(
     function<size_t()> completion) throw (std::invalid_argument)
       : thread_count_(num_threads),
         num_waiting_(0),
-        num_to_leave_(0),
         completion_fn_(completion) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
+  std::atomic_init(&num_to_leave_, 0);
 }
 
 barrier::barrier(
@@ -74,20 +74,22 @@ barrier::barrier(
     size_t (*completion)()) throw (std::invalid_argument)
       : thread_count_(num_threads),
         num_waiting_(0),
-        num_to_leave_(0),
         completion_fn_(completion) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
+  std::atomic_init(&num_to_leave_, 0);
 }
 
 barrier::~barrier() {
-  // TODO(alasdair): The current documentation does not define the destruct
-  // behaviour, and this assertion may be too strict. Keeping it for now as it
-  // can help with debugging incorrect useage, but we may want to remove it, or
-  // replace it with a more complex test.
-  unique_lock<mutex> lock(mutex_);
-  assert(all_threads_exited());
+  while (!all_threads_exited()) {
+    // Don't destroy this object if threads have not yet exited
+    // count_down_and_wait(). This can occur when a thread calls
+    // count_down_and_wait() followed by the destructor - the waiting threads
+    // may be scheduled to wake up, but not yet have exited.
+    //
+    // NOTE - on pthread systems, could add a yield call here
+  }
 }
 
 // These methods could be implemented as C++11 lambdas, but are written as
@@ -101,21 +103,24 @@ bool barrier::all_threads_waiting() {
 }
 
 void barrier::count_down_and_wait()  throw (std::logic_error) {
-  unique_lock<mutex> lock(mutex_);
-  idle_.wait(lock, bind(&barrier::all_threads_exited, this));
-  ++num_waiting_;
-  if (num_waiting_ == thread_count_) {
-    num_to_leave_ = thread_count_;
-    on_countdown();
-    ready_.notify_all();
-  } else {
-    ready_.wait(lock, bind(&barrier::all_threads_waiting, this));
+  {
+    unique_lock<mutex> lock(mutex_);
+    idle_.wait(lock, bind(&barrier::all_threads_exited, this));
+    ++num_waiting_;
+    if (num_waiting_ == thread_count_) {
+      num_to_leave_ = thread_count_;
+      on_countdown();
+      ready_.notify_all();
+    } else {
+      ready_.wait(lock, bind(&barrier::all_threads_waiting, this));
+    }
+    if (num_to_leave_ == 1) {
+      thread_count_ = new_thread_count_;
+      num_waiting_ = 0;
+      idle_.notify_all();
+    }
   }
-  if (--num_to_leave_ == 0) {
-    thread_count_ = new_thread_count_;
-    num_waiting_ = 0;
-    idle_.notify_all();
-  }
+  --num_to_leave_;
 }
 
 size_t barrier::completion_wrapper(function<void()> completion) {
