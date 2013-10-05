@@ -75,7 +75,8 @@ lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
 test : cxx11_test.o dynarray_test.pass \
         atomic_c_test.pass atomic_cpp_test.pass counter_test.pass \
 	stdfake_test.pass lower_test.pass mutex_test.pass higher_test.pass \
-	pipeline_test.pass queue_perf_test.exe lock_free_buffer_queue_test.pass
+	pipeline_test.pass queue_perf_test.exe lock_free_buffer_queue_test.pass \
+	scoped_guard_test.pass
 
 #### Simple Tests
 
@@ -153,3 +154,8 @@ $(QUEUE_PERF_TESTS) : CxxFlags += $(GTEST_INC)
 queue_perf_test.exe : $(QUEUE_PERF_TESTS) lower.a stdfake.a
 queue_perf_test.run : queue_perf_test.exe
 	./queue_perf_test.exe
+
+SCOPED_GUARD_TESTS := scoped_guard_test.o
+$(SCOPED_GUARD_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
+scoped_guard_test.exe : $(SCOPED_GUARD_TESTS) $(GMOCK_OBJ)
+scoped_guard_test.pass : scoped_guard_test.exe
