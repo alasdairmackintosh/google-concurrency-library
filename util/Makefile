@@ -68,7 +68,7 @@ build : stdfake.a lower.a
 stdfake.a : atomic.o mutex.o condition_variable.o thread.o
 
 lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
-	mutable_thread.o simple_thread_pool.o debug.o
+	mutable_thread.o simple_thread_pool.o debug.o notifying_barrier.o
 
 ######## Testing
 
@@ -113,8 +113,8 @@ stdfake_test.pass : stdfake_test.exe
 
 #### Test for the Google Concurrency Library Proper
 
-LOWER_TESTS := barrier_test.o serial_executor_test.o mutable_thread_test.o \
-	simple_thread_pool_test.o latch_test.o
+LOWER_TESTS := barrier_test.o notifying_barrier_test.o serial_executor_test.o \
+	simple_thread_pool_test.o latch_test.o mutable_thread_test.o
 $(LOWER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) lower.a stdfake.a
 lower_test.pass : lower_test.exe

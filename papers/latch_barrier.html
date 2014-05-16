@@ -122,13 +122,13 @@ Certain idioms that are commonly used in concurrent programming are missing
 from the standard libraries. Although many of these these can be relatively
 straightforward to implement, we believe it is more efficient to have a
 standard version.
-<p>
+</p><p>
 </p>
 In addition, although some idioms can be provided using
 mutexes, higher performance can often be obtained with atomic operations and
 lock-free algorithms. However, these algorithms are more complex to write, and
 are prone to error.
-</p>
+<p></p>
 <p>
 Other standard concurrency idioms may have difficult corner cases, and can be
 hard to implement correctly. For these reasons, we believe that it is
@@ -174,9 +174,9 @@ The parameter is the initial value of the internal counter.
 <dt><code>destructor( );</code></dt>
 <dd>
 <p>
-Destroys the latch. If the latch is destroyed while other threads are in
-<code>wait()</code>, or are invoking <code>count_down()</code>, the behaviour
-is undefined.
+Destroys the latch. If the latch is destroyed while other threads are blocked in
+<code>wait()</code>, the behaviour is undefined. Once the internal count has
+reached 0, the latch may safely be destroyed.
 </p>
 </dd>
 
@@ -273,8 +273,8 @@ Throws <code>std::invalid_argument</code> if the specified count is 0.
 <dt><code>destructor( );</code></dt>
 <dd>
 <p>
-Destroys the barrier. If the barrier is destroyed while other threads are in
-<code>count_down_and_wait()</code>, the behaviour is undefined.
+Destroys the barrier. If the barrier is destroyed while other threads are
+blocked in <code>count_down_and_wait()</code>, the behaviour is undefined.
 </p>
 </dd>
 
@@ -295,11 +295,11 @@ with a void function, then the internal thread count will be reset to the
 initial thread count specified in the contructor. If the barrier was created
 with a function returning size_t, then the thread count will be reset to the
 function's return value. It is illegal to return 0.
-<p>
+</p><p>
 Note that it is safe for a thread to re-enter <code>count_down_and_wait()</code>
 immediately. It is not necessary to ensure that all blocked threads have exited
 <code>count_down_and_wait()</code> before one thread re-enters it.
-</dd>
+</p></dd>
 </dl>
 <p>
 There are no copy or assignment operations.
@@ -311,11 +311,41 @@ all threads have counted down. Hence only the
 <code>count_down_and_wait()</code> method is supported.
 </p>
 
+
 <h4>Memory Ordering</h4>
 For threads X and Y that call <code>count_down_and_wait()</code>, the
 call to <code>count_down_and_wait()</code> in X synchronizes with the return from
 <code>count_down_and_wait()</code> in Y.
 
+<h4>A Note on Completion Functions and Templates</h4>
+The proposed barrier takes an optional completion function, which may either
+return void or size_t. A barrier may thus do one of three things after all
+threads have called <code>count_down_and_wait()</code>:
+<ul>
+<li>
+Reset itself automatically (if given no completion function.)
+</li>
+<li>
+Invoke the completion function and then reset itself automatically (if given a
+function returning void).
+</li>
+<li>
+Invoke the completion function and use the return value to reset itself (if
+given a function returning size_t).
+</li>
+</ul>
+<p>
+It has been suggested that the barrier class could be templated on the type of
+the completion function, so that a specialisation could be made for the first
+type of barrier. (If the compiler knew that no completion function would be
+involved, it could generate faster code, possibly using hardware barriers.)
+</p>
+<p>
+However, doing this would require users of the barrier to declare a templated
+barrier parameter rather than using a plain barrier type. Given this, it would
+be simpler to create multipe barrier types (e.g. simple_barrier and barrier,
+with the same interface) and let users of the barrier class template that.
+</p>
 
 <h3><a name="example">Sample Usage</a></h3>
 Sample use cases for the latch include:
@@ -335,7 +365,7 @@ An example of the first use case would be as follows:
   void DoWork(threadpool* pool) {
     latch completion_latch(NTASKS);
     for (int i = 0; i &lt; NTASKS; ++i) {
-      pool-&gt;add_task([&] {
+      pool-&gt;add_task([&amp;] {
         // perform work
         ...
         completion_latch.count_down();
@@ -346,7 +376,6 @@ An example of the first use case would be as follows:
   }
 </code>
 </pre>
-
 An example of the second use case is shown below. We need to load data and then
 process it using a number of threads. Loading the data is I/O bound, whereas
 starting threads and creating data structures is CPU bound. By running these in
@@ -357,7 +386,7 @@ parallel, throughput can be increased.
     latch start_latch(1);
     vector&lt;thread*&gt; workers;
     for (int i = 0; i &lt; NTHREADS; ++i) {
-      workers.push_back(new thread([&] {
+      workers.push_back(new thread([&amp;] {
         // Initialize data structures. This is CPU bound.
         ...
         start_latch.wait();
@@ -392,7 +421,7 @@ barrier when this happens.
 <code>
 
   void DoWork() {
-    Tasks& tasks;
+    Tasks&amp; tasks;
     size_t initial_threads;
     atomic&lt;size_t&gt; current_threads(initial_threads)
     vector&lt;thread*&gt; workers;
@@ -400,11 +429,11 @@ barrier when this happens.
     // Create a barrier, and set a lambda that will be invoked every time the
     // barrier counts down. If one or more active threads have completed,
     // reduce the number of threads.
-    std::function rf = [&] { return current_threads;};
+    std::function rf = [&amp;] { return current_threads;};
     barrier task_barrier(n_threads, rf);
 
     for (int i = 0; i &lt; n_threads; ++i) {
-      workers.push_back(new thread([&] {
+      workers.push_back(new thread([&amp;] {
         bool active = true;
         while(active) {
           Task task = tasks.get();
@@ -507,7 +536,7 @@ One or more threads may block waiting until the counter is decremented to 0.
 </p>
 <p>
 <code>latch(size_t count);</code>
-<blockquote>
+</p><blockquote>
 <p>
 <i>Effects:</i>
 Constructs an object of type latch.
@@ -544,7 +573,7 @@ Nothing.
 <i>Effects:</i>
 Decrements the internal count by 1, and returns. If the count reaches 0, any
 threads blocked in <code>wait()</code> will be released.
-<p>
+</p><p>
 <i>Synchronization:</i>
 All calls to <code>count_down()</code> synchronize with any thread
 returning from <code>wait()</code>.
@@ -557,7 +586,7 @@ that obtains a true return value from <code>try_wait()</code>.
 <code>system_error</code> when an exception is required.
 </p>
 </blockquote>
-</p>
+<p></p>
 
 <code>void wait();</code>
 <blockquote>
@@ -640,8 +669,8 @@ class barrier {
   void count_down_and_wait();
 
 };
+</code>
 </pre>
-</code> 
 <p>
 The class <code>barrier</code> provides a re-usable coordination mechanism.
 An individual barrier maintains an internal thread counter that is
@@ -654,7 +683,7 @@ change the internal thread count value.
 </p>
 <p>
 <code>barrier(size_t count);</code>
-<blockquote>
+</p><blockquote>
 <p>
 <i>Effects:</i>
 Constructs an object of type barrier.
@@ -668,7 +697,7 @@ The parameter is the initial value of the internal counter.
 <p>
 
 <code>barrier(size_t num_threads, std::function&lt;void()&gt; completion);</code>
-<blockquote>
+</p><blockquote>
 <p>
 <i>Effects:</i>
 Constructs an object of type barrier.

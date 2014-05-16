@@ -30,6 +30,7 @@
 #include "buffer_queue.h"
 #include "countdown_latch.h"
 #include "debug.h"
+#include "notifying_barrier.h"
 #include "queue_base.h"
 #include "simple_thread_pool.h"
 
@@ -87,7 +88,7 @@ class __instance {
   }
   void wait() {
     end_.wait();
-    thread_end_->count_down_and_wait();
+    thread_end_->arrive_and_wait();
     assert(is_done());
   }
 
@@ -95,7 +96,7 @@ class __instance {
     start_.wait();
   }
   void thread_done() {
-    thread_end_->count_down_and_wait();
+    thread_end_->arrive_and_wait();
   }
   void execute(function<void ()> func) {
     num_threads_++;
@@ -122,7 +123,7 @@ class __instance {
   countdown_latch end_;
   int num_threads_;
   bool done_;
-  barrier* thread_end_;
+  notifying_barrier* thread_end_;
   simple_thread_pool* pool_;
   queue_object<buffer_queue<terminated> > dummy_queue_;
 
@@ -683,7 +684,7 @@ __instance::__instance(simple_thread_pool* pool,
   // so we know num_threads_.
   function<size_t()> done_fn = std::bind(&__instance::all_threads_done,
                                          this);
-  thread_end_ = new barrier(num_threads_, done_fn);
+  thread_end_ = new notifying_barrier(num_threads_, done_fn);
   start_.count_down();  // Start the threads
 }
 

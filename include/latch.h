@@ -19,6 +19,7 @@
 #include "atomic.h"
 #include "condition_variable.h"
 #include "mutex.h"
+#include "scoped_guard.h"
 
 namespace gcl {
 
@@ -31,38 +32,34 @@ class latch {
 public:
 
   // Creates a new latch with the given count.
-  explicit latch(size_t count);
+  explicit latch(int count);
 
-  // Destroys the latch. If the latch is destroyed while other threads are in
-  // wait(), or are invoking count_down(), the behaviour is undefined.
   ~latch();
 
-  // Decrements the count, and returns. If the count reaches 0, any threads
-  // blocked in wait() will be released.
-  //
-  // Throws std::logic_error if the internal count is already 0.
-  void count_down();
+  void arrive();
 
-  // Waits until the count is decremented to 0. If the count is already 0, this
-  // is a no-op.
+  void arrive_and_wait();
+
+  void count_down(int n);
+
   void wait();
 
-  // Returns true if the count has been decremented to 0, and false
-  // otherwise. Does not block.
   bool try_wait();
 
-  // Decrements the count, and waits until it reaches 0. When it does, this
-  // thread, as well as any other threads blocked in wait() will be released.
-  //
-  // Throws std::logic_error if the internal count is already 0.
-  void count_down_and_wait();
+#ifdef HAS_CXX11_RVREF
+  // Creates a scoped_guard that will invoke arrive, wait, or
+  // arrive_and_wait on this latch when it goes out of scope.
+  scoped_guard arrive_guard();
+  scoped_guard wait_guard();
+  scoped_guard arrive_and_wait_guard();
+#endif
 
 private:
   // The counter for this latch.
-  size_t count_;
+  int count_;
 
   // Counts the number of threads that are currently waiting
-  std::atomic_size_t waiting_;
+  std::atomic_int waiting_;
 
   // The condition that blocks until the count reaches 0
   condition_variable condition_;

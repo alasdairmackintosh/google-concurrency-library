@@ -66,7 +66,7 @@ void test_enq(function<queue_op_status(const unsigned int&)> enq_fn,
         arr[j] = (double)random() / (double)((2 << 31) - 1);
     }
 
-    b->count_down_and_wait();
+    b->arrive_and_wait();
     while (i < total_enq) {
         do_work(size, arr);
         // Will always retry and not count the enq until success
@@ -91,7 +91,7 @@ void test_deq(function<queue_op_status(unsigned int&)> deq_fn,
 
     // Only start the thread when all the threads doing the same operation have
     // started.
-    b->count_down_and_wait();
+    b->arrive_and_wait();
     while (i < total_deq) {
         // Will always retry and not count the enq until success
         unsigned int val;

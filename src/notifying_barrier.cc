@@ -14,7 +14,7 @@
 
 #include <thread.h>
 
-#include "barrier.h"
+#include "notifying_barrier.h"
 
 namespace gcl {
 using std::atomic;
@@ -25,16 +25,7 @@ using std::bind;
 using std::tr1::bind;
 #endif
 
-barrier::barrier(int num_threads) throw (std::invalid_argument)
-    : thread_count_(num_threads),
-      num_waiting_(0) {
-  if (num_threads == 0) {
-    throw std::invalid_argument("num_threads is 0");
-  }
-  std::atomic_init(&num_to_leave_, 0);
-}
-
-barrier::~barrier() {
+notifying_barrier::~notifying_barrier() {
   while (!all_threads_exited()) {
     // Don't destroy this object if threads have not yet exited
     // arrive_and_wait(). This can occur when a thread calls
@@ -47,27 +38,28 @@ barrier::~barrier() {
 
 // These methods could be implemented as C++11 lambdas, but are written as
 // member functions for C++98 compatibility.
-bool barrier::all_threads_exited() {
+bool notifying_barrier::all_threads_exited() {
   return num_to_leave_ == 0;
 }
 
-bool barrier::all_threads_waiting() {
+bool notifying_barrier::all_threads_waiting() {
   return num_waiting_ == thread_count_;
 }
 
-void barrier::arrive_and_wait() {
+void notifying_barrier::arrive_and_wait()  throw (std::logic_error) {
   {
     unique_lock<mutex> lock(mutex_);
-    // TODO(alasdair): This can deadlock - fix it.
-    idle_.wait(lock, bind(&barrier::all_threads_exited, this));
+    idle_.wait(lock, bind(&notifying_barrier::all_threads_exited, this));
     ++num_waiting_;
     if (num_waiting_ == thread_count_) {
       num_to_leave_ = thread_count_;
+      on_countdown();
       ready_.notify_all();
     } else {
-      ready_.wait(lock, bind(&barrier::all_threads_waiting, this));
+      ready_.wait(lock, bind(&notifying_barrier::all_threads_waiting, this));
     }
     if (num_to_leave_ == 1) {
+      thread_count_ = new_thread_count_;
       num_waiting_ = 0;
       idle_.notify_all();
     }
@@ -75,23 +67,22 @@ void barrier::arrive_and_wait() {
   --num_to_leave_;
 }
 
-void barrier::arrive_and_leave() {
-  {
-    unique_lock<mutex> lock(mutex_);
-    idle_.wait(lock, bind(&barrier::all_threads_exited, this));
-    if (--thread_count_ == 0) {
-      throw std::invalid_argument("All threads have left");
-    }
-    if (num_waiting_ == thread_count_) {
-      num_to_leave_ = thread_count_;
-      ready_.notify_all();
-    }
+void notifying_barrier::on_countdown() {
+  reset(completion_fn_());
+}
+
+void notifying_barrier::reset(int num_threads) {
+  if (num_threads == 0) {
+    throw std::invalid_argument("num_threads is 0");
   }
+  // TODO(alasdair): Consider adding a check that we are either in the
+  // completion function, or have not yet called wait()
+  new_thread_count_ = num_threads;
 }
 
 #ifdef HAS_CXX11_RVREF
-scoped_guard barrier::arrive_and_wait_guard() {
-  function<void ()> f = bind(&barrier::arrive_and_wait, this);
+scoped_guard notifying_barrier::arrive_and_wait_guard() {
+  function<void ()> f = bind(&notifying_barrier::arrive_and_wait, this);
   return scoped_guard(f);
 }
 #endif

@@ -18,6 +18,7 @@
 
 #include "atomic.h"
 #include "thread.h"
+#include "scoped_guard.h"
 
 #include "latch.h"
 
@@ -25,6 +26,7 @@
 
 using namespace std;
 using gcl::latch;
+using gcl::scoped_guard;
 using testing::_;
 
 class LatchTest : public testing::Test {
@@ -37,7 +39,7 @@ void WaitForLatch(latch& latch) {
 }
 
 void TryWaitForLatch(latch& test_latch, latch& started_latch, atomic_bool* finished) {
-  started_latch.count_down();
+  started_latch.count_down(1);
   while (!test_latch.try_wait()) {
     // spin;
   }
@@ -47,14 +49,14 @@ void TryWaitForLatch(latch& test_latch, latch& started_latch, atomic_bool* finis
 void WaitForLatchAndDecrement(latch& to_wait,
                               latch& decrement) {
   to_wait.wait();
-  decrement.count_down();
+  decrement.count_down(1);
   EXPECT_TRUE(to_wait.try_wait());
   EXPECT_TRUE(to_wait.try_wait());
 }
 
 void DecrementAndWaitForLatch(latch& decrement,
                               latch& to_wait) {
-  decrement.count_down();
+  decrement.count_down(1);
   to_wait.wait();
   EXPECT_TRUE(to_wait.try_wait());
   EXPECT_TRUE(decrement.try_wait());
@@ -66,9 +68,9 @@ TEST_F(LatchTest, TwoThreads) {
   thread t1(std::bind(WaitForLatch, std::ref(latch)));
   thread t2(std::bind(WaitForLatch, std::ref(latch)));
   std::cerr << "Counting down " << this_thread::get_id() << "\n";
-  latch.count_down();
+  latch.count_down(1);
   std::cerr << "Counting down " << this_thread::get_id() << "\n";
-  latch.count_down();
+  latch.count_down(1);
   t1.join();
   t2.join();
 }
@@ -93,7 +95,7 @@ TEST_F(LatchTest, TwoThreadsTryWait) {
   started_latch.wait();
   ASSERT_FALSE(finished1);
   ASSERT_FALSE(finished2);
-  test_latch.count_down();
+  test_latch.count_down(1);
   t1.join();
   t2.join();
   ASSERT_TRUE(finished1);
@@ -104,8 +106,8 @@ TEST_F(LatchTest, TwoThreadsTryWait) {
 // been decremented.
 TEST_F(LatchTest, TwoThreadsPreDecremented) {
   latch latch(2);
-  latch.count_down();
-  latch.count_down();
+  latch.count_down(1);
+  latch.count_down(1);
   thread t1(std::bind(WaitForLatch, std::ref(latch)));
   thread t2(std::bind(WaitForLatch, std::ref(latch)));
   t1.join();
@@ -123,3 +125,41 @@ TEST_F(LatchTest, TwoThreadsTwoLatches) {
   t1.join();
   t2.join();
 }
+
+#ifdef HAS_CXX11_RVREF
+void ArriveWithGuard(latch& latch) {
+  scoped_guard g = latch.arrive_guard();
+}
+
+void WaitWithGuard(latch& latch) {
+  scoped_guard g = latch.wait_guard();
+}
+
+void ArriveAndWaitWithGuard(latch& latch) {
+  scoped_guard g = latch.arrive_and_wait_guard();
+}
+
+TEST_F(LatchTest, ScopedGuardArrive) {
+  latch latch(2);
+  thread t1(std::bind(
+      ArriveWithGuard, std::ref(latch)));
+  thread t2(std::bind(
+      ArriveWithGuard, std::ref(latch)));
+  t1.join();
+  t2.join();
+  // Both threads should have counted down
+  ASSERT_TRUE(latch.try_wait());
+}
+
+TEST_F(LatchTest, ScopedGuardWait) {
+  latch latch(1);
+  thread t1(std::bind(
+      ArriveAndWaitWithGuard, std::ref(latch)));
+  thread t2(std::bind(
+      WaitWithGuard, std::ref(latch)));
+  t1.join();
+  t2.join();
+  // Both threads should have completed. and one should have counted down.
+  ASSERT_TRUE(latch.try_wait());
+}
+#endif
