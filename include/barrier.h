@@ -49,7 +49,7 @@ class barrier {
   ~barrier();
 
   void arrive_and_wait();
-  void arrive_and_leave();
+  void arrive_and_drop();
 
 #ifdef HAS_CXX11_RVREF
   // Creates a scoped_guard that will invoke arrive_and_wait on this

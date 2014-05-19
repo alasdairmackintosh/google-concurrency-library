@@ -28,8 +28,8 @@ using std::tr1::bind;
 barrier::barrier(int num_threads) throw (std::invalid_argument)
     : thread_count_(num_threads),
       num_waiting_(0) {
-  if (num_threads == 0) {
-    throw std::invalid_argument("num_threads is 0");
+  if (num_threads < 0) {
+    throw std::invalid_argument("num_threads is negative");
   }
   std::atomic_init(&num_to_leave_, 0);
 }
@@ -37,8 +37,8 @@ barrier::barrier(int num_threads) throw (std::invalid_argument)
 barrier::~barrier() {
   while (!all_threads_exited()) {
     // Don't destroy this object if threads have not yet exited
-    // arrive_and_wait(). This can occur when a thread calls
-    // arrive_and_wait() followed by the destructor - the waiting threads
+    // arrive_and_drop(). This can occur when a thread calls
+    // arrive_and_drop() followed by the destructor - the waiting threads
     // may be scheduled to wake up, but not yet have exited.
     //
     // NOTE - on pthread systems, could add a yield call here
@@ -75,7 +75,7 @@ void barrier::arrive_and_wait() {
   --num_to_leave_;
 }
 
-void barrier::arrive_and_leave() {
+void barrier::arrive_and_drop() {
   {
     unique_lock<mutex> lock(mutex_);
     idle_.wait(lock, bind(&barrier::all_threads_exited, this));

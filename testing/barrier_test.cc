@@ -38,10 +38,10 @@ using std::tr1::function;
 #endif
 
 // TODO(alasdair): Update kNumCycles when the potential deadlock in
-// arrive_and_wait has been fixed.
+// arrive_and_drop has been fixed.
 static int kNumCycles = 1;
 static int kNumThreads = 5;
-static int kZero = 0;
+static int kInvalidCount = -1;
 
 class BarrierTest : public testing::Test {
 };
@@ -50,7 +50,7 @@ class BarrierTest : public testing::Test {
 // threads.
 TEST_F(BarrierTest, InvalidConstructorArg) {
   try {
-    barrier b(kZero);
+    barrier b(kInvalidCount);
     FAIL();
   } catch (std::invalid_argument expected) {
   }
@@ -62,8 +62,8 @@ static void WaitForBarrier(barrier* b, int n_cycles) {
   }
 }
 
-static void Leave(barrier* b) {
-  b->arrive_and_leave();
+static void Drop(barrier* b) {
+  b->arrive_and_drop();
 }
 
 TEST_F(BarrierTest, ArriveAndWait) {
@@ -94,14 +94,14 @@ TEST_F(BarrierTest, ArriveAndWaitMultipleCycles) {
   }
 }
 
-TEST_F(BarrierTest, ArriveAndLeave) {
+TEST_F(BarrierTest, ArriveAndDrop) {
   barrier b(kNumThreads);
   thread* threads[kNumThreads];
   for (int i = 0; i < kNumThreads; i++) {
     if (i % 2 == 0) {
       threads[i] = new thread(std::bind(WaitForBarrier, &b, kNumCycles));
     } else {
-      threads[i] = new thread(std::bind(Leave, &b));
+      threads[i] = new thread(std::bind(Drop, &b));
     }
   }
   for (int i = 0; i < kNumThreads; i++) {
