@@ -1,0 +1,1 @@
+A concurrency library for C++ that we hope to eventually propose for standardization.
