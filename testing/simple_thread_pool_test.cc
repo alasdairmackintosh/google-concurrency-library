@@ -16,11 +16,11 @@
 
 #include <stdio.h>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
+#include <atomic>
 
-#include "condition_variable.h"
+#include <condition_variable>
 
 #include "called_task.h"
 #include "mutable_thread.h"

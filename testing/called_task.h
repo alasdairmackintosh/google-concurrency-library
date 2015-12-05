@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "atomic.h"
-#include "condition_variable.h"
+#include <atomic>
+#include <condition_variable>
 
 #include "mutable_thread.h"
-
-using std::atomic;
-using std::memory_order_relaxed;
 
 namespace gcl {
 
@@ -27,19 +24,20 @@ namespace gcl {
 // in behavior but with a little bit more test-functionality).
 struct Called {
   Called(int ready_count) {
-    std::atomic_init(&this->ready_count, ready_count);
-    std::atomic_init(&count, 0);
+    //std::atomic_init(&this->ready_count, ready_count);
+    this->ready_count = ready_count;
+    count = 0; // std::atomic_init(&count, 0);
   }
 
   void run() {
-    unique_lock<mutex> wait_lock(ready_lock);
-    count.fetch_add(1, memory_order_relaxed);
+    std::unique_lock<std::mutex> wait_lock(ready_lock);
+    count.fetch_add(1, std::memory_order_relaxed);
     ready_condvar.notify_one();
   }
 
   // Blocking wait function which returns when count reaches ready_count
   void wait() {
-    unique_lock<mutex> wait_lock(ready_lock);
+    std::unique_lock<std::mutex> wait_lock(ready_lock);
     ready_condvar.wait(wait_lock, std::bind(&Called::is_done, this));
   }
 
@@ -50,15 +48,15 @@ struct Called {
                                               new_ready_count)) {}
   }
 
-  atomic<int> count;
+  std::atomic<int> count;
 
-  atomic<int> ready_count;
-  mutex ready_lock;
-  condition_variable ready_condvar;
+  std::atomic<int> ready_count;
+  std::mutex ready_lock;
+  std::condition_variable ready_condvar;
 
  private:
   bool is_done() {
-    return ready_count.load() == count.load(memory_order_relaxed);
+    return ready_count.load() == count.load(std::memory_order_relaxed);
   }
 };
 

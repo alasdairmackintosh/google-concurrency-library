@@ -17,8 +17,8 @@
 #include <algorithm>
 #include <string>
 
-#include "atomic.h"
-#include "thread.h"
+#include <atomic>
+#include <thread>
 #include "scoped_guard.h"
 
 #include "gmock/gmock.h"
@@ -27,15 +27,8 @@
 
 using testing::_;
 
-using std::atomic;
 using gcl::barrier;
 using gcl::scoped_guard;
-
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-using std::function;
-#else
-using std::tr1::function;
-#endif
 
 // TODO(alasdair): Update kNumCycles when the potential deadlock in
 // arrive_and_drop has been fixed.
@@ -68,9 +61,9 @@ static void Drop(barrier* b) {
 
 TEST_F(BarrierTest, ArriveAndWait) {
   barrier b(kNumThreads);
-  thread* threads[kNumThreads];
+  std::thread* threads[kNumThreads];
   for (int i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(std::bind(WaitForBarrier, &b, 1));
+    threads[i] = new std::thread(std::bind(WaitForBarrier, &b, 1));
   }
   for (int i = 0; i < kNumThreads; i++) {
     threads[i]->join();
@@ -82,9 +75,9 @@ TEST_F(BarrierTest, ArriveAndWait) {
 
 TEST_F(BarrierTest, ArriveAndWaitMultipleCycles) {
   barrier b(kNumThreads);
-  thread* threads[kNumThreads];
+  std::thread* threads[kNumThreads];
   for (int i = 0; i < kNumThreads; i++) {
-    threads[i] = new thread(std::bind(WaitForBarrier, &b, kNumCycles));
+    threads[i] = new std::thread(std::bind(WaitForBarrier, &b, kNumCycles));
   }
   for (int i = 0; i < kNumThreads; i++) {
     threads[i]->join();
@@ -96,12 +89,12 @@ TEST_F(BarrierTest, ArriveAndWaitMultipleCycles) {
 
 TEST_F(BarrierTest, ArriveAndDrop) {
   barrier b(kNumThreads);
-  thread* threads[kNumThreads];
+  std::thread* threads[kNumThreads];
   for (int i = 0; i < kNumThreads; i++) {
     if (i % 2 == 0) {
-      threads[i] = new thread(std::bind(WaitForBarrier, &b, kNumCycles));
+      threads[i] = new std::thread(std::bind(WaitForBarrier, &b, kNumCycles));
     } else {
-      threads[i] = new thread(std::bind(Drop, &b));
+      threads[i] = new std::thread(std::bind(Drop, &b));
     }
   }
   for (int i = 0; i < kNumThreads; i++) {
@@ -120,8 +113,8 @@ void CountDownAndWaitWithGuard(barrier& barrier) {
 
 TEST_F(BarrierTest, ScopedGuardCountDown) {
   barrier b(2);
-  thread t1(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
-  thread t2(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
+  std::thread t1(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
+  std::thread t2(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
   t1.join();
   t2.join();
 }

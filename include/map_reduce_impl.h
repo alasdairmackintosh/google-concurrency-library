@@ -16,7 +16,7 @@
 #define GCL_MAP_REDUCE_IMPL_
 
 #include "buffer_queue.h"
-#include "functional.h"
+#include <functional>
 #include "queue_base.h"
 
 namespace gcl {

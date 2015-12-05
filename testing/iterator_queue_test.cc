@@ -16,12 +16,12 @@
 
 #include <vector>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
+#include <atomic>
 
 #include "countdown_latch.h"
-#include "thread.h"
+#include <thread>
 #include "iterator_queue.h"
 
 #include "gmock/gmock.h"
@@ -78,9 +78,9 @@ TEST_F(IteratorQueueTest, ThreadedRead) {
   countdown_latch latch1(1);
   countdown_latch latch2(1);
   countdown_latch latch3(1);
-  thread thread1(std::bind(GetAndBlock, &queue, &latch1));
-  thread thread2(std::bind(GetAndBlock, &queue, &latch2));
-  thread thread3(std::bind(GetAndBlock, &queue, &latch3));
+  std::thread thread1(std::bind(GetAndBlock, &queue, &latch1));
+  std::thread thread2(std::bind(GetAndBlock, &queue, &latch2));
+  std::thread thread3(std::bind(GetAndBlock, &queue, &latch3));
   latch1.wait();
   latch2.wait();
   latch3.wait();

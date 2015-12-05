@@ -14,8 +14,8 @@
 
 #ifndef GCL_COUNTDOWN_LATCH_
 #define GCL_COUNTDOWN_LATCH_
-#include "mutex.h"
-#include "condition_variable.h"
+#include <mutex>
+#include <condition_variable>
 
 namespace gcl {
 
@@ -50,8 +50,8 @@ private:
   unsigned int count_;
 
   // The condition that blocks until the count reaches 0
-  condition_variable condition_;
-  mutex condition_mutex_;
+  std::condition_variable condition_;
+  std::mutex condition_mutex_;
 
  // Disallow copy and assign
   countdown_latch(const countdown_latch&);

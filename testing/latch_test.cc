@@ -14,10 +14,10 @@
 
 // Unit tests for latch
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
-#include "thread.h"
+#include <atomic>
+#include <thread>
 #include "scoped_guard.h"
 
 #include "latch.h"

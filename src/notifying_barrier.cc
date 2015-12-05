@@ -12,18 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thread.h>
+#include <thread>
 
 #include "notifying_barrier.h"
 
 namespace gcl {
-using std::atomic;
-using std::memory_order;
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-using std::bind;
-#else
-using std::tr1::bind;
-#endif
 
 notifying_barrier::~notifying_barrier() {
   while (!all_threads_exited()) {
@@ -48,15 +41,15 @@ bool notifying_barrier::all_threads_waiting() {
 
 void notifying_barrier::arrive_and_wait()  throw (std::logic_error) {
   {
-    unique_lock<mutex> lock(mutex_);
-    idle_.wait(lock, bind(&notifying_barrier::all_threads_exited, this));
+    std::unique_lock<std::mutex> lock(mutex_);
+    idle_.wait(lock, std::bind(&notifying_barrier::all_threads_exited, this));
     ++num_waiting_;
     if (num_waiting_ == thread_count_) {
       num_to_leave_ = thread_count_;
       on_countdown();
       ready_.notify_all();
     } else {
-      ready_.wait(lock, bind(&notifying_barrier::all_threads_waiting, this));
+      ready_.wait(lock, std::bind(&notifying_barrier::all_threads_waiting, this));
     }
     if (num_to_leave_ == 1) {
       thread_count_ = new_thread_count_;
@@ -82,7 +75,7 @@ void notifying_barrier::reset(int num_threads) {
 
 #ifdef HAS_CXX11_RVREF
 scoped_guard notifying_barrier::arrive_and_wait_guard() {
-  function<void ()> f = bind(&notifying_barrier::arrive_and_wait, this);
+  std::function<void ()> f = std::bind(&notifying_barrier::arrive_and_wait, this);
   return scoped_guard(f);
 }
 #endif

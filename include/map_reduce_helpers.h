@@ -19,7 +19,7 @@
 #include <map>
 #include <vector>
 
-#include "mutex.h"
+#include <mutex>
 
 namespace gcl {
 
@@ -28,11 +28,11 @@ class blocking_map : public MapType {
  public:
   std::pair<typename MapType::iterator, bool> insert(
       const typename MapType::value_type& value) {
-    lock_guard<mutex> map_lock(mu_);
+    std::lock_guard<std::mutex> map_lock(mu_);
     return MapType::insert(value);
   }
  private:
-  mutex mu_;
+  std::mutex mu_;
 };
 
 // Output iterator over a map

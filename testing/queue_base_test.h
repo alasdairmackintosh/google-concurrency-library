@@ -15,15 +15,13 @@
 #ifndef QUEUE_BASE_TEST_H
 #define QUEUE_BASE_TEST_H
 
-#include <tr1/functional>
+#include <functional>
 #include <iostream>
 #include "stream_mutex.h"
-#include "thread.h"
+#include <thread>
 #include "gmock/gmock.h"
 #include "cleanup_assert.h"
 #include "queue_base.h"
-
-namespace tr1 = std::tr1;
 
 using namespace gcl;
 
@@ -558,8 +556,8 @@ void producer_consumer(
     queue_base<int>& queue )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(drain, count, 1, &queue));
-    thread t2(tr1::bind(fill, count, 1, &queue));
+    std::thread t1(std::bind(drain, count, 1, &queue));
+    std::thread t2(std::bind(fill, count, 1, &queue));
     // Join in order of expected completion.
     // Closing as we go to stop the other thread.
     t2.join();
@@ -574,8 +572,8 @@ void try_producer_consumer(
     queue_base<int>& queue )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(try_drain, count, 1, &queue));
-    thread t2(tr1::bind(try_fill, count, 1, &queue));
+    std::thread t1(std::bind(try_drain, count, 1, &queue));
+    std::thread t2(std::bind(try_fill, count, 1, &queue));
     // Join in order of expected completion.
     // Closing as we go to stop the other thread.
     t2.join();
@@ -612,9 +610,9 @@ void linear_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(drain, count, 2, &tail));
-    thread t2(tr1::bind(filter, &head, &tail, twice));
-    thread t3(tr1::bind(fill, count, 1, &head));
+    std::thread t1(std::bind(drain, count, 2, &tail));
+    std::thread t2(std::bind(filter, &head, &tail, twice));
+    std::thread t3(std::bind(fill, count, 1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t3.join();
@@ -633,9 +631,9 @@ void linear_try_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(try_drain, count, 2, &tail));
-    thread t2(tr1::bind(filter, &head, &tail, twice));
-    thread t3(tr1::bind(try_fill, count, 1, &head));
+    std::thread t1(std::bind(try_drain, count, 2, &tail));
+    std::thread t2(std::bind(filter, &head, &tail, twice));
+    std::thread t3(std::bind(try_fill, count, 1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t3.join();
@@ -654,10 +652,10 @@ void merging_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(drain_pos_neg, 2 * count, 2, &tail));
-    thread t2(tr1::bind(filter, &head, &tail, twice));
-    thread t3(tr1::bind(fill, count, 1, &head));
-    thread t4(tr1::bind(fill, count, -1, &head));
+    std::thread t1(std::bind(drain_pos_neg, 2 * count, 2, &tail));
+    std::thread t2(std::bind(filter, &head, &tail, twice));
+    std::thread t3(std::bind(fill, count, 1, &head));
+    std::thread t4(std::bind(fill, count, -1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t4.join();
@@ -677,10 +675,10 @@ void merging_try_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(try_drain_pos_neg, 2 * count, 2, &tail));
-    thread t2(tr1::bind(filter, &head, &tail, twice));
-    thread t3(tr1::bind(try_fill, count, 1, &head));
-    thread t4(tr1::bind(try_fill, count, -1, &head));
+    std::thread t1(std::bind(try_drain_pos_neg, 2 * count, 2, &tail));
+    std::thread t2(std::bind(filter, &head, &tail, twice));
+    std::thread t3(std::bind(try_fill, count, 1, &head));
+    std::thread t4(std::bind(try_fill, count, -1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t4.join();
@@ -700,12 +698,12 @@ void parallel_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(drain_any, count, -2, &tail));
-    thread t2(tr1::bind(drain_any, count, 2, &tail));
-    thread t3(tr1::bind(filter, &head, &tail, twice));
-    thread t4(tr1::bind(filter, &head, &tail, twice));
-    thread t5(tr1::bind(fill, count, 1, &head));
-    thread t6(tr1::bind(fill, count, -1, &head));
+    std::thread t1(std::bind(drain_any, count, -2, &tail));
+    std::thread t2(std::bind(drain_any, count, 2, &tail));
+    std::thread t3(std::bind(filter, &head, &tail, twice));
+    std::thread t4(std::bind(filter, &head, &tail, twice));
+    std::thread t5(std::bind(fill, count, 1, &head));
+    std::thread t6(std::bind(fill, count, -1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t6.join();
@@ -727,12 +725,12 @@ void parallel_mixed_pipe(
     queue_base<int>& tail )
 {
     // Start drain first for extra testing of waiting
-    thread t1(tr1::bind(drain_any, count, -2, &tail));
-    thread t2(tr1::bind(try_drain_any, count, 2, &tail));
-    thread t3(tr1::bind(filter, &head, &tail, twice));
-    thread t4(tr1::bind(filter, &head, &tail, twice));
-    thread t5(tr1::bind(fill, count, 1, &head));
-    thread t6(tr1::bind(try_fill, count, -1, &head));
+    std::thread t1(std::bind(drain_any, count, -2, &tail));
+    std::thread t2(std::bind(try_drain_any, count, 2, &tail));
+    std::thread t3(std::bind(filter, &head, &tail, twice));
+    std::thread t4(std::bind(filter, &head, &tail, twice));
+    std::thread t5(std::bind(fill, count, 1, &head));
+    std::thread t6(std::bind(try_fill, count, -1, &head));
     // Join in order of expected completion.
     // Closing as we go to stop the other threads.
     t6.join();

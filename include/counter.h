@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include "dynarray.h"
-#include "unordered_set.h"
+#include <unordered_set>
 
-#include "atomic.h"
-#include "mutex.h"
+#include <atomic>
+#include <mutex>
 
 namespace gcl {
 
@@ -534,7 +534,7 @@ public:
 private:
     void insert( broker_type* child );
     void erase( broker_type* child, Integral by );
-    mutex serializer_;
+    std::mutex serializer_;
     typedef std::unordered_set< broker_type* > set_type;
     set_type children_;
 };
@@ -560,7 +560,7 @@ private:
 template< typename Integral >
 void strong_duplex< Integral >::insert( broker_type* child )
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.insert( child ).second );
 }
 
@@ -568,7 +568,7 @@ template< typename Integral >
 void strong_duplex< Integral >::erase( broker_type* child, Integral by )
 {
     this->operator +=( by );
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.erase( child ) == 1 );
 }
 
@@ -578,7 +578,7 @@ Integral strong_duplex< Integral >::load()
     typedef typename set_type::iterator iterator;
     Integral tmp = 0;
     {
-        lock_guard< mutex > _( serializer_ );
+        std::lock_guard< std::mutex > _( serializer_ );
         iterator rollcall = children_.begin();
         for ( ; rollcall != children_.end(); rollcall++ )
             tmp += (*rollcall)->poll();
@@ -592,7 +592,7 @@ Integral strong_duplex< Integral >::exchange( Integral to )
     typedef typename set_type::iterator iterator;
     Integral tmp = 0;
     {
-        lock_guard< mutex > _( serializer_ );
+        std::lock_guard< std::mutex > _( serializer_ );
         iterator rollcall = children_.begin();
         for ( ; rollcall != children_.end(); rollcall++ )
             tmp += (*rollcall)->drain();
@@ -603,7 +603,7 @@ Integral strong_duplex< Integral >::exchange( Integral to )
 template< typename Integral >
 strong_duplex< Integral >::~strong_duplex()
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.size() == 0 );
 }
 
@@ -640,7 +640,7 @@ public:
 private:
     void insert( broker_type* child );
     void erase( broker_type* child, Integral by );
-    mutex serializer_;
+    std::mutex serializer_;
     typedef std::unordered_set< broker_type* > set_type;
     set_type children_;
 };
@@ -665,14 +665,14 @@ private:
 template< typename Integral >
 void weak_duplex< Integral >::insert( broker_type* child )
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.insert( child ).second );
 }
 
 template< typename Integral >
 void weak_duplex< Integral >::erase( broker_type* child, Integral by )
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     this->operator +=( by );
     assert( children_.erase( child ) == 1 );
 }
@@ -683,7 +683,7 @@ Integral weak_duplex< Integral >::load()
     typedef typename set_type::iterator iterator;
     Integral tmp = 0;
     {
-        lock_guard< mutex > _( serializer_ );
+        std::lock_guard< std::mutex > _( serializer_ );
         iterator rollcall = children_.begin();
         for ( ; rollcall != children_.end(); rollcall++ )
             tmp += (*rollcall)->poll();
@@ -695,7 +695,7 @@ Integral weak_duplex< Integral >::load()
 template< typename Integral >
 weak_duplex< Integral >::~weak_duplex()
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.size() == 0 );
 }
 
@@ -821,7 +821,7 @@ public:
 private:
     void insert( broker_type* child );
     void erase( broker_type* child, Integral by );
-    mutex serializer_;
+    std::mutex serializer_;
     typedef std::unordered_set< broker_type* > set_type;
     set_type children_;
 };
@@ -852,7 +852,7 @@ private:
 template< typename Integral >
 strong_duplex_array< Integral >::~strong_duplex_array()
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.size() == 0 );
 }
 
@@ -894,7 +894,7 @@ public:
 private:
     void insert( broker_type* child );
     void erase( broker_type* child, Integral by );
-    mutex serializer_;
+    std::mutex serializer_;
     typedef std::unordered_set< broker_type* > set_type;
     set_type children_;
 };
@@ -923,7 +923,7 @@ private:
 template< typename Integral >
 weak_duplex_array< Integral >::~weak_duplex_array()
 {
-    lock_guard< mutex > _( serializer_ );
+    std::lock_guard< std::mutex > _( serializer_ );
     assert( children_.size() == 0 );
 }
 

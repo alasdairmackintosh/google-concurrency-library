@@ -15,8 +15,8 @@
 #ifndef BUFFER_QUEUE_H
 #define BUFFER_QUEUE_H
 
-#include "mutex.h"
-#include "condition_variable.h"
+#include <mutex>
+#include <condition_variable>
 
 #include "queue_base.h"
 
@@ -65,9 +65,9 @@ class buffer_queue
 #endif
 
   private:
-    mutex mtx_;
-    condition_variable not_empty_;
-    condition_variable not_full_;
+    std::mutex mtx_;
+    std::condition_variable not_empty_;
+    std::condition_variable not_full_;
     size_t waiting_full_;
     size_t waiting_empty_;
     Value* buffer_;
@@ -196,7 +196,7 @@ buffer_queue<Value>::~buffer_queue()
 template <typename Value>
 void buffer_queue<Value>::close()
 {
-    lock_guard<mutex> hold( mtx_ );
+    std::lock_guard<std::mutex> hold( mtx_ );
     closed_ = true;
     not_empty_.notify_all();
     not_full_.notify_all();
@@ -205,14 +205,14 @@ void buffer_queue<Value>::close()
 template <typename Value>
 bool buffer_queue<Value>::is_closed()
 {
-    lock_guard<mutex> hold( mtx_ );
+    std::lock_guard<std::mutex> hold( mtx_ );
     return closed_;
 }
 
 template <typename Value>
 bool buffer_queue<Value>::is_empty()
 {
-    lock_guard<mutex> hold( mtx_ );
+    std::lock_guard<std::mutex> hold( mtx_ );
     return push_index_ == pop_index_;
 }
 
@@ -236,7 +236,7 @@ queue_op_status buffer_queue<Value>::try_pop(Value& elem)
        operations or from the user-defined copy assignment operator
        in the pop_from operation. */
     try {
-        lock_guard<mutex> hold( mtx_ );
+        std::lock_guard<std::mutex> hold( mtx_ );
         return try_pop_common(elem);
     } catch (...) {
         close();
@@ -251,7 +251,7 @@ queue_op_status buffer_queue<Value>::nonblocking_pop(Value& elem)
        operations or from the user-defined copy assignment operator
        in the pop_from operation. */
     try {
-        unique_lock<mutex> hold( mtx_, try_to_lock );
+        std::unique_lock<std::mutex> hold( mtx_, std::try_to_lock );
         if ( !hold.owns_lock() ) {
             return CXX11_ENUM_QUAL(queue_op_status)busy;
         }
@@ -268,7 +268,7 @@ queue_op_status buffer_queue<Value>::wait_pop(Value& elem)
        operations or from the user-defined copy assignment operator
        in the pop_from operation. */
     try {
-        unique_lock<mutex> hold( mtx_ );
+        std::unique_lock<std::mutex> hold( mtx_ );
         size_t pdx;
         for (;;) {
             pdx = pop_index_;
@@ -325,7 +325,7 @@ queue_op_status buffer_queue<Value>::try_push(const Value& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        lock_guard<mutex> hold( mtx_ );
+        std::lock_guard<std::mutex> hold( mtx_ );
         return try_push_common(elem);
     } catch (...) {
         close();
@@ -340,7 +340,7 @@ queue_op_status buffer_queue<Value>::nonblocking_push(const Value& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        unique_lock<mutex> hold( mtx_, try_to_lock );
+        std::unique_lock<std::mutex> hold( mtx_, std::try_to_lock );
         if ( !hold.owns_lock() )
             return CXX11_ENUM_QUAL(queue_op_status)busy;
         return try_push_common(elem);
@@ -357,7 +357,7 @@ queue_op_status buffer_queue<Value>::wait_push(const Value& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        unique_lock<mutex> hold( mtx_ );
+        std::unique_lock<std::mutex> hold( mtx_ );
         size_t hdx;
         size_t nxt;
         for (;;) {
@@ -411,7 +411,7 @@ queue_op_status buffer_queue<Value>::try_push(Value&& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        lock_guard<mutex> hold( mtx_ );
+        std::lock_guard<std::mutex> hold( mtx_ );
         return try_push_common(std::move(elem));
     } catch (...) {
         close();
@@ -426,7 +426,7 @@ queue_op_status buffer_queue<Value>::nonblocking_push(Value&& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        unique_lock<mutex> hold( mtx_, try_to_lock );
+        std::unique_lock<std::mutex> hold( mtx_, std::try_to_lock );
         if (!hold.owns_lock()) {
             return CXX11_ENUM_QUAL(queue_op_status)busy;
         }
@@ -444,7 +444,7 @@ queue_op_status buffer_queue<Value>::wait_push(Value&& elem)
        operations or from the user-defined copy assignment
        operator in push_at. */
     try {
-        unique_lock<mutex> hold( mtx_ );
+        std::unique_lock<std::mutex> hold( mtx_ );
         size_t hdx;
         size_t nxt;
         for (;;) {

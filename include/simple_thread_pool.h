@@ -17,12 +17,12 @@
 
 #include <set>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 #include "mutable_thread.h"
 
 namespace gcl {
@@ -81,7 +81,7 @@ class simple_thread_pool {
   // Mutex used when creating new threads. This is here to avoid race
   // conditions when threads are being manipulated (adding or deleting threads
   // from the pool).
-  mutex new_thread_mu_;
+  std::mutex new_thread_mu_;
   bool shutting_down_;
   std::set<mutable_thread*> active_threads_;
   std::set<mutable_thread*> unused_threads_;

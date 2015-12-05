@@ -14,9 +14,9 @@
 
 // Unit tests for countdown_latch
 
-#include "functional.h"
+#include <functional>
 
-#include "thread.h"
+#include <thread>
 
 #include "countdown_latch.h"
 #include "test_mutex.h"

@@ -21,7 +21,7 @@
 #include <iostream>
 
 #include "cxx11.h"
-#include "atomic.h"
+#include <atomic>
 
 namespace gcl {
 

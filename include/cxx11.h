@@ -17,14 +17,14 @@
 
 // See ../testing/cxx11_test.cc for examples of use.
 
-#if defined(__GNUC__) && __GNUC__ == 4
-
-#ifndef __APPLE__
+//#if defined(__GNUC__) && __GNUC__ == 4
+//
+//#ifndef __APPLE__
 #define HAS_CXX11_PRIMITIVE_THREAD_LOCAL
-#endif
-
-#if defined(__GXX_EXPERIMENTAL_CXX0X__)
-#if __GNUC_MINOR__ >= 3
+//#endif
+//
+//#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+//#if __GNUC_MINOR__ >= 3
 #define HAS_CXX11_STATIC_ASSERT
 #define HAS_CXX11_RVREF
 #define HAS_CXX11_VARIADIC_TMPL
@@ -34,8 +34,8 @@
 #define HAS_CXX11___FUNC__
 #define HAS_CXX11_C99_PREPROCESSOR
 #define HAS_CXX11_LONG_LONG
-#endif
-#if __GNUC_MINOR__ >= 4
+//#endif
+//#if __GNUC_MINOR__ >= 4
 #define HAS_CXX11_DEFAULTED
 #define HAS_CXX11_DELETED
 #define HAS_CXX11_AUTO_VAR
@@ -50,8 +50,8 @@
 #define HAS_CXX11_INLINE_NAMESPACE
 #define HAS_CXX11_ATOMIC_OPS
 #define HAS_CXX11_PROPOGATE_EXCEPT
-#endif
-#if __GNUC_MINOR__ >= 5
+//#endif
+//#if __GNUC_MINOR__ >= 5
 #define HAS_CXX11_EXPLICIT_CONV
 #define HAS_CXX11_LAMBDA
 #define HAS_CXX11_UNICODE_STRING_LIT
@@ -59,8 +59,8 @@
 #define HAS_CXX11_UCN_NAME_LIT
 #define HAS_CXX11_STANDARD_LAYOUT
 #define HAS_CXX11_LOCAL_TMPL_ARGS
-#endif
-#if __GNUC_MINOR__ >= 6
+//#endif
+//#if __GNUC_MINOR__ >= 6
 #define HAS_CXX11_MOVE_SPECIAL
 #define HAS_CXX11_NULLPTR
 #define HAS_CXX11_FORWARD_ENUM
@@ -71,11 +71,11 @@
 #define HAS_CXX11_UNRESTRICT_UNION
 #define HAS_CXX11_RANGE_FOR
 #define HAS_CXX11_CORE_NOEXCEPT
-#endif
-#if __GNUC_MINOR__ >= 7
+//#endif
+//#if __GNUC_MINOR__ >= 7
 #define HAS_CXX11_EXTENDED_FRIEND
 #define HAS_CXX11_EXPLICIT_OVERRIDE
-#endif
+//#endif
 /* Unimplemented:
 // #define HAS_CXX11_RVREF_THIS
 // #define HAS_CXX11_FIELD_INIT
@@ -92,8 +92,8 @@
 // #define HAS_CXX11_EXTENDED_INTEGRAL
 // #define HAS_CXX11_TRIVIAL_PRIVATE
 */
-#endif
-#endif
+//#endif
+//#endif
 
 namespace std {
 

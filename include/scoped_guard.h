@@ -2,7 +2,7 @@
 #define GCL_SCOPED_GUARD_
 
 #include "cxx11.h"
-#include "functional.h"
+#include <functional>
 
 namespace gcl {
 

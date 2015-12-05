@@ -16,9 +16,9 @@
 #define GCL_LATCH_
 
 #include "cxx11.h"
-#include "atomic.h"
-#include "condition_variable.h"
-#include "mutex.h"
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include "scoped_guard.h"
 
 namespace gcl {
@@ -59,11 +59,11 @@ private:
   int count_;
 
   // Counts the number of threads that are currently waiting
-  std::atomic_int waiting_;
+  std::atomic<int> waiting_;
 
   // The condition that blocks until the count reaches 0
-  condition_variable condition_;
-  mutex condition_mutex_;
+  std::condition_variable condition_;
+  std::mutex condition_mutex_;
 
  // Disallow copy and assign
   latch(const latch&) CXX11_DELETED

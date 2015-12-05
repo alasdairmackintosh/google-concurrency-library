@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mutex.h"
-#include "condition_variable.h"
+#include <mutex>
+#include <condition_variable>
 
 #include "countdown_latch.h"
 
@@ -30,14 +30,14 @@ countdown_latch::~countdown_latch() {
 }
 
 void countdown_latch::wait() {
-  unique_lock<mutex> lock(condition_mutex_);
+  std::unique_lock<std::mutex> lock(condition_mutex_);
   while(count_ > 0) {
     condition_.wait(lock);
   }
 }
 
 void countdown_latch::count_down() {
-  lock_guard<mutex> lock(condition_mutex_);
+  std::lock_guard<std::mutex> lock(condition_mutex_);
   if (count_ <= 0) {
     throw std::system_error(std::make_error_code(std::errc::invalid_argument));
   }

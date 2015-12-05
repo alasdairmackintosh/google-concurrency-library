@@ -15,12 +15,12 @@
 #ifndef STREAM_MUTEX_H
 #define STREAM_MUTEX_H
 
-#include "unordered_map.h"
-#include "mutex.h"
+#include <unordered_map>
+#include <mutex>
 
 #include "cxx11.h"
 
-extern recursive_mutex* get_stream_mutex_map( void *stm_ptr );
+extern std::recursive_mutex* get_stream_mutex_map( void *stm_ptr );
 
 template <class Stream >
 class stream_mutex;
@@ -51,7 +51,7 @@ class stream_mutex
     Stream& bypass() { return stm_; }
   private:
     Stream& stm_;
-    recursive_mutex* mtx_;
+    std::recursive_mutex* mtx_;
 };
 
 template <class Stream >

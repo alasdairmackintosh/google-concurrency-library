@@ -15,7 +15,7 @@
 #ifndef GCL_SOURCE_
 #define GCL_SOURCE_
 
-#include "thread.h"
+#include <thread>
 
 #include "gcl_string.h"
 #include "closed_error.h"
@@ -100,7 +100,7 @@ class source {
         throw closed_error("Closed");
     }
     throw std::runtime_error("Invalid state" + to_string(state_) +
-                             " in thread " + to_string(this_thread::get_id()));
+                             " in thread " + to_string(std::this_thread::get_id()));
   }
 
   // Waits until a value is available, or the source becomes
@@ -117,7 +117,7 @@ class source {
       } else {
         throw std::logic_error(
             std::string("Invalid state " + to_string(state_) +
-                        " in thread " + to_string(this_thread::get_id())));
+                        " in thread " + to_string(std::this_thread::get_id())));
       }
     }
     try {

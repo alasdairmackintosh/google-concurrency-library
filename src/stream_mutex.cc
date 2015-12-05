@@ -16,14 +16,14 @@
 
 #include "stream_mutex.h"
 
-recursive_mutex* get_stream_mutex_map( void *stm_ptr )
+std::recursive_mutex* get_stream_mutex_map( void *stm_ptr )
 {
-    static mutex map_mutex;
-    static std::unordered_map<void*, recursive_mutex*> stream_map( 19 );
-    lock_guard<mutex> _(map_mutex);
-    recursive_mutex*& mtx_ptr = stream_map[stm_ptr];
+    static std::mutex map_mutex;
+    static std::unordered_map<void*, std::recursive_mutex*> stream_map( 19 );
+    std::lock_guard<std::mutex> _(map_mutex);
+    std::recursive_mutex*& mtx_ptr = stream_map[stm_ptr];
     if (!mtx_ptr)
-        mtx_ptr = new recursive_mutex;
+        mtx_ptr = new std::recursive_mutex;
     return mtx_ptr;
 }
 

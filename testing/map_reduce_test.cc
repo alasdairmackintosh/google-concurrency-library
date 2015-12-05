@@ -17,13 +17,13 @@
 #include <map>
 
 #include "buffer_queue.h"
-#include "functional.h"
+#include <functional>
 #include "map_reduce.h"
 #include "map_reduce_helpers.h"
 #include "queue_base.h"
 #include "simple_thread_pool.h"
 #include "gtest/gtest.h"
-#include "thread.h"
+#include <thread>
 
 using gcl::buffer_queue;
 using gcl::map_reduce_options;

@@ -15,6 +15,7 @@
 #ifndef GCL_PIPELINE_
 #define GCL_PIPELINE_
 
+#include <assert.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -23,9 +24,9 @@
 #include <exception>
 #include <stdexcept>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
+#include <atomic>
 #include "barrier.h"
 #include "buffer_queue.h"
 #include "countdown_latch.h"
@@ -58,11 +59,11 @@ std::atomic<int> filter_thread_point_count(0);
 std::atomic<int> filter_count(0);
 std::atomic<int> segment_count(0);
 
-static mutex qcount_lock_;
+static std::mutex qcount_lock_;
 static int qcount_ = 0;
 static vector<string> qnames_;
 const char* get_q_name(const char* prefix) {
-  unique_lock<mutex> l(qcount_lock_);
+  std::unique_lock<std::mutex> l(qcount_lock_);
   std::stringstream new_name;
   new_name << prefix << "-" << ++qcount_;
   qnames_.push_back(new_name.str());
@@ -98,7 +99,7 @@ class __instance {
   void thread_done() {
     thread_end_->arrive_and_wait();
   }
-  void execute(function<void ()> func) {
+  void execute(std::function<void ()> func) {
     num_threads_++;
     // TODO(aberkan): handle errors
     pool_->try_get_unused_thread()->execute(func);
@@ -168,7 +169,7 @@ template<typename IN,
          typename OUT>
 void run_simple_function(queue_front<IN> in_queue,
                          queue_back<OUT> out_queue,
-                         function<OUT(IN)> func,
+                         std::function<OUT(IN)> func,
                          __instance* inst) {
   inst->thread_start();
   while (1) {
@@ -187,7 +188,7 @@ template<typename IN,
          typename OUT>
 void run_multi_out_function(queue_front<IN> in_queue,
                             queue_back<OUT> out_queue,
-                            function<void (IN, queue_back<OUT>)> func,
+                            std::function<void (IN, queue_back<OUT>)> func,
                             __instance* inst) {
   inst->thread_start();
   while (1) {
@@ -206,7 +207,7 @@ template<typename IN,
          typename OUT>
 void run_multi_in_function(queue_front<IN> in_queue,
                            queue_back<OUT> out_queue,
-                           function<OUT(queue_front<IN>)> func,
+                           std::function<OUT(queue_front<IN>)> func,
                            __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -220,7 +221,7 @@ template<typename IN,
          typename OUT>
 void run_full_function(queue_front<IN> in_queue,
                        queue_back<OUT> out_queue,
-                       function<void(queue_front<IN>, queue_back<OUT>)> func,
+                       std::function<void(queue_front<IN>, queue_back<OUT>)> func,
                        __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -232,7 +233,7 @@ void run_full_function(queue_front<IN> in_queue,
 
 template<typename IN>
 void run_consumer(queue_front<IN> in_queue,
-                  function<void(IN)> func,
+                  std::function<void(IN)> func,
                   __instance* inst) {
   inst->thread_start();
   while (1) {
@@ -248,7 +249,7 @@ void run_consumer(queue_front<IN> in_queue,
 
 template<typename IN>
 void run_multi_in_consumer(queue_front<IN> in_queue,
-                           function<void(queue_front<IN>)> func,
+                           std::function<void(queue_front<IN>)> func,
                            __instance* inst) {
   inst->thread_start();
   while (!in_queue.is_closed()) {
@@ -259,7 +260,7 @@ void run_multi_in_consumer(queue_front<IN> in_queue,
 
 
 template<typename OUT>
-void run_producer(function<OUT (void)> f,
+void run_producer(std::function<OUT (void)> f,
                   queue_back<OUT> out_queue,
                   __instance* inst) {
   inst->thread_start();
@@ -269,7 +270,7 @@ void run_producer(function<OUT (void)> f,
 }
 
 template<typename OUT>
-void run_multi_out_producer(function<void (queue_back<OUT>)> f,
+void run_multi_out_producer(std::function<void (queue_back<OUT>)> f,
                             queue_back<OUT> out_queue,
                             __instance* inst) {
   inst->thread_start();
@@ -369,7 +370,7 @@ class __segment_function : public __segment_base<IN, OUT> {
  public:
   virtual ~__segment_function() {}
 
-  __segment_function(function<OUT (IN)> f) :
+  __segment_function(std::function<OUT (IN)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_simple_function<IN, OUT>,
                       std::placeholders::_1,
@@ -379,7 +380,7 @@ class __segment_function : public __segment_base<IN, OUT> {
       has_merged_in_queue_(false),
       merged_in_queue_(NULL) {}
 
-  __segment_function(function<OUT (queue_front<IN>)> f) :
+  __segment_function(std::function<OUT (queue_front<IN>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_multi_in_function<IN, OUT>,
                       std::placeholders::_1,
@@ -389,7 +390,7 @@ class __segment_function : public __segment_base<IN, OUT> {
       has_merged_in_queue_(false),
       merged_in_queue_(NULL) {}
 
-  __segment_function(function<void (IN, queue_back<OUT>)> f) :
+  __segment_function(std::function<void (IN, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_multi_out_function<IN, OUT>,
                       std::placeholders::_1,
@@ -399,7 +400,7 @@ class __segment_function : public __segment_base<IN, OUT> {
       has_merged_in_queue_(false),
       merged_in_queue_(NULL) {}
 
-  __segment_function(function<void (queue_front<IN>, queue_back<OUT>)> f) :
+  __segment_function(std::function<void (queue_front<IN>, queue_back<OUT>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_full_function<IN, OUT>,
                       std::placeholders::_1,
@@ -439,7 +440,7 @@ class __segment_function : public __segment_base<IN, OUT> {
   }
 
   queue_object<buffer_queue<IN> > queue_;
-  function<void (queue_front<IN>, queue_back<OUT>, __instance*)> func_;
+  std::function<void (queue_front<IN>, queue_back<OUT>, __instance*)> func_;
 
   bool has_merged_in_queue_;
   queue_front<IN> merged_in_queue_;
@@ -448,13 +449,13 @@ class __segment_function : public __segment_base<IN, OUT> {
 template<typename OUT>
 class __segment_producer : public __segment_base<terminated, OUT> {
  public:
-  __segment_producer(function<OUT (void)> f) :
+  __segment_producer(std::function<OUT (void)> f) :
       func_(std::bind(run_producer<OUT>,
                       f,
                       std::placeholders::_1,
                       std::placeholders::_2)) {}
 
-  __segment_producer(function<void (queue_back<OUT>)> f) :
+  __segment_producer(std::function<void (queue_back<OUT>)> f) :
       func_(std::bind(run_multi_out_producer<OUT>,
                       f,
                       std::placeholders::_1,
@@ -475,13 +476,13 @@ class __segment_producer : public __segment_base<terminated, OUT> {
   }
 
   // TODO(aberkan): should be private to __segment_parallel
-  __segment_producer(function<void (queue_back<OUT>, __instance*)> func) :
+  __segment_producer(std::function<void (queue_back<OUT>, __instance*)> func) :
       func_(func) {}
  private:
   __segment_producer(const __segment_producer<OUT>& f) :
       func_(f.func_) {}
 
-  function<void (queue_back<OUT>, __instance*)> func_;
+  std::function<void (queue_back<OUT>, __instance*)> func_;
 };
 
 template<typename OUT>
@@ -530,14 +531,14 @@ class __segment_queue_producer : public __segment_base<terminated, OUT> {
 template<typename IN>
 class __segment_consumer : public __segment_base<IN, terminated> {
  public:
-  __segment_consumer(function<void (IN)> f) :
+  __segment_consumer(std::function<void (IN)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_consumer<IN>,
                       std::placeholders::_1,
                       f,
                       std::placeholders::_2)) {}
 
-  __segment_consumer(function<void (queue_front<IN>)> f) :
+  __segment_consumer(std::function<void (queue_front<IN>)> f) :
       queue_(10),  // TODO(aberkan): remove limit
       func_(std::bind(run_multi_in_consumer<IN>,
                       std::placeholders::_1,
@@ -562,7 +563,7 @@ class __segment_consumer : public __segment_base<IN, terminated> {
   virtual queue_back<IN> get_back() { return queue_back<IN>(queue_); }
   queue_object<buffer_queue<IN> > queue_;
 
-  function<void (queue_front<IN>, __instance*)> func_;
+  std::function<void (queue_front<IN>, __instance*)> func_;
 };
 
 template<typename IN>
@@ -682,7 +683,7 @@ __instance::__instance(simple_thread_pool* pool,
   plan_->run(this, queue_back<terminated>(dummy_queue_));
   // We can't create the barrier until all of the threads have started running
   // so we know num_threads_.
-  function<size_t()> done_fn = std::bind(&__instance::all_threads_done,
+  std::function<size_t()> done_fn = std::bind(&__instance::all_threads_done,
                                          this);
   thread_end_ = new notifying_barrier(num_threads_, done_fn);
   start_.count_down();  // Start the threads

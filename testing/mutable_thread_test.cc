@@ -16,11 +16,11 @@
 
 #include <stdio.h>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <atomic>
+#include <condition_variable>
+#include <thread>
 
 #include "called_task.h"
 #include "mutable_thread.h"
@@ -48,7 +48,7 @@ TEST(MutableThreadTest, TestExecute) {
   // Then release the thread by calling wait() and let the count go up.
   called.run();
 
-  this_thread::sleep_for(chrono::milliseconds(1));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
   // Count should go up to 3 (the 2 queued calls and the one run() call here).
   EXPECT_EQ(3, called.count.load());

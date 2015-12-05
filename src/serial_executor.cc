@@ -14,11 +14,11 @@
 
 #include <queue>
 
-#include "functional.h"
+#include <functional>
 
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 #include "serial_executor.h"
 
@@ -44,7 +44,7 @@ serial_executor::~serial_executor() {
 }
 
 void serial_executor::execute(std::function<void()> fn) {
-  lock_guard<mutex> guard(queue_lock);
+  std::lock_guard<std::mutex> guard(queue_lock);
   function_queue.push(fn);
   queue_condvar.notify_one();
 }
@@ -53,7 +53,7 @@ void serial_executor::execute(std::function<void()> fn) {
 // of CPU). Probably should move this to use a notification.
 void serial_executor::run() {
   while (!shutting_down) {
-    unique_lock<mutex> ul(queue_lock);
+    std::unique_lock<std::mutex> ul(queue_lock);
     queue_condvar.wait(ul, std::bind(&serial_executor::queue_ready, this));
 
     // Queue can be ready if the executor is shutting down and the runner must

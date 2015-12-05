@@ -16,8 +16,7 @@
 
 MAKE_JOBS := $(shell sh util/makejobs.sh)
 FLAGS_MAKE = $(MAKE_JOBS) -f ../util/Makefile
-FLAGS_98 = CXXFLAGS="-std=c++98 -Wno-c++0x-compat"
-FLAGS_11 = CC=gcc CXX=g++ CXXFLAGS=-std=c++0x
+FLAGS_11 = CC=gcc CXX=g++ CXXFLAGS=-std=c++11
 FLAGS_DBG = BFLAGS=-g3
 FLAGS_OPT = BFLAGS=-O3
 
@@ -25,19 +24,13 @@ FLAGS_OPT = BFLAGS=-O3
 
 default : debug
 
-build : build_opt98 build_opt11
+build : build_opt11
 
-debug : test_dbg98
+debug : test_dbg11
 
-test : test_dbg98 test_opt98 test_dbg11 test_opt11
+test : test_dbg11 test_opt11
 
 ######## Build Directories
-
-dbg98 :
-	mkdir dbg98
-
-opt98 :
-	mkdir opt98
 
 dbg11 :
 	mkdir dbg11
@@ -46,39 +39,18 @@ opt11 :
 	mkdir opt11
 
 clean :
-	rm -rf dbg98 opt98 dbg11 opt11
+	rm -rf dbg11 opt11
 
-######## C++98
-
-generate_dbg98 : dbg98
-	cd dbg98 ; make $(FLAGS_MAKE) generate $(FLAGS_DBG) $(FLAGS_98)
-generate_opt98 : opt98
-	cd opt98 ; make $(FLAGS_MAKE) generate $(FLAGS_OPT) $(FLAGS_98)
-
-build_dbg98 : generate_dbg98
-	cd dbg98 ; make $(FLAGS_MAKE) build $(FLAGS_DBG) $(FLAGS_98)
-build_opt98 : generate_opt98
-	cd opt98 ; make $(FLAGS_MAKE) build $(FLAGS_OPT) $(FLAGS_98)
-
-test_dbg98 : generate_dbg98
-	cd dbg98 ; make $(FLAGS_MAKE) test $(FLAGS_DBG) $(FLAGS_98)
-test_opt98 : generate_opt98
-	cd opt98 ; make $(FLAGS_MAKE) test $(FLAGS_OPT) $(FLAGS_98)
 
 ######## C++11
 
-generate_dbg11 : dbg11
-	cd dbg11 ; make $(FLAGS_MAKE) generate $(FLAGS_DBG) $(FLAGS_11)
-generate_opt11 : opt11
-	cd opt11 ; make $(FLAGS_MAKE) generate $(FLAGS_OPT) $(FLAGS_11)
-
-build_dbg11 : generate_dbg11
+build_dbg11 : dbg11
 	cd dbg11 ; make $(FLAGS_MAKE) build $(FLAGS_DBG) $(FLAGS_11)
-build_opt11 : generate_opt11
+build_opt11 : opt11
 	cd opt11 ; make $(FLAGS_MAKE) build $(FLAGS_OPT) $(FLAGS_11)
 
-test_dbg11 : generate_dbg11
+test_dbg11 : dbg11
 	cd dbg11 ; make $(FLAGS_MAKE) test $(FLAGS_DBG) $(FLAGS_11)
-test_opt11 : generate_opt11
+test_opt11 : opt11
 	cd opt11 ; make $(FLAGS_MAKE) test $(FLAGS_OPT) $(FLAGS_11)
 

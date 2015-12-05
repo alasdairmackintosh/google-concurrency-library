@@ -15,7 +15,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "thread.h"
+#include <thread>
 
 #include "stream_mutex.h"
 
@@ -70,7 +70,7 @@ void block(stream_mutex<std::ostream>& mstream)
 // The above code is a better approach, but this one must work.
 void glock(stream_mutex<std::ostream>& mstream)
 {
-    lock_guard<stream_mutex<std::ostream> > lck(mstream);
+    std::lock_guard<stream_mutex<std::ostream> > lck(mstream);
     mstream.bypass() << "1";
     mstream.bypass() << "2";
     mstream.bypass() << "3";
@@ -84,7 +84,7 @@ void glock(stream_mutex<std::ostream>& mstream)
 // This double locking is not recommended, but it must work.
 void rlock(stream_mutex<std::ostream>& mstream)
 {
-    lock_guard<stream_mutex<std::ostream> > lck(mstream);
+    std::lock_guard<stream_mutex<std::ostream> > lck(mstream);
     mstream.hold() << "1" << "2" << "3";
     mstream << "4" << "5" << std::endl;
 }
@@ -92,7 +92,7 @@ void rlock(stream_mutex<std::ostream>& mstream)
 // Test with unique_lock.
 void ulock(stream_mutex<std::ostream>& mstream)
 {
-    unique_lock<stream_mutex<std::ostream> > lck(mstream, defer_lock);
+    std::unique_lock<stream_mutex<std::ostream> > lck(mstream, std::defer_lock);
     lck.lock();
     mstream.bypass() << "1";
     mstream.bypass() << "2";
@@ -105,7 +105,7 @@ void ulock(stream_mutex<std::ostream>& mstream)
 // Test with try_lock.
 void trylock(stream_mutex<std::ostream>& mstream)
 {
-    unique_lock<stream_mutex<std::ostream> > lck(mstream, defer_lock);
+    std::unique_lock<stream_mutex<std::ostream> > lck(mstream, std::defer_lock);
     if ( lck.try_lock() ) {
         mstream.bypass() << "1";
         mstream.bypass() << "2";
@@ -164,13 +164,13 @@ TEST_F(LockStreamTest, Sequential) {
 
 // Verify threaded operation
 TEST_F(LockStreamTest, Parallel) {
-    thread thr1(writer<implicit>);
-    thread thr2(writer<holding>);
-    thread thr3(writer<block>);
-    thread thr4(writer<glock>);
-    thread thr5(writer<rlock>);
-    thread thr6(writer<ulock>);
-    thread thr7(writer<trylock>);
+    std::thread thr1(writer<implicit>);
+    std::thread thr2(writer<holding>);
+    std::thread thr3(writer<block>);
+    std::thread thr4(writer<glock>);
+    std::thread thr5(writer<rlock>);
+    std::thread thr6(writer<ulock>);
+    std::thread thr7(writer<trylock>);
     thr1.join();
     thr2.join();
     thr3.join();

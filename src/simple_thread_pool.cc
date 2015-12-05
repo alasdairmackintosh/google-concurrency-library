@@ -16,12 +16,12 @@
 #include <set>
 #include <time.h>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 #include "mutable_thread.h"
 
 #include "simple_thread_pool.h"
@@ -46,7 +46,7 @@ simple_thread_pool::~simple_thread_pool() {
   {
     // Lock the new thread mutex to prevent new any sort of operations on this
     // pool.
-    unique_lock<mutex> ul(new_thread_mu_);
+    std::unique_lock<std::mutex> ul(new_thread_mu_);
     shutting_down_ = true;
   }
 
@@ -71,7 +71,7 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
   mutable_thread* next_thread = NULL;
 
   {
-    unique_lock<mutex> ul(new_thread_mu_);
+    std::unique_lock<std::mutex> ul(new_thread_mu_);
     if (!shutting_down_) {
       if (unused_threads_.empty()) {
         if (active_threads_.size() < max_threads_) {
@@ -90,7 +90,7 @@ mutable_thread* simple_thread_pool::try_get_unused_thread() {
 }
 
 bool simple_thread_pool::donate_thread(mutable_thread* t) {
-  unique_lock<mutex> ul(new_thread_mu_);
+  std::unique_lock<std::mutex> ul(new_thread_mu_);
   // Check that the pool doesn't already own the thread
   std::set<mutable_thread*>::iterator active_iter = active_threads_.find(t);
   if (active_iter != active_threads_.end()) {
@@ -105,7 +105,7 @@ bool simple_thread_pool::donate_thread(mutable_thread* t) {
 }
 
 bool simple_thread_pool::release_thread(mutable_thread* t) {
-  unique_lock<mutex> ul(new_thread_mu_);
+  std::unique_lock<std::mutex> ul(new_thread_mu_);
   std::set<mutable_thread*>::iterator iter = active_threads_.find(t);
   if (iter != active_threads_.end()) {
     active_threads_.erase(iter);

@@ -15,12 +15,12 @@
 #ifndef GCL_MUTABLE_THREAD__
 #define GCL_MUTABLE_THREAD__
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 namespace gcl {
 
@@ -68,7 +68,7 @@ class mutable_thread {
   bool is_done();
 
   // Returns the id of this mutable thread.
-  thread::id get_id();
+  std::thread::id get_id();
 
  private:
   enum thread_state {
@@ -95,10 +95,10 @@ class mutable_thread {
   // Returns true if there is work to be done.
   bool thread_wait();
 
-  thread* t_;
+  std::thread* t_;
 
-  mutex thread_state_mu_;
-  condition_variable thread_paused_cond_;
+  std::mutex thread_state_mu_;
+  std::condition_variable thread_paused_cond_;
   std::atomic<int> thread_state_;
 
   // Actively running function.

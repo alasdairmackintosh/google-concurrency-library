@@ -18,9 +18,9 @@
 //  - Add tests on which race detectors may potentially give false warnings.
 //  - Add tests that use dynamic annotations.
 
-#include "functional.h"
+#include <functional>
 
-#include "thread.h"
+#include <thread>
 
 #include "test_mutex.h"
 

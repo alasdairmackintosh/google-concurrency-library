@@ -17,12 +17,12 @@
 
 #include <stdio.h>
 
-#include "functional.h"
+#include <functional>
 
-#include "atomic.h"
+#include <atomic>
 
-#include "condition_variable.h"
-#include "thread.h"
+#include <condition_variable>
+#include <thread>
 
 #include "called_task.h"
 #include "serial_executor.h"
@@ -56,14 +56,14 @@ TEST(SerialExecutorTest, MultiExecution) {
 }
 
 struct LockedTask {
-  LockedTask(mutex* lock) : block_lock(lock) {}
+  LockedTask(std::mutex* lock) : block_lock(lock) {}
 
   void run() {
-    unique_lock<mutex> ul(*block_lock);
+    std::unique_lock<std::mutex> ul(*block_lock);
     ++count;
   }
 
-  mutex* block_lock;
+  std::mutex* block_lock;
   int count;
 };
 
@@ -75,7 +75,7 @@ TEST(SerialExecutorTest, ShutdownTest) {
   // To test shutting down, we need to create a thread which blocks then kill
   // the executor and try to enqueue more stuff, yet make sure that the
   // executor thread doesn't actually execute the extra stuff.
-  mutex task_blocker;
+  std::mutex task_blocker;
   task_blocker.lock();
 
   LockedTask locked_task(&task_blocker);
@@ -83,14 +83,14 @@ TEST(SerialExecutorTest, ShutdownTest) {
   serial_executor* exec = new serial_executor();
   exec->execute(std::bind(&LockedTask::run, &locked_task));
   // Let the executor thread make some progress.
-  this_thread::sleep_for(chrono::milliseconds(100));
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   // NOTE: this should deadlock! Need to start a new thread to handle shutdown
   // since the executor will block waiting for the running task to join!
-  thread exec_deleter(std::bind(&delete_executor, exec));
+  std::thread exec_deleter(std::bind(&delete_executor, exec));
 
   // Let the deleter make some progress.
-  this_thread::sleep_for(chrono::milliseconds(100));
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   // other_task should never execute.
   Called other_task(1);
@@ -98,7 +98,7 @@ TEST(SerialExecutorTest, ShutdownTest) {
   task_blocker.unlock();
 
   // Sleep a bit to give the task a chance to run.
-  this_thread::sleep_for(chrono::milliseconds(10));
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
   exec_deleter.join();
 
   EXPECT_EQ(0, other_task.count);

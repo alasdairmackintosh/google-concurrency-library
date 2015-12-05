@@ -15,13 +15,13 @@
 #ifndef LOCK_FREE_BUFFER_QUEUE_H
 #define LOCK_FREE_BUFFER_QUEUE_H
 
-#include <atomic.h>
+#include <atomic>
 #include <iostream>
 #include <stdint.h>
 
 #include "debug.h"
 #include "queue_base.h"
-#include "system_error.h"
+#include <system_error>
 
 using std::atomic;
 

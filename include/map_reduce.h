@@ -30,14 +30,14 @@
 #include "buffer_queue.h"
 #include "closed_error.h"
 #include "countdown_latch.h"
-#include "functional.h"
+#include <functional>
 #include "map_reduce_helpers.h"
 #include "map_reduce_impl.h"
 #include "mutable_thread.h"
-#include "mutex.h"
+#include <mutex>
 #include "queue_base.h"
 #include "simple_thread_pool.h"
-#include "thread.h"
+#include <thread>
 
 namespace gcl {
 

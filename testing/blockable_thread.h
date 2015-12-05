@@ -17,8 +17,8 @@
 
 #include <iostream>
 
-#include "mutex.h"
-#include "thread.h"
+#include <mutex>
+#include <thread>
 
 #include "countdown_latch.h"
 #include "test_mutex.h"

@@ -17,11 +17,11 @@
 
 #include <queue>
 
-#include "functional.h"
+#include <functional>
 
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 namespace gcl {
 
@@ -50,11 +50,11 @@ class serial_executor {
   bool shutting_down;
 
   // Lock to serialize accesses to the function queue.
-  mutex queue_lock;
-  condition_variable queue_condvar;
+  std::mutex queue_lock;
+  std::condition_variable queue_condvar;
 
   // Thread used by the executor to do all its work.
-  thread run_thread;
+  std::thread run_thread;
 
   // Internal run function which handles all the execution logic.
   void run();

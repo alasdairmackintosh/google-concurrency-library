@@ -17,7 +17,7 @@
 
 #include <algorithm>
 
-#include "mutex.h"
+#include <mutex>
 
 #include "closed_error.h"
 
@@ -47,7 +47,7 @@ class iterator_queue {
   }
 
   typename std::iterator_traits<Iterator>::value_type pop() {
-    unique_lock<mutex> l(lock_);
+    std::unique_lock<std::mutex> l(lock_);
     if (it_ == end_) {
       throw closed_error("Iterator at end");
     }
@@ -57,14 +57,14 @@ class iterator_queue {
   }
 
   bool is_closed() {
-    unique_lock<mutex> l(lock_);
+    std::unique_lock<std::mutex> l(lock_);
     return (it_ == end_);
   }
 
  private:
   Iterator it_;
   Iterator end_;
-  mutex lock_;
+  std::mutex lock_;
 
   iterator_queue(const iterator_queue& other);
   iterator_queue& operator=(const iterator_queue& other);

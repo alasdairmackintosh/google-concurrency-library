@@ -25,14 +25,14 @@
 #include <sys/time.h>
 #include <vector>
 
-#include "atomic.h"
+#include <atomic>
 #include "barrier.h"
 #include "buffer_queue.h"
 #include "debug.h"
-#include "functional.h"
+#include <functional>
 #include "lock_free_buffer_queue.h"
 #include "queue_base.h"
-#include "thread.h"
+#include <thread>
 
 
 using namespace std;

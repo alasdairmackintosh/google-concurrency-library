@@ -19,11 +19,11 @@
 #include <string>
 #include <vector>
 
-#include "functional.h"
+#include <functional>
 
-#include "mutex.h"
-#include "condition_variable.h"
-#include "thread.h"
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 namespace gcl {
 
@@ -139,7 +139,7 @@ class concurrent_priority_queue {
 
   // Adds a new element to the queue.
   void push(const value_type& x) {
-    unique_lock<mutex> l(pop_mutex_);
+    std::unique_lock<std::mutex> l(pop_mutex_);
     cont_.push_back(x);
     push_heap(cont_.begin(), cont_.end(), less_);
     pop_var_.notify_all();
@@ -162,7 +162,7 @@ class concurrent_priority_queue {
 
   // requires MoveAssignable<value_type>
   bool try_pop(value_type& out) {
-    unique_lock<mutex> lock(pop_mutex_);
+    std::unique_lock<std::mutex> lock(pop_mutex_);
     return do_pop(out);
   }
 
@@ -177,7 +177,7 @@ class concurrent_priority_queue {
   // available.
   // requires MoveConstructible<value_type>
   value_type pop() {
-    unique_lock<mutex> lock(pop_mutex_);
+    std::unique_lock<std::mutex> lock(pop_mutex_);
     value_type result;
     while (!do_pop(result)) {
       pop_var_.wait(lock);
@@ -205,8 +205,8 @@ class concurrent_priority_queue {
  
   Less less_;
   Container cont_;
-  mutex pop_mutex_;
-  condition_variable pop_var_; 
+  std::mutex pop_mutex_;
+  std::condition_variable pop_var_; 
 };
 
 }  // End namespace gcl
