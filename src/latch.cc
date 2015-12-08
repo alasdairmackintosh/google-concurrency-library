@@ -91,7 +91,6 @@ void latch::arrive_and_wait() {
   --waiting_;
 }
 
-#ifdef HAS_CXX11_RVREF
 scoped_guard latch::arrive_guard() {
   std::function<void ()> f = std::bind(&latch::arrive, this);
   return scoped_guard(f);
@@ -106,5 +105,5 @@ scoped_guard latch::arrive_and_wait_guard() {
   std::function<void ()> f = std::bind(&latch::arrive_and_wait, this);
   return scoped_guard(f);
 }
-#endif
+
 }  // End namespace gcl

@@ -47,9 +47,9 @@ int number = 3; // expected number of true elements
 
 using namespace gcl::counter;
 
-static const atomicity non_atomic = CXX11_ENUM_QUAL(atomicity)none;
-static const atomicity semi_atomic = CXX11_ENUM_QUAL(atomicity)semi;
-static const atomicity full_atomic = CXX11_ENUM_QUAL(atomicity)full;
+static const atomicity non_atomic = atomicity::none;
+static const atomicity semi_atomic = atomicity::semi;
+static const atomicity full_atomic = atomicity::full;
 
 
 template< typename Bumper >
@@ -96,7 +96,7 @@ void test_simplex( int number )
 void test_strong_duplex( int number )
 {
     static strong_duplex< int > ctr;
-    static CXX11_TRIVIAL_THREAD_LOCAL strong_broker< int >* bkr;
+    static thread_local strong_broker< int >* bkr;
     bkr = new strong_broker< int >( ctr );
     test_counter( ctr, number );
     test_buffer< buffer< int > >( ctr, ctr, number );
@@ -109,7 +109,7 @@ void test_strong_duplex( int number )
 void test_weak_duplex( int number )
 {
     static weak_duplex< int > ctr;
-    static CXX11_TRIVIAL_THREAD_LOCAL weak_broker< int >* bkr;
+    static thread_local weak_broker< int >* bkr;
     bkr = new weak_broker< int >( ctr );
     test_counter( ctr, number );
     test_buffer< buffer< int, semi_atomic > >( *bkr, ctr, number );

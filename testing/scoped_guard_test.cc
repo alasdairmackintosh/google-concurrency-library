@@ -69,7 +69,6 @@ scoped_guard make_guard(T t) {
   return s;
 }
 
-#ifdef HAS_CXX11_RVREF
 TEST_F(ScopedGuardTest, Factory) {
   EXPECT_EQ(i, 0);
   {
@@ -98,6 +97,3 @@ TEST_F(ScopedGuardTest, Factory) {
   }
   EXPECT_EQ(i, 3);
 }
-#endif
-
-

@@ -35,9 +35,9 @@ class lock_free_buffer_queue
     typedef Value value_type;
 
     // Deleted constructors
-    lock_free_buffer_queue() CXX11_DELETED
-    lock_free_buffer_queue(const lock_free_buffer_queue&) CXX11_DELETED
-    lock_free_buffer_queue& operator =(const lock_free_buffer_queue&) CXX11_DELETED
+    lock_free_buffer_queue() = delete;
+    lock_free_buffer_queue(const lock_free_buffer_queue&) = delete;
+    lock_free_buffer_queue& operator =(const lock_free_buffer_queue&) = delete;
 
     explicit lock_free_buffer_queue(size_t max_elems);
     template <typename Iter>
@@ -54,13 +54,11 @@ class lock_free_buffer_queue
     queue_op_status nonblocking_pop(Value&);
     queue_op_status try_push(const Value& x);
     queue_op_status nonblocking_push(const Value& x);
-#ifdef HAS_CXX11_RVREF
     queue_op_status try_push(Value&& x);
     queue_op_status nonblocking_push(Value&& x);
-#endif
 
   private:
-    CXX11_ENUM_CLASS value_state
+    enum class value_state
     {
         valid = 0, /* The value can safely be read */
         waiting,     /* The value is coming but not ready yet */
@@ -109,7 +107,7 @@ void lock_free_buffer_queue<Value>::init()
     value_state_ = new atomic<value_state>[cardinality_];    
     for (unsigned int i = 0; i < cardinality_; ++i) {
         // Reset the value to empty since it doesn't have a value yet.
-        value_state_[i] = CXX11_ENUM_QUAL(value_state)waiting;
+        value_state_[i] = value_state::waiting;
     }
 }
 
@@ -129,7 +127,7 @@ void lock_free_buffer_queue<Value>::iter_init(Iter first, Iter last)
         // Could technically do this in a more efficient way since this will
         // only get called from the constructor so synchronization could be
         // cheaper.
-        while(try_push(*cur) != CXX11_ENUM_QUAL(queue_op_status)success) {
+        while(try_push(*cur) != queue_op_status::success) {
             // keep trying until we can try no longer.
         }
     }
@@ -182,7 +180,7 @@ queue_op_status lock_free_buffer_queue<Value>::try_pop(Value& elem)
     queue_op_status status;
     do {
         status = nonblocking_pop(elem);
-    } while (status == CXX11_ENUM_QUAL(queue_op_status)busy);
+    } while (status == queue_op_status::busy);
     return status;
 }
 
@@ -190,7 +188,7 @@ template <typename Value>
 void lock_free_buffer_queue<Value>::clear_value(value_state old_value,
                                                 size_t pos) {
     if (!value_state_[pos].compare_exchange_weak(
-            old_value, CXX11_ENUM_QUAL(value_state)waiting,
+            old_value, value_state::waiting,
             std::memory_order_release)) {
         // This should never happen for real
         // DBG << "Invalid Pop" << std::endl;
@@ -200,7 +198,7 @@ void lock_free_buffer_queue<Value>::clear_value(value_state old_value,
 template <typename Value>
 void lock_free_buffer_queue<Value>::set_state(value_state new_value,
                                               size_t pos) {
-    value_state old_value = CXX11_ENUM_QUAL(value_state)waiting;
+    value_state old_value = value_state::waiting;
     if (!value_state_[pos].compare_exchange_weak(
             old_value, new_value,
             std::memory_order_release)) {
@@ -214,13 +212,13 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_pop(Value& elem)
 {
     uint_least64_t head = head_.load(std::memory_order_relaxed);
     if (head == tail_.load(std::memory_order_relaxed)) {
-        return CXX11_ENUM_QUAL(queue_op_status)empty;
+        return queue_op_status::empty;
     }
 
     // Check that there is a value and head didn't move.
     uint_least64_t pos = head % cardinality_;
     value_state old_state = value_state_[pos].load(std::memory_order_acquire);
-    if (old_state == CXX11_ENUM_QUAL(value_state)valid) {
+    if (old_state == value_state::valid) {
         // Found a value, now see if we can keep it.
         if (head_.compare_exchange_strong(head, head + 1,
                                           std::memory_order_relaxed)) {
@@ -232,34 +230,34 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_pop(Value& elem)
             } catch (...) {
                 // If the copy fails, we still complete the rest of the
                 // operation or else 
-                clear_value(CXX11_ENUM_QUAL(value_state)valid, pos);
+                clear_value(value_state::valid, pos);
                 // Rethrow to indicate the exception to the caller.
                 throw;
             }
-            clear_value(CXX11_ENUM_QUAL(value_state)valid, pos);
-            return CXX11_ENUM_QUAL(queue_op_status)success;
+            clear_value(value_state::valid, pos);
+            return queue_op_status::success;
         }
-    } else if (old_state == CXX11_ENUM_QUAL(value_state)invalid) {
+    } else if (old_state == value_state::invalid) {
         // Have to move the pointer forward since this entry is not going
         // to be filled in.
         head_.compare_exchange_strong(head, head + 1);
         // And fix the state back to empty.
-        clear_value(CXX11_ENUM_QUAL(value_state)invalid, pos);
+        clear_value(value_state::invalid, pos);
     }
     // NOTE: This last condition is a repeat of the busy state, so no need to
     // check these conditions. If default state changes to non-busy or
     // something, then we have to add this condition back.
     //
-    // else if (old_state == CXX11_ENUM_QUAL(value_state)waiting &&
+    // else if (old_state == value_state::waiting &&
     //           head == head_.load(std::memory_order_relaxed)) {
     //    // Null but head is still the same, so waiting on a value since the
     //    // value_state must be empty right now.
-    //    return CXX11_ENUM_QUAL(queue_op_status)busy;
+    //    return queue_op_status::busy;
     //}
 
     // Fall through case, weren't able to complete the operation because
     // someone else popped underneath us.
-    return CXX11_ENUM_QUAL(queue_op_status)busy;
+    return queue_op_status::busy;
 
     // Other active dequeue threads could cause this one to stall
     // indefinitely, but someone is always trying to make progres.
@@ -271,7 +269,7 @@ queue_op_status lock_free_buffer_queue<Value>::try_push(const Value& elem)
     queue_op_status status;
     do {
         status = nonblocking_push(elem);
-    } while (status == CXX11_ENUM_QUAL(queue_op_status)busy);
+    } while (status == queue_op_status::busy);
     return status;
 }
 
@@ -285,25 +283,25 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(
     // corrected when we attempt to do the compare-exchange.
     uint_least64_t tail = tail_.load(std::memory_order_relaxed);
     if (tail == (head_.load(std::memory_order_relaxed) + cardinality_)) {
-        return CXX11_ENUM_QUAL(queue_op_status)full;
+        return queue_op_status::full;
     }
 
     // Write into the current tail position.
     uint_least64_t pos = tail % cardinality_;
     value_state old_state = value_state_[pos].load(std::memory_order_acquire);
-    if (old_state == CXX11_ENUM_QUAL(value_state)valid) {
+    if (old_state == value_state::valid) {
         // Pop from same position is still pending. We can't do much to
         // help him along unfortunately.
-        return CXX11_ENUM_QUAL(queue_op_status)busy;
-    } else if (old_state == CXX11_ENUM_QUAL(value_state)invalid) {
+        return queue_op_status::busy;
+    } else if (old_state == value_state::invalid) {
         // Someone ended up throwing an exception here, just return
         // busy for now and let the other guy clean it up. Should probably
         // try to move head forward in this case.
-        return CXX11_ENUM_QUAL(queue_op_status)busy;
+        return queue_op_status::busy;
     }
 
     // Try to reserve the tail, current value_state should be empty!
-    if (old_state == CXX11_ENUM_QUAL(value_state)waiting &&
+    if (old_state == value_state::waiting &&
         tail_.compare_exchange_strong(tail, tail + 1,
                                       std::memory_order_relaxed)) {
         // Success! Now push the new element into the value. The only
@@ -318,16 +316,14 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(
             // made. NOTE: might be able to undo the tail update, but it
             // could also cause some ABA issues on the tail value, so need
             // to walk through that logic a bit.
-            set_state(CXX11_ENUM_QUAL(value_state)invalid, pos);
+            set_state(value_state::invalid, pos);
             throw;
         }
-        set_state(CXX11_ENUM_QUAL(value_state)valid, pos);
-        return CXX11_ENUM_QUAL(queue_op_status)success;
+        set_state(value_state::valid, pos);
+        return queue_op_status::success;
     }
-    return CXX11_ENUM_QUAL(queue_op_status)busy;
+    return queue_op_status::busy;
 }
-
-#ifdef HAS_CXX11_RVREF
 
 template <typename Value>
 queue_op_status lock_free_buffer_queue<Value>::try_push(Value&& elem)
@@ -335,7 +331,7 @@ queue_op_status lock_free_buffer_queue<Value>::try_push(Value&& elem)
     queue_op_status status;
     do {
         status = nonblocking_push(std::move(elem));
-    } while (status == CXX11_ENUM_QUAL(queue_op_status)busy);
+    } while (status == queue_op_status::busy);
     return status;
 }
 
@@ -348,25 +344,25 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
     // corrected when we attempt to do the compare-exchange.
     uint_least64_t tail = tail_.load(std::memory_order_relaxed);
     if (tail == (head_.load(std::memory_order_relaxed) + cardinality_)) {
-        return CXX11_ENUM_QUAL(queue_op_status)full;
+        return queue_op_status::full;
     }
 
     // Write into the current tail position.
     uint_least64_t pos = tail % cardinality_;
     value_state old_state = value_state_[pos].load(std::memory_order_acquire);
-    if (old_state == CXX11_ENUM_QUAL(value_state)valid) {
+    if (old_state == value_state::valid) {
         // Pop from same position is still pending. We can't do much to
         // help him along unfortunately.
-        return CXX11_ENUM_QUAL(queue_op_status)busy;
-    } else if (old_state == CXX11_ENUM_QUAL(value_state)invalid) {
+        return queue_op_status::busy;
+    } else if (old_state == value_state::invalid) {
         // Someone ended up throwing an exception here, just return
         // busy for now and let the other guy clean it up. Should probably
         // try to move head forward in this case.
-        return CXX11_ENUM_QUAL(queue_op_status)busy;
+        return queue_op_status::busy;
     }
 
     // Try to reserve the tail, current value_state should be empty!
-    if (old_state == CXX11_ENUM_QUAL(value_state)waiting &&
+    if (old_state == value_state::waiting &&
         tail_.compare_exchange_strong(tail, tail + 1,
                                       std::memory_order_relaxed)) {
         // Success! Now push the new element into the value. The only
@@ -381,17 +377,14 @@ queue_op_status lock_free_buffer_queue<Value>::nonblocking_push(Value&& elem)
             // made. NOTE: might be able to undo the tail update, but it
             // could also cause some ABA issues on the tail value, so need
             // to walk through that logic a bit.
-            set_state(CXX11_ENUM_QUAL(value_state)invalid, pos);
+            set_state(value_state::invalid, pos);
             throw;
         }
-        set_state(CXX11_ENUM_QUAL(value_state)valid, pos);
-        return CXX11_ENUM_QUAL(queue_op_status)success;
+        set_state(value_state::valid, pos);
+        return queue_op_status::success;
     }
-    return CXX11_ENUM_QUAL(queue_op_status)busy;
+    return queue_op_status::busy;
 }
-
-// HAS_CXX11_RVREF
-#endif
 
 } // namespace gcl
 

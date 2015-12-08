@@ -20,7 +20,6 @@
 #include <iterator>
 #include <iostream>
 
-#include "cxx11.h"
 #include <atomic>
 
 namespace gcl {
@@ -85,7 +84,7 @@ class queue_front_iter
     value_type v_;
 };
 
-CXX11_ENUM_CLASS queue_op_status
+enum class queue_op_status
 {
     success = 0,
     empty,
@@ -112,7 +111,7 @@ class queue_common
 };
 
 template <typename Value>
-queue_common<Value>::~queue_common() CXX11_DEFAULTED_EASY
+queue_common<Value>::~queue_common() = default;
 #endif
 
 template <typename Queue>
@@ -126,13 +125,13 @@ class generic_queue_back
     typedef queue_back_iter<generic_queue_back> iterator;
     typedef const queue_back_iter<generic_queue_back> const_iterator;
 
-    //FIX generic_queue_back() CXX11_DEFAULTED_EASY
+    //FIX generic_queue_back() = default;
     generic_queue_back(Queue& queue) : queue_(&queue) { }
     generic_queue_back(Queue* queue) : queue_(queue) { }
     generic_queue_back(const generic_queue_back& other)
-        CXX11_DEFAULTED_HARD( : queue_(other.queue_) { } )
+        = default;
     generic_queue_back& operator =(const generic_queue_back& other)
-        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; return *this; } )
+        = default;
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -151,7 +150,6 @@ class generic_queue_back
         { return queue_->try_push(x); }
     queue_op_status nonblocking_push(const value_type& x)
         { return queue_->nonblocking_push(x); }
-#ifdef HAS_CXX11_RVREF
     void push(value_type&& x)
         { queue_->push( std::move(x) ); }
     queue_op_status wait_push(value_type&& x)
@@ -160,7 +158,6 @@ class generic_queue_back
         { return queue_->try_push( std::move(x) ); }
     queue_op_status nonblocking_push(value_type&& x)
         { return queue_->nonblocking_push( std::move(x) ); }
-#endif
 
     bool has_queue() { return queue_ != NULL; }
 
@@ -179,13 +176,13 @@ class generic_queue_front
     typedef queue_front_iter<generic_queue_front> iterator;
     typedef queue_front_iter<generic_queue_front> const_iterator;
 
-    //FIX generic_queue_front() CXX11_DEFAULTED_EASY
+    //FIX generic_queue_front() = default;
     generic_queue_front(Queue& queue) : queue_(&queue) { }
     generic_queue_front(Queue* queue) : queue_(queue) { }
     generic_queue_front(const generic_queue_front& other)
-        CXX11_DEFAULTED_HARD( : queue_(other.queue_) { } )
+        = default;
     generic_queue_front& operator =(const generic_queue_front& other)
-        CXX11_DEFAULTED_HARD( { queue_ = other.queue_; return *this; } )
+        = default;
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -216,7 +213,7 @@ queue_back_iter<Queue>&
 queue_back_iter<Queue>::operator =(const value_type& value)
 {
     queue_op_status s = q_->wait_push(value);
-    if ( s != CXX11_ENUM_QUAL(queue_op_status)success ) {
+    if ( s != queue_op_status::success ) {
         q_ = NULL;
         throw s;
     }
@@ -228,7 +225,7 @@ void
 queue_front_iter<Queue>::next()
 {
     queue_op_status s = q_->wait_pop(v_);
-    if ( s == CXX11_ENUM_QUAL(queue_op_status)closed )
+    if ( s == queue_op_status::closed )
         q_ = NULL;
 }
 
@@ -251,12 +248,10 @@ class queue_base
     virtual queue_op_status try_push(const Value& x) = 0;
     virtual queue_op_status nonblocking_push(const Value& x) = 0;
 
-#ifdef HAS_CXX11_RVREF
     virtual void push(Value&& x) = 0;
     virtual queue_op_status wait_push(Value&& x) = 0;
     virtual queue_op_status try_push(Value&& x) = 0;
     virtual queue_op_status nonblocking_push(Value&& x) = 0;
-#endif
 
     virtual Value value_pop() = 0;
     virtual queue_op_status wait_pop(Value&) = 0;
@@ -271,7 +266,7 @@ class queue_back
 : public generic_queue_back< queue_base<Value> >
 {
   public:
-    queue_back() CXX11_DEFAULTED_EASY
+    queue_back() = default;
     queue_back(queue_base<Value>& queue)
         : generic_queue_back< queue_base<Value> >(queue) { }
     queue_back(queue_base<Value>* queue)
@@ -285,7 +280,7 @@ class queue_front
 : public generic_queue_front< queue_base<Value> >
 {
   public:
-    queue_front() CXX11_DEFAULTED_EASY
+    queue_front() = default;
     queue_front(queue_base<Value>& queue)
         : generic_queue_front< queue_base<Value> >(queue) { }
     queue_front(queue_base<Value>* queue)
@@ -338,7 +333,6 @@ class queue_wrapper
     virtual queue_op_status nonblocking_push(const value_type& x)
     { return ptr->nonblocking_push(x); }
 
-#ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
     { ptr->push(std::move(x)); }
 
@@ -350,8 +344,6 @@ class queue_wrapper
 
     virtual queue_op_status nonblocking_push(value_type&& x)
     { return ptr->nonblocking_push(std::move(x)); }
-
-#endif
 
     virtual value_type value_pop()
     { return ptr->value_pop(); }
@@ -410,10 +402,8 @@ class shared_queue_back
         : queue_(queue) { queue->inc_back(); }
     shared_queue_back(const shared_queue_back& other)
         : queue_(other.queue_) { queue_->inc_back(); }
-#ifdef HAS_CXX11_RVREF
     shared_queue_back(shared_queue_back&& other)
         : queue_(other.queue_) { other.queue_ = NULL; }
-#endif
 
   private:
     void release()
@@ -439,7 +429,6 @@ class shared_queue_back
         }
         return *this;
     }
-#ifdef HAS_CXX11_RVREF
     shared_queue_back& operator =(shared_queue_back&& other)
     {
         if ( this != &other ) {
@@ -449,7 +438,6 @@ class shared_queue_back
         }
         return *this;
     }
-#endif
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -468,7 +456,6 @@ class shared_queue_back
         { return queue_->try_push(x); }
     queue_op_status nonblocking_push(const value_type& x)
         { return queue_->nonblocking_push(x); }
-#ifdef HAS_CXX11_RVREF
     void push(value_type&& x)
         { queue_->push( std::move(x) ); }
     queue_op_status wait_push(value_type&& x)
@@ -477,7 +464,6 @@ class shared_queue_back
         { return queue_->try_push( std::move(x) ); }
     queue_op_status nonblocking_push(value_type&& x)
         { return queue_->nonblocking_push( std::move(x) ); }
-#endif
 
   private:
     queue_counted<value_type>* queue_;
@@ -500,10 +486,8 @@ class shared_queue_front
         : queue_(queue) { queue->inc_front(); }
     shared_queue_front(const shared_queue_front& other)
         : queue_(other.queue_) { queue_->inc_front(); }
-#ifdef HAS_CXX11_RVREF
     shared_queue_front(shared_queue_front&& other)
         : queue_(other.queue_) { other.queue_ = NULL; }
-#endif
 
   private:
     void release()
@@ -529,7 +513,7 @@ class shared_queue_front
         }
         return *this;
     }
-#ifdef HAS_CXX11_RVREF
+
     shared_queue_front& operator =(shared_queue_front&& other)
     {
         if ( this != &other ) {
@@ -539,7 +523,6 @@ class shared_queue_front
         }
         return *this;
     }
-#endif
 
     void close() { queue_->close(); }
     bool is_closed() { return queue_->is_closed(); }
@@ -575,7 +558,7 @@ class queue_owner
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    queue_owner(const queue_owner&) CXX11_DELETED
+    queue_owner(const queue_owner&) = delete;
     queue_owner(Queue* arg) : ptr(arg) { }
 
     virtual ~queue_owner() { delete ptr; }
@@ -598,7 +581,6 @@ class queue_owner
     virtual queue_op_status nonblocking_push(const value_type& x)
         { return ptr->nonblocking_push(x); }
 
-#ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
         { ptr->push(std::move(x)); }
     virtual queue_op_status wait_push(value_type&& x)
@@ -607,7 +589,6 @@ class queue_owner
         { return ptr->try_push(std::move(x)); }
     virtual queue_op_status nonblocking_push(value_type&& x)
         { return ptr->nonblocking_push(std::move(x)); }
-#endif
 
     virtual value_type value_pop()
         { return ptr->value_pop(); }
@@ -632,16 +613,9 @@ class queue_object
     typedef value_type& reference;
     typedef const value_type& const_reference;
 
-    queue_object(const queue_object&) CXX11_DELETED
-#ifdef HAS_CXX11_VARIADIC_TMPL
+    queue_object(const queue_object&) = delete;
     template <typename ... Args>
     queue_object(Args ... args) : obj_(args...) { }
-#else
-    template <typename Arg>
-    queue_object(Arg arg) : obj_(arg) { }
-    template <typename Arg1, typename Arg2>
-    queue_object(Arg1 arg1, Arg2 arg2) : obj_(arg1, arg2) { }
-#endif
 
     virtual ~queue_object() { }
 
@@ -665,7 +639,6 @@ class queue_object
     virtual queue_op_status nonblocking_push(const value_type& x)
         { return obj_.nonblocking_push(x); }
 
-#ifdef HAS_CXX11_RVREF
     virtual void push(value_type&& x)
         { obj_.push(std::move(x)); }
     virtual queue_op_status wait_push(value_type&& x)
@@ -674,7 +647,6 @@ class queue_object
         { return obj_.try_push(std::move(x)); }
     virtual queue_op_status nonblocking_push(value_type&& x)
         { return obj_.nonblocking_push(std::move(x)); }
-#endif
 
     virtual value_type value_pop()
         { return obj_.value_pop(); }
@@ -686,45 +658,16 @@ class queue_object
         { return obj_.nonblocking_pop(x); }
 };
 
-
-#ifdef HAS_CXX11_VARIADIC_TMPL
-
 template <typename Queue, typename ... Args>
 std::pair< shared_queue_back<typename Queue::value_type>,
            shared_queue_front<typename Queue::value_type> >
 share_queue_ends(Args ... args)
 {
   typedef typename Queue::value_type elemtype;
-  CXX11_AUTO_VAR( q, new queue_object<Queue>(args...) );
+  auto  q =  new queue_object<Queue>(args...) ;
   return std::make_pair(shared_queue_back<elemtype>(q),
                         shared_queue_front<elemtype>(q));
 }
-
-#else
-
-template <typename Queue, typename Arg>
-std::pair< shared_queue_back<typename Queue::value_type>,
-           shared_queue_front<typename Queue::value_type> >
-share_queue_ends(Arg arg)
-{
-  typedef typename Queue::value_type elemtype;
-  CXX11_AUTO_VAR( q, new queue_object<Queue>(arg) );
-  return std::make_pair(shared_queue_back<elemtype>(q),
-                        shared_queue_front<elemtype>(q));
-}
-
-template <typename Queue, typename Arg1, typename Arg2>
-std::pair< shared_queue_back<typename Queue::value_type>,
-           shared_queue_front<typename Queue::value_type> >
-share_queue_ends(Arg1 arg1, Arg2 arg2)
-{
-  typedef typename Queue::value_type elemtype;
-  CXX11_AUTO_VAR( q, new queue_object<Queue>(arg1, arg2) );
-  return std::make_pair(shared_queue_back<elemtype>(q),
-                        shared_queue_front<elemtype>(q));
-}
-
-#endif
 
 } // namespace gcl
 

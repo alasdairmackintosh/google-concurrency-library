@@ -18,8 +18,6 @@
 #include <unordered_map>
 #include <mutex>
 
-#include "cxx11.h"
-
 extern std::recursive_mutex* get_stream_mutex_map( void *stm_ptr );
 
 template <class Stream >

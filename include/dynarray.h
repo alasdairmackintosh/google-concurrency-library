@@ -1,7 +1,6 @@
 #include <iterator>
 #include <stdexcept>
 #include <limits>
-#include "cxx11.h"
 
 namespace std {
 
@@ -36,8 +35,8 @@ private:
 
 public:
     // construct and destruct:
-    dynarray() CXX11_DELETED
-    const dynarray operator=(const dynarray&) CXX11_DELETED
+    dynarray() = delete;
+    const dynarray operator=(const dynarray&) = delete;
 
     explicit dynarray(size_type c)
         : store( alloc( c ) ), count( c )

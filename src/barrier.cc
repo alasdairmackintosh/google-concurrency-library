@@ -82,10 +82,9 @@ void barrier::arrive_and_drop() {
   }
 }
 
-#ifdef HAS_CXX11_RVREF
 scoped_guard barrier::arrive_and_wait_guard() {
   std::function<void ()> f = std::bind(&barrier::arrive_and_wait, this);
   return scoped_guard(f);
 }
-#endif
+
 }  // End namespace gcl

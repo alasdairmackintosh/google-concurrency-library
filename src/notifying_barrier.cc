@@ -73,10 +73,9 @@ void notifying_barrier::reset(int num_threads) {
   new_thread_count_ = num_threads;
 }
 
-#ifdef HAS_CXX11_RVREF
 scoped_guard notifying_barrier::arrive_and_wait_guard() {
   std::function<void ()> f = std::bind(&notifying_barrier::arrive_and_wait, this);
   return scoped_guard(f);
 }
-#endif
+
 }  // End namespace gcl

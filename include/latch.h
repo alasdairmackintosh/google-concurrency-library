@@ -15,7 +15,6 @@
 #ifndef GCL_LATCH_
 #define GCL_LATCH_
 
-#include "cxx11.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -46,13 +45,11 @@ public:
 
   bool try_wait();
 
-#ifdef HAS_CXX11_RVREF
   // Creates a scoped_guard that will invoke arrive, wait, or
   // arrive_and_wait on this latch when it goes out of scope.
   scoped_guard arrive_guard();
   scoped_guard wait_guard();
   scoped_guard arrive_and_wait_guard();
-#endif
 
 private:
   // The counter for this latch.
@@ -66,8 +63,8 @@ private:
   std::mutex condition_mutex_;
 
  // Disallow copy and assign
-  latch(const latch&) CXX11_DELETED
-  latch& operator=(const latch&) CXX11_DELETED
+  latch(const latch&) = delete;
+  latch& operator=(const latch&) = delete;
 };
 
 }  // End namespace gcl

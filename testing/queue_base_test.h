@@ -30,16 +30,16 @@ inline std::ostream& operator<<(
     queue_op_status status )
 {
     switch ( status ) {
-        case CXX11_ENUM_QUAL(queue_op_status)success:
+        case queue_op_status::success:
             stream << "success";
             break;
-        case CXX11_ENUM_QUAL(queue_op_status)empty:
+        case queue_op_status::empty:
             stream << "empty";
             break;
-        case CXX11_ENUM_QUAL(queue_op_status)full:
+        case queue_op_status::full:
             stream << "full";
             break;
-        case CXX11_ENUM_QUAL(queue_op_status)closed:
+        case queue_op_status::closed:
             stream << "closed";
             break;
         default:
@@ -89,7 +89,7 @@ void seq_try_fill(
 {
     ASSERT_TRUE(f->is_empty());
     for ( int i = 1; i <= count; ++i ) {
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success,
+        ASSERT_EQ(queue_op_status::success,
                   f->try_push(i * multiplier));
         ASSERT_FALSE(f->is_empty());
     }
@@ -103,7 +103,7 @@ void seq_try_fill(
 {
     ASSERT_TRUE(bk.is_empty());
     for ( int i = 1; i <= count; ++i ) {
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success,
+        ASSERT_EQ(queue_op_status::success,
                   bk.try_push(i * multiplier));
         ASSERT_FALSE(bk.is_empty());
     }
@@ -119,7 +119,7 @@ void seq_try_drain(
     for ( int i = 1; i <= count; ++i ) {
         int popped;
         ASSERT_FALSE(b->is_empty());
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, b->try_pop(popped));
+        ASSERT_EQ(queue_op_status::success, b->try_pop(popped));
         ASSERT_EQ(i * multiplier, popped);
     }
     ASSERT_TRUE(b->is_empty());
@@ -134,7 +134,7 @@ void seq_try_drain(
     for ( int i = 1; i <= count; ++i ) {
         int popped;
         ASSERT_FALSE(ft.is_empty());
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, ft.try_pop(popped));
+        ASSERT_EQ(queue_op_status::success, ft.try_pop(popped));
         ASSERT_EQ(i * multiplier, popped);
     }
     ASSERT_TRUE(ft.is_empty());
@@ -145,9 +145,9 @@ template <typename Queue>
 void seq_try_empty( Queue* q )
 {
     int result;
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)empty, q->try_pop(result));
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, q->try_push(1));
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, q->try_pop(result));
+    ASSERT_EQ(queue_op_status::empty, q->try_pop(result));
+    ASSERT_EQ(queue_op_status::success, q->try_push(1));
+    ASSERT_EQ(queue_op_status::success, q->try_pop(result));
     ASSERT_EQ(1, result);
     ASSERT_TRUE(q->is_empty());
 }
@@ -159,9 +159,9 @@ void seq_try_empty(
     queue_front<int> ft )
 {
     int result;
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)empty, ft.try_pop(result));
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, bk.try_push(1));
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, ft.try_pop(result));
+    ASSERT_EQ(queue_op_status::empty, ft.try_pop(result));
+    ASSERT_EQ(queue_op_status::success, bk.try_push(1));
+    ASSERT_EQ(queue_op_status::success, ft.try_pop(result));
     ASSERT_EQ(1, result);
     ASSERT_TRUE(ft.is_empty());
 }
@@ -173,16 +173,16 @@ void seq_try_full(
     Queue* q )
 {
     seq_try_fill(count, 1, q);
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)full, q->try_push(count + 1));
+    ASSERT_EQ(queue_op_status::full, q->try_push(count + 1));
     // This assert might fail if try_pop doesn't return success.
     int val;
-    while (q->try_pop(val) != CXX11_ENUM_QUAL(queue_op_status)success) {}
+    while (q->try_pop(val) != queue_op_status::success) {}
     ASSERT_EQ(1, val);
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, q->try_push(count + 1));
+    ASSERT_EQ(queue_op_status::success, q->try_push(count + 1));
     for ( int i = 2; i <= count + 1; ++i ) {
         int popped;
         ASSERT_FALSE(q->is_empty());
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, q->try_pop(popped));
+        ASSERT_EQ(queue_op_status::success, q->try_pop(popped));
         ASSERT_EQ(i, popped);
     }
     ASSERT_TRUE(q->is_empty());
@@ -195,13 +195,13 @@ void seq_try_full(
     queue_front<int> ft)
 {
     seq_try_fill(count, 1, bk);
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)full, bk.try_push(count + 1));
+    ASSERT_EQ(queue_op_status::full, bk.try_push(count + 1));
     ASSERT_EQ(1, ft.value_pop());
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, bk.try_push(count + 1));
+    ASSERT_EQ(queue_op_status::success, bk.try_push(count + 1));
     for ( int i = 2; i <= count + 1; ++i ) {
         int popped;
         ASSERT_FALSE(ft.is_empty());
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)success, ft.try_pop(popped));
+        ASSERT_EQ(queue_op_status::success, ft.try_pop(popped));
         ASSERT_EQ(i, popped);
     }
     ASSERT_TRUE(ft.is_empty());
@@ -221,7 +221,7 @@ void seq_push_pop_closed(
         bk.push(count);
         FAIL();
     } catch (queue_op_status expected) {
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)closed, expected);
+        ASSERT_EQ(queue_op_status::closed, expected);
     }
     seq_drain(count, 1, ft);
     ASSERT_TRUE(ft.is_closed());
@@ -229,7 +229,7 @@ void seq_push_pop_closed(
         ft.value_pop();
         FAIL();
     } catch (queue_op_status expected) {
-        ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)closed, expected);
+        ASSERT_EQ(queue_op_status::closed, expected);
     }
 }
 
@@ -243,12 +243,12 @@ void seq_try_push_pop_closed(
     seq_try_fill(count, 1, bk);
     bk.close();
     ASSERT_TRUE(bk.is_closed());
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)closed, bk.try_push(42));
+    ASSERT_EQ(queue_op_status::closed, bk.try_push(42));
     seq_try_drain(count, 1, ft);
     ASSERT_TRUE(ft.is_closed());
     int popped;
     queue_op_status result = ft.try_pop(popped);
-    ASSERT_EQ(CXX11_ENUM_QUAL(queue_op_status)closed, result);
+    ASSERT_EQ(queue_op_status::closed, result);
 }
 
 // Test queue iteration, which also tests wait_push and wait_pop.
@@ -408,10 +408,10 @@ void try_fill(
         for ( int i = 1; i <= count; ) {
             queue_op_status status = bk.try_push(i * multiplier);
             switch ( status ) {
-                case CXX11_ENUM_QUAL(queue_op_status)success:
+                case queue_op_status::success:
                     ++i;
                     break;
-                case CXX11_ENUM_QUAL(queue_op_status)full:
+                case queue_op_status::full:
                     break;
                 default:
                     mcout << "unexpected queue_op_status::" << status
@@ -439,11 +439,11 @@ void try_drain(
             int popped;
             queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
-                case CXX11_ENUM_QUAL(queue_op_status)success:
+                case queue_op_status::success:
                     CLEANUP_ASSERT_EQ(i * multiplier, popped, ft.close(); );
                     ++i;
                     break;
-                case CXX11_ENUM_QUAL(queue_op_status)empty:
+                case queue_op_status::empty:
                     break;
                 default:
                     mcout << "unexpected queue_op_status::" << status
@@ -474,7 +474,7 @@ void try_drain_pos_neg(
             int popped;
             queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
-                case CXX11_ENUM_QUAL(queue_op_status)success:
+                case queue_op_status::success:
                     if ( popped < 0 ) {
                         CLEANUP_ASSERT_LT(popped, last_neg, ft.close(); );
                         last_neg = popped;
@@ -485,7 +485,7 @@ void try_drain_pos_neg(
                     }
                     ++i;
                     break;
-                case CXX11_ENUM_QUAL(queue_op_status)empty:
+                case queue_op_status::empty:
                     break;
                 default:
                     mcout << "unexpected queue_op_status::" << status
@@ -514,7 +514,7 @@ void try_drain_any(
             int popped;
             queue_op_status status = ft.try_pop(popped);
             switch ( status ) {
-                case CXX11_ENUM_QUAL(queue_op_status)success:
+                case queue_op_status::success:
                     if ( popped < 0 )
                         CLEANUP_ASSERT_GE(popped, count * -factor,
                                           ft.close(); );
@@ -523,7 +523,7 @@ void try_drain_any(
                                           ft.close(); );
                     ++i;
                     break;
-                case CXX11_ENUM_QUAL(queue_op_status)empty:
+                case queue_op_status::empty:
                     break;
                 default:
                     mcout << "unexpected queue_op_status::" << status

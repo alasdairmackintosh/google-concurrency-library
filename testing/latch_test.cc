@@ -126,7 +126,6 @@ TEST_F(LatchTest, TwoThreadsTwoLatches) {
   t2.join();
 }
 
-#ifdef HAS_CXX11_RVREF
 void ArriveWithGuard(latch& latch) {
   scoped_guard g = latch.arrive_guard();
 }
@@ -162,4 +161,3 @@ TEST_F(LatchTest, ScopedGuardWait) {
   // Both threads should have completed. and one should have counted down.
   ASSERT_TRUE(latch.try_wait());
 }
-#endif

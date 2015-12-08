@@ -58,7 +58,7 @@ lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
 
 ######## Testing
 
-test : cxx11_test.o dynarray_test.pass counter_test.pass lower_test.pass \
+test : dynarray_test.pass counter_test.pass lower_test.pass \
 	higher_test.pass pipeline_test.pass queue_perf_test.exe \
 	lock_free_buffer_queue_test.pass scoped_guard_test.pass
 

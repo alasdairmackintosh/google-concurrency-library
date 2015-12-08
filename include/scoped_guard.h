@@ -1,7 +1,6 @@
 #ifndef GCL_SCOPED_GUARD_
 #define GCL_SCOPED_GUARD_
 
-#include "cxx11.h"
 #include <functional>
 
 namespace gcl {
@@ -14,7 +13,6 @@ class scoped_guard {
   template<typename T>
   explicit scoped_guard(T t) : f_(std::bind(&scoped_guard::call<T>, t)) {};
 
-#ifdef HAS_CXX11_RVREF
   scoped_guard(scoped_guard&& other) : f_(std::move(other.f_)) {
     other.dismiss();
   }
@@ -26,7 +24,6 @@ class scoped_guard {
     }
     return *this;
   }
-#endif
 
   ~scoped_guard() {
     f_();
@@ -41,8 +38,8 @@ class scoped_guard {
   template<typename T>
   static void call(T t) { t(); };
 
-  scoped_guard(const scoped_guard&) CXX11_DELETED;
-  scoped_guard& operator=(const scoped_guard& other) CXX11_DELETED;
+  scoped_guard(const scoped_guard&) = delete;;
+  scoped_guard& operator=(const scoped_guard& other) = delete;;
   std::function<void ()> f_;
 };
 

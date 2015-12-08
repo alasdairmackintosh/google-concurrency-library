@@ -105,8 +105,6 @@ TEST_F(BarrierTest, ArriveAndDrop) {
   }
 }
 
-#ifdef HAS_CXX11_RVREF
-
 void CountDownAndWaitWithGuard(barrier& barrier) {
   scoped_guard g = barrier.arrive_and_wait_guard();
 }
@@ -118,4 +116,3 @@ TEST_F(BarrierTest, ScopedGuardCountDown) {
   t1.join();
   t2.join();
 }
-#endif

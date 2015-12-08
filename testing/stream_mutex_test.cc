@@ -25,7 +25,7 @@
 
 class non_copyable
 {
-    non_copyable(const non_copyable&) CXX11_DELETED
+    non_copyable(const non_copyable&) = delete;
 public:
     non_copyable() { }
 };

@@ -38,11 +38,9 @@ class notifying_barrier {
 
   void arrive_and_wait() throw (std::logic_error);
 
-#ifdef HAS_CXX11_RVREF
   // Creates a scoped_guard that will invoke arrive_and_wait on this
   // notifying_barrier when it goes out of scope.
   scoped_guard arrive_and_wait_guard();
-#endif
 
  private:
   int completion_wrapper(std::function<void()> completion);

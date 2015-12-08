@@ -222,7 +222,6 @@ TEST_F(NotifyingBarrierTest, FunctionInvocationAndReset) {
   }
 }
 
-#ifdef HAS_CXX11_RVREF
 static int WaitAndCountFn(int* num_calls) {
   (*num_calls)++;
   return kNumThreads;
@@ -244,4 +243,3 @@ TEST_F(NotifyingBarrierTest, ScopedGuardCountDown) {
   // have been invoked.
   ASSERT_EQ(1, num_calls);
 }
-#endif

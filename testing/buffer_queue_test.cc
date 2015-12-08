@@ -214,21 +214,18 @@ TEST_F(BufferQueueTest, ParallelMixedPipe) {
 
 // Verify ability to create and copy shared queue ends.
 TEST_F(BufferQueueTest, SharedQueueEndsCopy) {
-  CXX11_AUTO_VAR( x, share_queue_ends< buffer_queue<int> >(kSmall) );
+  auto  x =  share_queue_ends< buffer_queue<int> >(kSmall) ;
   shared_queue_back<int> bk(x.first);
   shared_queue_front<int> ft(x.second);
   bk.push(3);
   ASSERT_EQ(3, ft.value_pop());
 }
 
-#ifdef HAS_CXX11_RVREF
 // Verify ability to create and move shared queue ends.
 TEST_F(BufferQueueTest, SharedQueueEndsMove) {
-  CXX11_AUTO_VAR( x, share_queue_ends< buffer_queue<int> >(kSmall) );
+  auto  x =  share_queue_ends< buffer_queue<int> >(kSmall) ;
   shared_queue_back<int> bk(std::move(x.first));
   shared_queue_front<int> ft(std::move(x.second));
   bk.push(3);
   ASSERT_EQ(3, ft.value_pop());
 }
-#endif
-

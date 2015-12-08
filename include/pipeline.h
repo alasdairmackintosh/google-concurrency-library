@@ -175,7 +175,7 @@ void run_simple_function(queue_front<IN> in_queue,
   while (1) {
     IN in;
     queue_op_status status = in_queue.wait_pop(in);
-    if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
+    if (status != queue_op_status::success) {
       break;  // Queue closed
     }
     out_queue.push(func(in));
@@ -194,7 +194,7 @@ void run_multi_out_function(queue_front<IN> in_queue,
   while (1) {
     IN in;
     queue_op_status status = in_queue.wait_pop(in);
-    if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
+    if (status != queue_op_status::success) {
       break;  // Queue closed
     }
     func(in, out_queue);
@@ -239,7 +239,7 @@ void run_consumer(queue_front<IN> in_queue,
   while (1) {
     IN in;
     queue_op_status status = in_queue.wait_pop(in);
-    if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
+    if (status != queue_op_status::success) {
       break;  // Queue closed
     }
     func(in);
@@ -284,7 +284,7 @@ void run_queue_internal(queue_front<T> ft, queue_back<T> bk) {
   while (1) {
     T t;
     queue_op_status status = ft.wait_pop(t);
-    if (status != CXX11_ENUM_QUAL(queue_op_status)success) {
+    if (status != queue_op_status::success) {
       return;  // Queue closed
     }
     bk.push(t);
