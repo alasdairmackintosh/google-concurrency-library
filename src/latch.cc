@@ -21,8 +21,7 @@
 
 namespace gcl {
 
-latch::latch(int count)
-    : count_(count) {
+latch::latch(std::ptrdiff_t count) : count_(count) {
   waiting_ = 0; // std::atomic_init(&waiting_, 0);
 }
 
@@ -36,7 +35,7 @@ latch::~latch() {
   }
 }
 
-void latch::wait() {
+void latch::wait() const {
   ++waiting_;
   {
     std::unique_lock<std::mutex> lock(condition_mutex_);
@@ -47,18 +46,12 @@ void latch::wait() {
   --waiting_;
 }
 
-bool latch::try_wait() {
-  ++waiting_;
-  bool success;
-  {
-    std::unique_lock<std::mutex> lock(condition_mutex_);
-    success = (count_ == 0);
-  }
-  --waiting_;
-  return success;
+bool latch::is_ready() const noexcept {
+  std::unique_lock<std::mutex> lock(condition_mutex_);
+  return (count_ == 0);
 }
 
-void latch::count_down(int n) {
+void latch::count_down(std::ptrdiff_t n) {
   std::lock_guard<std::mutex> lock(condition_mutex_);
   if (count_ - n < 0) {
     throw std::logic_error("internal count == 0");
@@ -69,11 +62,7 @@ void latch::count_down(int n) {
   }
 }
 
-void latch::arrive() {
-  count_down(1);
-}
-
-void latch::arrive_and_wait() {
+void latch::count_down_and_wait() {
   ++waiting_;
   {
     std::unique_lock<std::mutex> lock(condition_mutex_);
@@ -89,21 +78,6 @@ void latch::arrive_and_wait() {
     }
   }
   --waiting_;
-}
-
-scoped_guard latch::arrive_guard() {
-  std::function<void ()> f = std::bind(&latch::arrive, this);
-  return scoped_guard(f);
-}
-
-scoped_guard latch::wait_guard() {
-  std::function<void ()> f = std::bind(&latch::wait, this);
-  return scoped_guard(f);
-}
-
-scoped_guard latch::arrive_and_wait_guard() {
-  std::function<void ()> f = std::bind(&latch::arrive_and_wait, this);
-  return scoped_guard(f);
 }
 
 }  // End namespace gcl

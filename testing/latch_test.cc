@@ -32,34 +32,34 @@ using testing::_;
 class LatchTest : public testing::Test {
 };
 
-void WaitForLatch(latch& latch) {
+void WaitForLatch(const latch& latch) {
   std::cerr << "WaitForLatch " << this_thread::get_id() << "\n";
   latch.wait();
   std::cerr << "WaitForLatch waited " << this_thread::get_id() << "\n";
 }
 
-void TryWaitForLatch(latch& test_latch, latch& started_latch, atomic_bool* finished) {
+void TryWaitForLatch(const latch& test_latch, latch& started_latch, atomic_bool* finished) {
   started_latch.count_down(1);
-  while (!test_latch.try_wait()) {
+  while (!test_latch.is_ready()) {
     // spin;
   }
   *finished = true;
 }
 
-void WaitForLatchAndDecrement(latch& to_wait,
+void WaitForLatchAndDecrement(const latch& to_wait,
                               latch& decrement) {
   to_wait.wait();
-  decrement.count_down(1);
-  EXPECT_TRUE(to_wait.try_wait());
-  EXPECT_TRUE(to_wait.try_wait());
+  decrement.count_down();
+  EXPECT_TRUE(to_wait.is_ready());
+  EXPECT_TRUE(to_wait.is_ready());
 }
 
 void DecrementAndWaitForLatch(latch& decrement,
-                              latch& to_wait) {
-  decrement.count_down(1);
+                              const latch& to_wait) {
+  decrement.count_down();
   to_wait.wait();
-  EXPECT_TRUE(to_wait.try_wait());
-  EXPECT_TRUE(decrement.try_wait());
+  EXPECT_TRUE(to_wait.is_ready());
+  EXPECT_TRUE(decrement.is_ready());
 }
 
 // Tests two threads waiting on a single latch
@@ -75,7 +75,7 @@ TEST_F(LatchTest, TwoThreads) {
   t2.join();
 }
 
-// Tests two threads try_waiting on a single latch
+// Tests two threads try-waiting on a single latch
 TEST_F(LatchTest, TwoThreadsTryWait) {
   latch test_latch(1);
   latch started_latch(2);
@@ -124,40 +124,4 @@ TEST_F(LatchTest, TwoThreadsTwoLatches) {
       DecrementAndWaitForLatch, std::ref(first), std::ref(second)));
   t1.join();
   t2.join();
-}
-
-void ArriveWithGuard(latch& latch) {
-  scoped_guard g = latch.arrive_guard();
-}
-
-void WaitWithGuard(latch& latch) {
-  scoped_guard g = latch.wait_guard();
-}
-
-void ArriveAndWaitWithGuard(latch& latch) {
-  scoped_guard g = latch.arrive_and_wait_guard();
-}
-
-TEST_F(LatchTest, ScopedGuardArrive) {
-  latch latch(2);
-  thread t1(std::bind(
-      ArriveWithGuard, std::ref(latch)));
-  thread t2(std::bind(
-      ArriveWithGuard, std::ref(latch)));
-  t1.join();
-  t2.join();
-  // Both threads should have counted down
-  ASSERT_TRUE(latch.try_wait());
-}
-
-TEST_F(LatchTest, ScopedGuardWait) {
-  latch latch(1);
-  thread t1(std::bind(
-      ArriveAndWaitWithGuard, std::ref(latch)));
-  thread t2(std::bind(
-      WaitWithGuard, std::ref(latch)));
-  t1.join();
-  t2.join();
-  // Both threads should have completed. and one should have counted down.
-  ASSERT_TRUE(latch.try_wait());
 }
