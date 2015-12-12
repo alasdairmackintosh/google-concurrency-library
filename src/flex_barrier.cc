@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
 #include <thread>
 
-#include "notifying_barrier.h"
+#include "flex_barrier.h"
 
 namespace gcl {
 
-notifying_barrier::~notifying_barrier() {
+flex_barrier::~flex_barrier() {
   while (!all_threads_exited()) {
     // Don't destroy this object if threads have not yet exited
     // arrive_and_wait(). This can occur when a thread calls
@@ -27,55 +28,69 @@ notifying_barrier::~notifying_barrier() {
     //
     // NOTE - on pthread systems, could add a yield call here
   }
+  std::cerr << "destroying with - thread_count_ = " << thread_count_
+            << ", num_waiting_ " << num_waiting_ << "\n";
 }
 
 // These methods could be implemented as C++11 lambdas, but are written as
 // member functions for C++98 compatibility.
-bool notifying_barrier::all_threads_exited() {
+bool flex_barrier::all_threads_exited() {
   return num_to_leave_ == 0;
 }
 
-bool notifying_barrier::all_threads_waiting() {
+bool flex_barrier::all_threads_waiting() {
   return num_waiting_ == thread_count_;
 }
 
-void notifying_barrier::arrive_and_wait()  throw (std::logic_error) {
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    idle_.wait(lock, std::bind(&notifying_barrier::all_threads_exited, this));
-    ++num_waiting_;
-    if (num_waiting_ == thread_count_) {
-      num_to_leave_ = thread_count_;
-      on_countdown();
-      ready_.notify_all();
-    } else {
-      ready_.wait(lock, std::bind(&notifying_barrier::all_threads_waiting, this));
-    }
-    if (num_to_leave_ == 1) {
-      thread_count_ = new_thread_count_;
-      num_waiting_ = 0;
-      idle_.notify_all();
-    }
+void flex_barrier::arrive_and_wait() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  idle_.wait(lock, std::bind(&flex_barrier::all_threads_exited, this));
+   ++num_waiting_;
+  if (num_waiting_ == thread_count_) {
+    num_to_leave_ = thread_count_;
+    on_countdown();
+    ready_.notify_all();
+  } else {
+    ready_.wait(lock, std::bind(&flex_barrier::all_threads_waiting, this));
+  }
+  // The last thread to leave resets the thread_count_ for the next phase.
+  if (num_to_leave_ == 1) {
+    thread_count_ = new_thread_count_;
+    num_waiting_ = 0;
+    idle_.notify_all();
   }
   --num_to_leave_;
 }
 
-void notifying_barrier::on_countdown() {
+void flex_barrier::arrive_and_drop() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  idle_.wait(lock, std::bind(&flex_barrier::all_threads_exited, this));
+  if (thread_count_ == 0) {
+    throw std::invalid_argument("All threads have left");
+  }
+  --thread_count_;
+  if (num_waiting_ == thread_count_) {
+    num_to_leave_ = thread_count_;
+    on_countdown();
+    ready_.notify_all();
+  }
+}
+
+void flex_barrier::on_countdown() {
   reset(completion_fn_());
 }
 
-void notifying_barrier::reset(int num_threads) {
+void flex_barrier::reset(std::ptrdiff_t num_threads) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
   }
   // TODO(alasdair): Consider adding a check that we are either in the
   // completion function, or have not yet called wait()
-  new_thread_count_ = num_threads;
-}
-
-scoped_guard notifying_barrier::arrive_and_wait_guard() {
-  std::function<void ()> f = std::bind(&notifying_barrier::arrive_and_wait, this);
-  return scoped_guard(f);
+  if (num_threads > 0) {
+    new_thread_count_ = num_threads;
+  } else {
+    new_thread_count_ = thread_count_;
+  }
 }
 
 }  // End namespace gcl
