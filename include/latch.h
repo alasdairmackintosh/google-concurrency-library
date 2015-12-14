@@ -29,42 +29,32 @@ namespace gcl {
 // returns.
 class latch {
 public:
-
   // Creates a new latch with the given count.
-  explicit latch(int count);
+  explicit latch(std::ptrdiff_t count);
 
   ~latch();
 
-  void arrive();
+  latch(const latch&) = delete;
+  latch& operator=(const latch&) = delete;
 
-  void arrive_and_wait();
+  void count_down_and_wait();
 
-  void count_down(int n);
+  void count_down(std::ptrdiff_t n = 1);
 
-  void wait();
+  bool is_ready() const noexcept;
 
-  bool try_wait();
-
-  // Creates a scoped_guard that will invoke arrive, wait, or
-  // arrive_and_wait on this latch when it goes out of scope.
-  scoped_guard arrive_guard();
-  scoped_guard wait_guard();
-  scoped_guard arrive_and_wait_guard();
+  void wait() const;
 
 private:
   // The counter for this latch.
-  int count_;
+  std::ptrdiff_t count_;
 
   // Counts the number of threads that are currently waiting
-  std::atomic<int> waiting_;
+  mutable std::atomic<std::ptrdiff_t> waiting_;
 
   // The condition that blocks until the count reaches 0
-  std::condition_variable condition_;
-  std::mutex condition_mutex_;
-
- // Disallow copy and assign
-  latch(const latch&) = delete;
-  latch& operator=(const latch&) = delete;
+  mutable std::condition_variable condition_;
+  mutable std::mutex condition_mutex_;
 };
 
 }  // End namespace gcl
