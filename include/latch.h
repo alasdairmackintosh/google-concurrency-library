@@ -18,7 +18,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include "scoped_guard.h"
 
 namespace gcl {
 
