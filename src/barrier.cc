@@ -18,9 +18,8 @@
 
 namespace gcl {
 
-barrier::barrier(int num_threads) throw (std::invalid_argument)
-    : thread_count_(num_threads),
-      num_waiting_(0) {
+barrier::barrier(std::ptrdiff_t num_threads)
+    : thread_count_(num_threads), num_waiting_(0) {
   if (num_threads < 0) {
     throw std::invalid_argument("num_threads is negative");
   }
@@ -80,11 +79,6 @@ void barrier::arrive_and_drop() {
       ready_.notify_all();
     }
   }
-}
-
-scoped_guard barrier::arrive_and_wait_guard() {
-  std::function<void ()> f = std::bind(&barrier::arrive_and_wait, this);
-  return scoped_guard(f);
 }
 
 }  // End namespace gcl

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GCL_NOTIFYING_BARRIER_
-#define GCL_NOTIFYING_BARRIER_
+#ifndef GCL_FLEX_BARRIER_
+#define GCL_FLEX_BARRIER_
 
 #include <stddef.h>
 #include <stdexcept>
@@ -29,41 +29,43 @@ namespace gcl {
 
 // Allows a set of threads to wait until all threads have reached a
 // common point.
-class notifying_barrier {
+class flex_barrier {
  public:
   template <typename F>
-  notifying_barrier(int num_threads, F completion) throw (std::invalid_argument);
+  flex_barrier(std::ptrdiff_t num_threads, F completion) throw (std::invalid_argument);
 
-  ~notifying_barrier();
+  explicit flex_barrier(ptrdiff_t num_threads);
 
-  void arrive_and_wait() throw (std::logic_error);
+  ~flex_barrier();
 
-  // Creates a scoped_guard that will invoke arrive_and_wait on this
-  // notifying_barrier when it goes out of scope.
-  scoped_guard arrive_and_wait_guard();
+  flex_barrier(const flex_barrier&) = delete;
+  flex_barrier& operator=(const flex_barrier&) = delete;
+
+  void arrive_and_wait();
+  void arrive_and_drop();
 
  private:
-  int completion_wrapper(std::function<void()> completion);
-  void reset(int num_threads);
+  std::ptrdiff_t completion_wrapper(std::function<void()> completion);
+  void reset(std::ptrdiff_t num_threads);
   bool all_threads_exited();
   bool all_threads_waiting();
   void on_countdown();
 
-  int thread_count_;
-  int new_thread_count_;
+  std::ptrdiff_t thread_count_;
+  std::ptrdiff_t new_thread_count_;
 
   std::mutex mutex_;
   std::condition_variable idle_;
   std::condition_variable ready_;
-  int num_waiting_;
-  std::atomic<int> num_to_leave_;
+  std::ptrdiff_t num_waiting_;
+  std::atomic<std::ptrdiff_t> num_to_leave_;
 
-  std::function<int()> completion_fn_;
+  std::function<std::ptrdiff_t()> completion_fn_;
 };
 
 template <typename F>
-notifying_barrier::notifying_barrier(int num_threads,
-                                     F completion) throw(std::invalid_argument)
+flex_barrier::flex_barrier(std::ptrdiff_t num_threads,
+                           F completion) throw(std::invalid_argument)
     : thread_count_(num_threads), num_waiting_(0), completion_fn_(completion) {
   if (num_threads == 0) {
     throw std::invalid_argument("num_threads is 0");
@@ -72,4 +74,4 @@ notifying_barrier::notifying_barrier(int num_threads,
 }
 
 }
-#endif // GCL_NOTIFYING_BARRIER_
+#endif // GCL_FLEX_BARRIER_

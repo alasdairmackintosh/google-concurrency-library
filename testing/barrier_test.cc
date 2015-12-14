@@ -19,7 +19,6 @@
 
 #include <atomic>
 #include <thread>
-#include "scoped_guard.h"
 
 #include "gmock/gmock.h"
 
@@ -28,7 +27,6 @@
 using testing::_;
 
 using gcl::barrier;
-using gcl::scoped_guard;
 
 // TODO(alasdair): Update kNumCycles when the potential deadlock in
 // arrive_and_drop has been fixed.
@@ -103,16 +101,4 @@ TEST_F(BarrierTest, ArriveAndDrop) {
   for (int i = 0; i < kNumThreads; i++) {
     delete threads[i];
   }
-}
-
-void CountDownAndWaitWithGuard(barrier& barrier) {
-  scoped_guard g = barrier.arrive_and_wait_guard();
-}
-
-TEST_F(BarrierTest, ScopedGuardCountDown) {
-  barrier b(2);
-  std::thread t1(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
-  std::thread t2(std::bind(CountDownAndWaitWithGuard, std::ref(b)));
-  t1.join();
-  t2.join();
 }

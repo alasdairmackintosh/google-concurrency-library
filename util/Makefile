@@ -54,7 +54,7 @@ LFlags = -pthread $(CXXFLAGS)
 build : lower.a
 
 lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
-	mutable_thread.o simple_thread_pool.o debug.o notifying_barrier.o
+	mutable_thread.o simple_thread_pool.o debug.o flex_barrier.o
 
 ######## Testing
 
@@ -84,7 +84,7 @@ $(GMOCK_OBJ) : CxxFlags += $(GTEST_INC) $(GTEST_SRC) $(GMOCK_INC) $(GMOCK_SRC)
 
 #### Test for the Google Concurrency Library Proper
 
-LOWER_TESTS := barrier_test.o notifying_barrier_test.o serial_executor_test.o \
+LOWER_TESTS := barrier_test.o flex_barrier_test.o serial_executor_test.o \
 	simple_thread_pool_test.o latch_test.o mutable_thread_test.o
 $(LOWER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) lower.a

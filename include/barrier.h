@@ -21,8 +21,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include "scoped_guard.h"
-
 #include <functional>
 
 namespace gcl {
@@ -31,17 +29,16 @@ namespace gcl {
 // common point.
 class barrier {
  public:
-
-  explicit barrier(int num_threads) throw (std::invalid_argument);
+  explicit barrier(std::ptrdiff_t num_threads);
 
   ~barrier();
 
-  void arrive_and_wait();
-  void arrive_and_drop();
+  barrier(const barrier&) = delete;
+  barrier& operator=(const barrier&) = delete;
 
-  // Creates a scoped_guard that will invoke arrive_and_wait on this
-  // barrier when it goes out of scope.
-  scoped_guard arrive_and_wait_guard();
+  void arrive_and_wait();
+
+  void arrive_and_drop();
 
  private:
   void check_all_threads_exited();
@@ -52,11 +49,9 @@ class barrier {
   std::mutex mutex_;
   std::condition_variable idle_;
   std::condition_variable ready_;
-  int thread_count_;
-  int num_waiting_;
-  std::atomic<int> num_to_leave_;
-
-  std::function<int()> completion_fn_;
+  std::ptrdiff_t thread_count_;
+  std::ptrdiff_t num_waiting_;
+  std::atomic<std::ptrdiff_t> num_to_leave_;
 };
 }
 #endif // GCL_BARRIER_
