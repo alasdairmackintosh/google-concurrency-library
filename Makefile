@@ -30,6 +30,9 @@ debug : test_dbg11
 
 test : test_dbg11 test_opt11
 
+install : test_opt11
+	cd opt11 ; make $(FLAGS_MAKE) install
+
 ######## Build Directories
 
 dbg11 :

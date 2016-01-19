@@ -51,9 +51,9 @@ LFlags = -pthread $(CXXFLAGS)
 
 ######### Library Build
 
-build : lower.a
+build : libgoocon.a
 
-lower.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
+libgoocon.a : stream_mutex.o countdown_latch.o latch.o serial_executor.o barrier.o \
 	mutable_thread.o simple_thread_pool.o debug.o flex_barrier.o
 
 ######## Testing
@@ -87,35 +87,35 @@ $(GMOCK_OBJ) : CxxFlags += $(GTEST_INC) $(GTEST_SRC) $(GMOCK_INC) $(GMOCK_SRC)
 LOWER_TESTS := barrier_test.o flex_barrier_test.o serial_executor_test.o \
 	simple_thread_pool_test.o latch_test.o mutable_thread_test.o
 $(LOWER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
-lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) lower.a
+lower_test.exe : $(LOWER_TESTS) $(GMOCK_OBJ) libgoocon.a
 lower_test.pass : lower_test.exe
 
 HIGHER_TESTS := source_test.o iterator_queue_test.o \
 	stream_mutex_test.o buffer_queue_test.o
 $(HIGHER_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
-higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) lower.a
+higher_test.exe : $(HIGHER_TESTS) $(GMOCK_OBJ) libgoocon.a
 higher_test.pass : higher_test.exe
 
 LOCK_FREE_BUFFER_QUEUE_TESTS := lock_free_buffer_queue_test.o
 $(LOCK_FREE_BUFFER_QUEUE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 lock_free_buffer_queue_test.exe : $(LOCK_FREE_BUFFER_QUEUE_TESTS) $(GMOCK_OBJ) \
-    lower.a
+    libgoocon.a
 lock_free_buffer_queue_test.pass : lock_free_buffer_queue_test.exe
 
 MAP_REDUCE_TESTS := map_reduce_test.o
 $(MAP_REDUCE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
-map_reduce_test.exe : $(MAP_REDUCE_TESTS) $(GMOCK_OBJ) lower.a
+map_reduce_test.exe : $(MAP_REDUCE_TESTS) $(GMOCK_OBJ) libgoocon.a
 map_reduce_test.run : map_reduce_test.exe
 	./map_reduce_test.exe
 
 PIPELINE_TESTS := pipeline_test.o
 $(PIPELINE_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
-pipeline_test.exe : $(PIPELINE_TESTS) $(GMOCK_OBJ) lower.a
+pipeline_test.exe : $(PIPELINE_TESTS) $(GMOCK_OBJ) libgoocon.a
 pipeline_test.pass : pipeline_test.exe
 
 QUEUE_PERF_TESTS := queue_perf_test.o
 $(QUEUE_PERF_TESTS) : CxxFlags += $(GTEST_INC)
-queue_perf_test.exe : $(QUEUE_PERF_TESTS) lower.a
+queue_perf_test.exe : $(QUEUE_PERF_TESTS) libgoocon.a
 queue_perf_test.run : queue_perf_test.exe
 	./queue_perf_test.exe
 
@@ -123,3 +123,27 @@ SCOPED_GUARD_TESTS := scoped_guard_test.o
 $(SCOPED_GUARD_TESTS) : CxxFlags += $(GTEST_INC) $(GMOCK_INC)
 scoped_guard_test.exe : $(SCOPED_GUARD_TESTS) $(GMOCK_OBJ)
 scoped_guard_test.pass : scoped_guard_test.exe
+
+######## Installing
+
+INSTALL_PREFIX = /usr/local
+
+$(INSTALL_PREFIX) :
+	install -d $(INSTALL_PREFIX)
+
+$(INSTALL_PREFIX)/lib : $(INSTALL_PREFIX)
+	install -d $(INSTALL_PREFIX)/lib
+
+install_library : libgoocon.a $(INSTALL_PREFIX)/lib
+	install -p -m 0444 libgoocon.a $(INSTALL_PREFIX)/lib
+
+$(INSTALL_PREFIX)/include : $(INSTALL_PREFIX)
+	install -d $(INSTALL_PREFIX)/include
+
+$(INSTALL_PREFIX)/include/goocon : $(INSTALL_PREFIX)
+	install -d $(INSTALL_PREFIX)/include/goocon
+
+install_headers : $(INSTALL_PREFIX)/include/goocon
+	install -p -m 0444 ../include/* $(INSTALL_PREFIX)/include/goocon
+
+install : install_library install_headers
